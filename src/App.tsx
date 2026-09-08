@@ -138,7 +138,7 @@ function AppContent() {
 
   const checkAuth = async () => {
     try {
-      const res = await fetch('/auth/status');
+      const res = await customFetch('/auth/status');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setServerAuth(data);

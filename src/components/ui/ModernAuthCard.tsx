@@ -105,10 +105,10 @@ export function ModernAuthCard({
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleLogin = async (forceRedirect = false) => {
     setError(null);
     setIsLoading(true);
-    const res = await loginWithGoogle();
+    const res = await loginWithGoogle(forceRedirect);
     setIsLoading(false);
     if (res.success) {
       handleClose();
@@ -177,7 +177,7 @@ export function ModernAuthCard({
   };
 
   return (
-    <div className="relative w-full max-w-[820px] mx-auto bg-white rounded-2xl sm:rounded-3xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.35)] overflow-hidden border border-slate-100 flex flex-col md:flex-row min-h-0 md:min-h-[550px] max-h-[calc(100dvh-1.5rem)] sm:max-h-[92dvh] md:max-h-none">
+    <div className="relative w-full max-w-[820px] mx-auto bg-white rounded-2xl sm:rounded-3xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.35)] overflow-hidden border border-slate-100 flex flex-col md:flex-row min-h-0 md:min-h-[520px] max-h-[calc(100dvh-1.5rem)] sm:max-h-[92dvh]">
       
       {/* Close button if in modal mode */}
       {mode === 'modal' && (
@@ -241,8 +241,17 @@ export function ModernAuthCard({
         {/* Mobile Form Body - Smoothly scrollable with no clipping */}
         <div className="p-4 sm:p-6 overflow-y-auto flex-1 overscroll-contain">
           {error && (
-            <div className="mb-3 p-2.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-medium">
-              {error}
+            <div className="mb-3 p-2.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-medium space-y-1">
+              <p>{error}</p>
+              {(error.includes('closed') || error.includes('Popup') || error.includes('blocked') || error.includes('Redirect') || error.includes('popup')) && (
+                <button
+                  type="button"
+                  onClick={() => handleGoogleLogin(true)}
+                  className="block text-[11px] font-bold text-emerald-800 underline hover:text-emerald-950 cursor-pointer pt-0.5"
+                >
+                  Sign in via Direct Redirect →
+                </button>
+              )}
             </div>
           )}
 
@@ -503,7 +512,7 @@ export function ModernAuthCard({
 
       {/* ========================================================================= */}
       {/* DESKTOP VIEW: Two Columns with Smooth Spring Swap Transition */}
-      <div className="hidden md:flex w-full min-h-[550px] relative overflow-hidden">
+      <div className="hidden md:flex w-full min-h-[520px] max-h-[calc(100dvh-2rem)] md:max-h-[660px] relative overflow-hidden">
         
         {/* Sliding Forest-Green Brand Panel */}
         {/* When isSignIn = true: Panel is on the RIGHT (left: 55%, width: 45%) */}
@@ -513,7 +522,7 @@ export function ModernAuthCard({
             x: isSignIn ? '122.22%' : '0%'
           }}
           transition={springConfig}
-          className="absolute top-0 left-0 w-[45%] h-full bg-[#1C362A] text-white p-10 z-20 flex flex-col justify-between overflow-hidden shadow-2xl"
+          className="absolute top-0 left-0 w-[45%] h-full bg-[#1C362A] text-white p-6 lg:p-8 z-20 flex flex-col justify-between overflow-hidden shadow-2xl"
         >
           {/* Subtle decorative glow */}
           <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -531,7 +540,7 @@ export function ModernAuthCard({
           </div>
 
           {/* Centered Dynamic Messaging */}
-          <div className="relative z-10 my-auto py-6">
+          <div className="relative z-10 my-auto py-4">
             <AnimatePresence mode="wait">
               {isSignIn ? (
                 <motion.div
@@ -540,12 +549,12 @@ export function ModernAuthCard({
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -15 }}
                   transition={{ duration: 0.25 }}
-                  className="space-y-4"
+                  className="space-y-3"
                 >
-                  <h2 className="text-3xl font-extrabold tracking-tight leading-tight text-white">
+                  <h2 className="text-2xl lg:text-3xl font-extrabold tracking-tight leading-tight text-white">
                     Welcome<br />back.
                   </h2>
-                  <p className="text-sm text-emerald-100/80 leading-relaxed max-w-[260px]">
+                  <p className="text-xs lg:text-sm text-emerald-100/80 leading-relaxed max-w-[260px]">
                     Your boards, your drafts and your corporate filings are exactly where you left them.
                   </p>
                 </motion.div>
@@ -556,12 +565,12 @@ export function ModernAuthCard({
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -15 }}
                   transition={{ duration: 0.25 }}
-                  className="space-y-4"
+                  className="space-y-3"
                 >
-                  <h2 className="text-3xl font-extrabold tracking-tight leading-tight text-white">
+                  <h2 className="text-2xl lg:text-3xl font-extrabold tracking-tight leading-tight text-white">
                     Start the<br />first page.
                   </h2>
-                  <p className="text-sm text-emerald-100/80 leading-relaxed max-w-[260px]">
+                  <p className="text-xs lg:text-sm text-emerald-100/80 leading-relaxed max-w-[260px]">
                     One account for every board, every draft and every device you own.
                   </p>
                 </motion.div>
@@ -570,7 +579,7 @@ export function ModernAuthCard({
           </div>
 
           {/* Bottom Trust Badge */}
-          <div className="relative z-10 pt-4 border-t border-emerald-800/60 flex items-center gap-2 text-xs text-emerald-200/70">
+          <div className="relative z-10 pt-3 border-t border-emerald-800/60 flex items-center gap-2 text-xs text-emerald-200/70">
             <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
             <span>Encrypted BSE WebSocket & Cloud Synced</span>
           </div>
@@ -584,7 +593,7 @@ export function ModernAuthCard({
             x: isSignIn ? '0%' : '81.81%'
           }}
           transition={springConfig}
-          className="w-[55%] h-full p-10 flex flex-col justify-center z-10"
+          className="w-[55%] h-full p-6 lg:p-8 flex flex-col justify-center z-10 overflow-y-auto max-h-[calc(100dvh-2rem)] md:max-h-[660px]"
         >
           <div className="max-w-[340px] mx-auto w-full">
             <AnimatePresence mode="wait">
@@ -596,7 +605,7 @@ export function ModernAuthCard({
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20 }}
                   transition={{ duration: 0.25 }}
-                  className="space-y-5"
+                  className="space-y-4"
                 >
                   <div>
                     <h3 className="text-2xl font-bold tracking-tight text-slate-900">Sign in</h3>
@@ -604,12 +613,21 @@ export function ModernAuthCard({
                   </div>
 
                   {error && (
-                    <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-medium">
-                      {error}
+                    <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-medium space-y-1">
+                      <p>{error}</p>
+                      {(error.includes('closed') || error.includes('Popup') || error.includes('blocked') || error.includes('Redirect') || error.includes('popup')) && (
+                        <button
+                          type="button"
+                          onClick={() => handleGoogleLogin(true)}
+                          className="block text-[11px] font-bold text-emerald-800 underline hover:text-emerald-950 cursor-pointer pt-0.5"
+                        >
+                          Sign in via Direct Redirect →
+                        </button>
+                      )}
                     </div>
                   )}
 
-                  <form onSubmit={handleEmailLogin} className="space-y-4">
+                  <form onSubmit={handleEmailLogin} className="space-y-3.5">
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
                         Username or email
@@ -747,8 +765,17 @@ export function ModernAuthCard({
                   </div>
 
                   {error && (
-                    <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-medium">
-                      {error}
+                    <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-medium space-y-1">
+                      <p>{error}</p>
+                      {(error.includes('closed') || error.includes('Popup') || error.includes('blocked') || error.includes('Redirect') || error.includes('popup')) && (
+                        <button
+                          type="button"
+                          onClick={() => handleGoogleLogin(true)}
+                          className="block text-[11px] font-bold text-emerald-800 underline hover:text-emerald-950 cursor-pointer pt-0.5"
+                        >
+                          Sign in via Direct Redirect →
+                        </button>
+                      )}
                     </div>
                   )}
 

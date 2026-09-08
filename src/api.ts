@@ -2,6 +2,8 @@ import { auth } from './firebase';
 
 export async function customFetch(url: string, options: RequestInit = {}) {
   try {
+    const apiBase = (((import.meta as any).env?.VITE_API_BASE_URL as string) || '').replace(/\/$/, '');
+    const resolvedUrl = (apiBase && url.startsWith('/')) ? `${apiBase}${url}` : url;
     const headers = new Headers(options.headers || {});
     
     // Automatically attach verified Firebase ID token if present
@@ -29,7 +31,7 @@ export async function customFetch(url: string, options: RequestInit = {}) {
       }
     } catch {}
 
-    let res = await fetch(url, {
+    let res = await fetch(resolvedUrl, {
       credentials: 'include',
       ...options,
       headers
@@ -43,7 +45,7 @@ export async function customFetch(url: string, options: RequestInit = {}) {
           if (freshToken && freshToken.split('.').length === 3) {
             localStorage.setItem('bse_nexus_fb_id_token', freshToken);
             headers.set('Authorization', `Bearer ${freshToken}`);
-            res = await fetch(url, {
+            res = await fetch(resolvedUrl, {
               credentials: 'include',
               ...options,
               headers

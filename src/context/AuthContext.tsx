@@ -62,7 +62,7 @@ interface AuthContextType {
   isPro: boolean;
   proDaysLeft: number;
   adminUnlocked: boolean;
-  loginWithGoogle: () => Promise<{ success: boolean; error?: string; isIframeBlocked?: boolean }>;
+  loginWithGoogle: (forceRedirect?: boolean) => Promise<{ success: boolean; error?: string; isIframeBlocked?: boolean }>;
   loginWithEmail: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
   signupWithEmail: (email: string, pass: string, name: string, username?: string) => Promise<{ success: boolean; error?: string; needsEmailVerification?: boolean }>;
   quickDemoLogin: (role?: 'user' | 'admin') => Promise<{ success: boolean; error?: string }>;
@@ -359,6 +359,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .then(async (res) => {
           if (res && res.user) {
             await syncUserProfile(res.user);
+            setIsAuthModalOpen(false);
+            if (res.user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+              setIsAdminPinModalOpen(true);
+            }
           }
         })
         .catch((e) => console.warn('Redirect auth result info:', e?.message || e));
@@ -474,11 +478,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // Google Sign-In with smart environment awareness
-  const loginWithGoogle = async () => {
+  // Google Sign-In with smart environment awareness and seamless popup-to-redirect fallback
+  const loginWithGoogle = async (forceRedirect = false) => {
     try {
       const isInsideIframe = typeof window !== 'undefined' && window.self !== window.top;
       
+      // If forceRedirect is requested (e.g. if desktop popup is blocked) and NOT in iframe:
+      if (forceRedirect && !isInsideIframe) {
+        await signInWithRedirect(auth, googleProvider);
+        return { success: true };
+      }
+
       if (isInsideIframe) {
         const result = await signInWithPopup(auth, googleProvider);
         if (result && result.user) {
@@ -492,35 +502,71 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, error: 'Google sign-in was cancelled.' };
       }
 
+      // Normal browser tab outside iframe (Desktop & Mobile)
       try {
         const result = await signInWithPopup(auth, googleProvider);
         if (result && result.user) {
           await syncUserProfile(result.user);
           setIsAuthModalOpen(false);
+          if (result.user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+            setIsAdminPinModalOpen(true);
+          }
           return { success: true };
         }
       } catch (popupErr: any) {
-        if (popupErr?.code === 'auth/popup-blocked') {
-          await signInWithRedirect(auth, googleProvider);
-          return { success: true };
+        console.warn('Google popup notice:', popupErr?.code || popupErr?.message);
+        
+        // Never attempt redirect loop if the domain is explicitly unauthorized in Firebase Console
+        if (popupErr?.code === 'auth/unauthorized-domain') {
+          throw popupErr;
+        }
+
+        // On desktop browsers (Chrome, Edge, Brave, Safari) where 3rd-party cookies or popups are restricted:
+        // Automatically switch to signInWithRedirect so the user can complete login without getting stuck!
+        if (
+          popupErr?.code === 'auth/popup-blocked' ||
+          popupErr?.code === 'auth/popup-closed-by-user' ||
+          popupErr?.code === 'auth/cancelled-popup-request' ||
+          popupErr?.code === 'auth/internal-error' ||
+          popupErr?.code === 'auth/network-request-failed'
+        ) {
+          try {
+            console.log('Switching to signInWithRedirect for reliable desktop sign-in...');
+            await signInWithRedirect(auth, googleProvider);
+            return { success: true };
+          } catch (redirErr: any) {
+            console.warn('Redirect sign-in fallback notice:', redirErr?.code || redirErr?.message);
+            throw redirErr;
+          }
         }
         throw popupErr;
       }
       return { success: false, error: 'Google sign-in was cancelled.' };
     } catch (error: any) {
       console.warn('Google Sign In Error:', error?.code || error?.message);
+      const currentHost = typeof window !== 'undefined' ? window.location.hostname : 'current domain';
+
+      if (error?.code === 'auth/unauthorized-domain') {
+        return { 
+          success: false, 
+          error: `Domain "${currentHost}" is not added to Firebase Authorized Domains. In Firebase Console > Authentication > Settings > Authorized Domains, please add "${currentHost}".` 
+        };
+      }
       if (error?.code === 'auth/popup-closed-by-user' || error?.code === 'auth/cancelled-popup-request') {
-        return { success: false, error: 'Sign-in popup was closed before completion. Please try again.' };
+        return { 
+          success: false, 
+          error: 'Sign-in window was closed. Click "Sign in via Direct Redirect" below to bypass popup blockers.' 
+        };
       }
       if (error?.code === 'auth/popup-blocked') {
-        return { success: false, error: 'Popup was blocked by your browser. Please allow popups for this site or open in a new window.' };
-      }
-      if (error?.code === 'auth/unauthorized-domain') {
-        return { success: false, error: 'This domain is not authorized in Firebase. Please add this domain to Authorized Domains in Firebase Console.' };
+        return { 
+          success: false, 
+          error: 'Popup was blocked by your browser. Please allow popups or use redirect login below.' 
+        };
       }
       return { 
         success: false, 
-        isIframeBlocked: false,
+        isIframeBlocked: false, 
         error: error?.message || 'Google sign-in encountered an error. Please try again.' 
       };
     }
@@ -569,10 +615,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const loginWithEmail = async (email: string, pass: string) => {
-    const trimmedEmail = email.trim().toLowerCase();
+    let trimmedEmail = email.trim().toLowerCase();
     
     if (!trimmedEmail || !pass) {
       return { success: false, error: 'Please provide both email and password.' };
+    }
+
+    // Auto-resolve handle/username if user typed username without domain
+    if (!trimmedEmail.includes('@')) {
+      if (trimmedEmail === 'admin' || trimmedEmail === 'dahiyarahul023' || trimmedEmail === 'rahul') {
+        trimmedEmail = ADMIN_EMAIL.toLowerCase();
+      } else {
+        trimmedEmail = `${trimmedEmail.replace(/^@/, '')}@gmail.com`;
+      }
     }
 
     try {
@@ -591,7 +646,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       let errorMsg = 'Invalid email or password.';
       if (fbErr?.code === 'auth/user-not-found') errorMsg = 'No account found with this email. Please Sign Up first.';
       else if (fbErr?.code === 'auth/wrong-password' || fbErr?.code === 'auth/invalid-credential') errorMsg = 'Incorrect password. Please try again.';
-      else if (fbErr?.code === 'auth/invalid-email') errorMsg = 'Please enter a valid email address.';
+      else if (fbErr?.code === 'auth/invalid-email') errorMsg = 'Please enter a valid email address (e.g. name@domain.com).';
       else if (fbErr?.code === 'auth/too-many-requests') errorMsg = 'Too many failed attempts. Please try again in a few minutes.';
       else if (fbErr?.message) errorMsg = fbErr.message;
       return { success: false, error: errorMsg };
