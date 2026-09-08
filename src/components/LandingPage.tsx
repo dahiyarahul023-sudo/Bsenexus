@@ -395,7 +395,7 @@ export function LandingPage({
               ) : (
                 <motion.button
                   whileTap={{ scale: 0.96 }}
-                  onClick={() => setIsAuthModalOpen(true)}
+                  onClick={() => onEnterTerminal('dashboard')}
                   aria-label="Sign in to your account"
                   className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-[#222030] hover:bg-slate-200 dark:hover:bg-[#2C293D] text-slate-700 dark:text-slate-200 text-xs font-bold transition-all border border-slate-200 dark:border-[#332E45] cursor-pointer shrink-0 min-h-[38px] whitespace-nowrap select-none"
                 >

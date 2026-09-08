@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { IntelModalProvider } from './context/IntelModalContext';
 import { ToastProvider } from './context/ToastContext';
@@ -119,6 +119,15 @@ function AppContent() {
     document.body.style.overflow = '';
     document.documentElement.style.overflow = '';
   }, [activeTab]);
+
+  // When user successfully signs in, immediately navigate inside to the live terminal dashboard
+  const prevUserRef = useRef<any>(null);
+  useEffect(() => {
+    if (user && !prevUserRef.current) {
+      setActiveTab(prev => (prev === 'home' ? 'dashboard' : prev));
+    }
+    prevUserRef.current = user;
+  }, [user]);
 
   useEffect(() => {
     if (theme === 'dark') document.documentElement.classList.add('dark');

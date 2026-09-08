@@ -478,68 +478,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // Google Sign-In with smart environment awareness and seamless popup-to-redirect fallback
-  const loginWithGoogle = async (forceRedirect = false) => {
+  // Google Sign-In with standard rock-solid popup authentication across Desktop & Mobile
+  const loginWithGoogle = async () => {
     try {
-      const isInsideIframe = typeof window !== 'undefined' && window.self !== window.top;
-      
-      // If forceRedirect is requested (e.g. if desktop popup is blocked) and NOT in iframe:
-      if (forceRedirect && !isInsideIframe) {
-        await signInWithRedirect(auth, googleProvider);
+      const result = await signInWithPopup(auth, googleProvider);
+      if (result && result.user) {
+        await syncUserProfile(result.user);
+        setIsAuthModalOpen(false);
+        if (result.user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+          setAdminUnlocked(true);
+        }
         return { success: true };
-      }
-
-      if (isInsideIframe) {
-        const result = await signInWithPopup(auth, googleProvider);
-        if (result && result.user) {
-          await syncUserProfile(result.user);
-          setIsAuthModalOpen(false);
-          if (result.user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
-            setIsAdminPinModalOpen(true);
-          }
-          return { success: true };
-        }
-        return { success: false, error: 'Google sign-in was cancelled.' };
-      }
-
-      // Normal browser tab outside iframe (Desktop & Mobile)
-      try {
-        const result = await signInWithPopup(auth, googleProvider);
-        if (result && result.user) {
-          await syncUserProfile(result.user);
-          setIsAuthModalOpen(false);
-          if (result.user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
-            setIsAdminPinModalOpen(true);
-          }
-          return { success: true };
-        }
-      } catch (popupErr: any) {
-        console.warn('Google popup notice:', popupErr?.code || popupErr?.message);
-        
-        // Never attempt redirect loop if the domain is explicitly unauthorized in Firebase Console
-        if (popupErr?.code === 'auth/unauthorized-domain') {
-          throw popupErr;
-        }
-
-        // On desktop browsers (Chrome, Edge, Brave, Safari) where 3rd-party cookies or popups are restricted:
-        // Automatically switch to signInWithRedirect so the user can complete login without getting stuck!
-        if (
-          popupErr?.code === 'auth/popup-blocked' ||
-          popupErr?.code === 'auth/popup-closed-by-user' ||
-          popupErr?.code === 'auth/cancelled-popup-request' ||
-          popupErr?.code === 'auth/internal-error' ||
-          popupErr?.code === 'auth/network-request-failed'
-        ) {
-          try {
-            console.log('Switching to signInWithRedirect for reliable desktop sign-in...');
-            await signInWithRedirect(auth, googleProvider);
-            return { success: true };
-          } catch (redirErr: any) {
-            console.warn('Redirect sign-in fallback notice:', redirErr?.code || redirErr?.message);
-            throw redirErr;
-          }
-        }
-        throw popupErr;
       }
       return { success: false, error: 'Google sign-in was cancelled.' };
     } catch (error: any) {
@@ -555,18 +504,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error?.code === 'auth/popup-closed-by-user' || error?.code === 'auth/cancelled-popup-request') {
         return { 
           success: false, 
-          error: 'Sign-in window was closed. Click "Sign in via Direct Redirect" below to bypass popup blockers.' 
+          error: 'Google sign-in window was closed. Please click "Sign in with Google" to try again.' 
         };
       }
       if (error?.code === 'auth/popup-blocked') {
         return { 
           success: false, 
-          error: 'Popup was blocked by your browser. Please allow popups or use redirect login below.' 
+          error: 'Popup was blocked by your browser. Please allow popups for this site (click the popup icon in your browser address bar) and try again.' 
         };
       }
       return { 
         success: false, 
-        isIframeBlocked: false, 
         error: error?.message || 'Google sign-in encountered an error. Please try again.' 
       };
     }
@@ -1031,7 +979,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user && user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()
   );
 
-  const isAdmin = Boolean(adminUnlocked && (isOwner || profile?.tier === 'admin' || user?.isAdmin));
+  const isAdmin = Boolean((adminUnlocked || isOwner) && (isOwner || profile?.tier === 'admin' || user?.isAdmin));
 
   const now = Date.now();
   const proDaysLeft = profile?.proExpiresAt 

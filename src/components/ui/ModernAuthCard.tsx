@@ -105,10 +105,10 @@ export function ModernAuthCard({
     }
   };
 
-  const handleGoogleLogin = async (forceRedirect = false) => {
+  const handleGoogleLogin = async () => {
     setError(null);
     setIsLoading(true);
-    const res = await loginWithGoogle(forceRedirect);
+    const res = await loginWithGoogle();
     setIsLoading(false);
     if (res.success) {
       handleClose();
@@ -241,17 +241,8 @@ export function ModernAuthCard({
         {/* Mobile Form Body - Smoothly scrollable with no clipping */}
         <div className="p-4 sm:p-6 overflow-y-auto flex-1 overscroll-contain">
           {error && (
-            <div className="mb-3 p-2.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-medium space-y-1">
+            <div className="mb-3 p-2.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-medium">
               <p>{error}</p>
-              {(error.includes('closed') || error.includes('Popup') || error.includes('blocked') || error.includes('Redirect') || error.includes('popup')) && (
-                <button
-                  type="button"
-                  onClick={() => handleGoogleLogin(true)}
-                  className="block text-[11px] font-bold text-emerald-800 underline hover:text-emerald-950 cursor-pointer pt-0.5"
-                >
-                  Sign in via Direct Redirect →
-                </button>
-              )}
             </div>
           )}
 
@@ -613,17 +604,8 @@ export function ModernAuthCard({
                   </div>
 
                   {error && (
-                    <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-medium space-y-1">
+                    <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-medium">
                       <p>{error}</p>
-                      {(error.includes('closed') || error.includes('Popup') || error.includes('blocked') || error.includes('Redirect') || error.includes('popup')) && (
-                        <button
-                          type="button"
-                          onClick={() => handleGoogleLogin(true)}
-                          className="block text-[11px] font-bold text-emerald-800 underline hover:text-emerald-950 cursor-pointer pt-0.5"
-                        >
-                          Sign in via Direct Redirect →
-                        </button>
-                      )}
                     </div>
                   )}
 
@@ -677,7 +659,7 @@ export function ModernAuthCard({
                       </label>
                       <button
                         type="button"
-                        onClick={handleGoogleLogin}
+                        onClick={() => setError('Please sign in using Google or enter your registered account credentials.')}
                         className="text-slate-500 hover:text-slate-800 cursor-pointer"
                       >
                         Forgot password?
@@ -765,17 +747,8 @@ export function ModernAuthCard({
                   </div>
 
                   {error && (
-                    <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-medium space-y-1">
+                    <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-medium">
                       <p>{error}</p>
-                      {(error.includes('closed') || error.includes('Popup') || error.includes('blocked') || error.includes('Redirect') || error.includes('popup')) && (
-                        <button
-                          type="button"
-                          onClick={() => handleGoogleLogin(true)}
-                          className="block text-[11px] font-bold text-emerald-800 underline hover:text-emerald-950 cursor-pointer pt-0.5"
-                        >
-                          Sign in via Direct Redirect →
-                        </button>
-                      )}
                     </div>
                   )}
 
