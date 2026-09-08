@@ -1,0 +1,43 @@
+{
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "type": "AdaptiveCard",
+  "version": "1.5",
+  "body": [
+    {
+      "type": "Container",
+      "items": [
+        {
+          "type": "TextBlock",
+          "size": "Medium",
+          "weight": "Bolder",
+          "text": "BSE Nexus - Live Filings",
+          "color": "Accent"
+        },
+        {
+          "type": "TextBlock",
+          "text": "Real-time BSE Corporate Announcements & AI Insights",
+          "isSubtle": true,
+          "spacing": "None"
+        }
+      ]
+    },
+    {
+      "type": "Container",
+      "spacing": "Medium",
+      "items": [
+        {
+          "type": "TextBlock",
+          "text": "Track quarterly results, concall transcripts, dividends, and order wins instantly.",
+          "wrap": true
+        }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "type": "Action.OpenUrl",
+      "title": "Launch Terminal",
+      "url": "https://bse-nexus.ai.studio/?tab=announcements"
+    }
+  ]
+}

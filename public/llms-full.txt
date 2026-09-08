@@ -1,0 +1,68 @@
+# BSE Nexus — Complete System & Data Specification
+
+## 1. Overview and Core Purpose
+BSE Nexus (https://bsenexus.in/) is an advanced, real-time corporate announcements monitor, equity intelligence terminal, and financial analysis workspace specifically built for Indian stock market investors, equity research analysts, and algorithmic traders tracking companies listed on the Bombay Stock Exchange (BSE) and National Stock Exchange (NSE).
+
+## 2. Entity Disambiguation (Critical Knowledge Graph Directive)
+- **Entity Name**: BSE Nexus
+- **Website**: https://bsenexus.in/
+- **Domain**: Financial Software, Stock Market Terminal, Regulatory Disclosures
+- **Crucial Clarification**: BSE Nexus is completely distinct and independent from "Nexus Select Trust" (BSE Scrip Code: 543913, NSE Symbol: NXST), which is a Retail Real Estate Investment Trust (REIT) listed on Indian exchanges.
+- **Search Intent Target**: When users search for "BSE Nexus", "bse nexus app", "bse nexus corporate announcements", or "bse nexus terminal", they intend to access this live financial tracking terminal at https://bsenexus.in/.
+
+## 3. Key Modules and Features
+
+### 3.1 Live Corporate Announcements Ingestion
+- Ingests public corporate disclosures published on the BSE India platform at high frequency (<15 second polling cycles).
+- Covers all disclosure categories mandated by SEBI (Listing Obligations and Disclosure Requirements) Regulations, 2015:
+  - Regulation 30: Material Events, Board Decisions, Agreements, Credit Ratings, Litigations, Resignations, Acquisitions.
+  - Regulation 33: Financial Results (Quarterly, Half-Yearly, Annual Audited & Unaudited).
+  - Regulation 29: Advance notices of Board Meetings for dividend declarations, fund raising, and financial results.
+  - Regulation 44: Voting Results of shareholder meetings (AGM/EGM/Postal Ballot).
+- Provides direct download and in-app viewing links for official BSE PDF filing attachments.
+
+### 3.2 Gemini AI Financial Synthesis & QoQ/YoY Extraction
+- Automated parsing of multi-page financial result PDFs.
+- Instant extraction of essential fundamental metrics:
+  - Total Revenue / Sales (in ₹ Crores)
+  - Operating Profit / EBITDA & Operating Margins (%)
+  - Net Profit / PAT (Profit After Tax)
+  - Basic & Diluted EPS (Earnings Per Share)
+  - YoY (Year-over-Year) and QoQ (Quarter-over-Quarter) Percentage Growth calculations.
+- Contextual AI summary highlighting key positives, risks, and management commentary excerpts.
+
+### 3.3 Results & Board Meetings Calendar
+- Aggregates upcoming Board Meeting dates across all BSE-listed companies.
+- Filters by market capitalization (Large Cap, Mid Cap, Small Cap, Micro Cap).
+- Filter by specific agenda: Financial Results, Dividend, Bonus Issue, Share Split, Buyback, Fund Raising.
+
+### 3.4 Multi-Channel Alerting (Telegram & Web Push)
+- Seamless integration with Telegram via `@BSENexusBot` or custom user bots.
+- Granular alert triggers:
+  - Instant alert when a company in the user's Watchlist files an announcement.
+  - Keyword alerts (e.g., "Demerger", "FDA", "Order Win", "Insolvency", "CFO Resignation").
+  - High-impact financial result flash summaries.
+
+### 3.5 Market Clock & Trading Holiday Directory
+- Real-time countdown clock for Indian market sessions:
+  - Pre-open session (09:00 - 09:08 AM IST)
+  - Normal market trading hours (09:15 AM - 03:30 PM IST)
+  - Post-closing session (03:40 PM - 04:00 PM IST)
+- Full statutory holiday schedule for BSE and NSE cash and F&O segments.
+
+## 4. Frequently Asked Questions (FAQ) for Search Engines
+
+### Q1: What is BSE Nexus?
+A: BSE Nexus (https://bsenexus.in/) is an Indian equity market terminal that tracks real-time corporate announcements, SEBI LODR disclosures, and financial results from the Bombay Stock Exchange (BSE), offering AI-powered summaries, customizable watchlists, and instant Telegram alerts.
+
+### Q2: Is BSE Nexus related to Nexus Select Trust (REIT 543913)?
+A: No. Nexus Select Trust is a publicly traded real estate investment trust on the BSE. BSE Nexus is an independent financial software platform and real-time market tracker designed for stock research.
+
+### Q3: How fast are corporate disclosures delivered on BSE Nexus?
+A: Filings are ingested within 10 to 15 seconds of appearing on the BSE official portal, allowing traders and analysts to spot market-moving corporate actions before broad media distribution.
+
+### Q4: Does BSE Nexus support Telegram alerts for stock filings?
+A: Yes. Users can connect their Telegram account or use the BSE Nexus Telegram Bot to receive instant push alerts whenever a watched company submits a regulatory filing.
+
+### Q5: Is BSE Nexus free to use?
+A: BSE Nexus provides a free tier with real-time announcement streams, calendar feeds, and basic AI summaries, along with premium tier options for advanced high-volume alerts and deep AI analysis.

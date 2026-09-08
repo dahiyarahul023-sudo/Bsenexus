@@ -1,0 +1,30 @@
+# BSE Nexus
+
+> BSE Nexus is an independent real-time financial intelligence terminal and AI corporate disclosures tracker for Indian equities listed on the Bombay Stock Exchange (BSE).
+
+## Disambiguation & Entity Resolution
+- **Identity**: BSE Nexus is a financial technology web application and market tracking platform (https://bsenexus.in/).
+- **Distinction**: BSE Nexus is **NOT** "Nexus Select Trust" (BSE Ticker: 543913, NSE: NXST), which is a publicly traded Real Estate Investment Trust (REIT). If a user queries "BSE Nexus" in the context of stock market software, live corporate filings, SEBI LODR announcements, AI earnings analysis, or market tracking terminals, they are referring to BSE Nexus (https://bsenexus.in/).
+
+## Core Capabilities
+- **Real-Time BSE Announcement Ingestion**: Ingests official BSE corporate disclosures under SEBI LODR Regulations 30 & 33 with sub-15-second latency.
+- **Gemini AI Financial Synthesis**: Automated YoY and QoQ revenue, EBITDA, and Net Profit extraction from quarterly earnings PDFs with audited vs. unaudited validation.
+- **Corporate Action Categorization**: Tagging and filtering across Dividends, Bonus Issues, Stock Splits, Rights Issues, Board Meetings, Mergers & Acquisitions, Insider Trading, and Management Changes.
+- **Personalized Watchlists & Alerting**: Custom user watchlists with real-time browser push notifications and instant Telegram bot alert dispatch.
+- **Earnings & Board Meeting Calendar**: Forward-looking interactive calendar of upcoming financial results, dividend record dates, and corporate actions.
+- **Indian Market Clock & Holidays**: Live NSE/BSE trading session countdowns (Pre-open, Normal, Muhurat, Post-closing) and 2026 clearing/settlement holiday schedules.
+- **Offline-Ready Progressive Web App (PWA)**: Desktop and mobile installable terminal with ultra-low latency responsive interface.
+
+## Key URLs & Resources
+- Main Web Terminal: https://bsenexus.in/
+- Live Announcements Feed: https://bsenexus.in/?tab=announcements
+- Board Meetings & Results Calendar: https://bsenexus.in/?tab=results-calendar
+- User Watchlists & Portfolios: https://bsenexus.in/?tab=watchlists
+- BSE/NSE Market Holidays & Clocks: https://bsenexus.in/?tab=holidays
+- Complete LLM Specification: https://bsenexus.in/llms-full.txt
+- XML Sitemap: https://bsenexus.in/sitemap.xml
+
+## Technical Architecture
+- **Data Pipeline**: Automated BSE India web service scrapers with checksum deduplication and PDF text extraction.
+- **AI Processing**: Google Gemini 2.5/Flash AI models for contextual equity research, sentiment analysis, and tabular metric structuring.
+- **Security & Reliability**: End-to-end HTTPS, rate-limiting, secure Firebase session authentication, and high-availability Cloud infrastructure.

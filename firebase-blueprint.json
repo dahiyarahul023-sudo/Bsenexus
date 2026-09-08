@@ -1,0 +1,169 @@
+{
+  "entities": {
+    "Announcement": {
+      "title": "Announcement",
+      "description": "BSE Announcement",
+      "type": "object",
+      "properties": {
+        "newsId": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "companyName": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "subject": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "details": {
+          "type": "string",
+          "maxLength": 5000
+        },
+        "pdfLink": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "bseTime": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "category": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "priority": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "fetched_at": {
+          "type": "number"
+        },
+        "is_sent": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "newsId",
+        "companyName",
+        "subject"
+      ]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "App Settings",
+      "type": "object",
+      "properties": {
+        "botToken": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "chatId": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "isRunning": {
+          "type": "boolean"
+        },
+        "isFilterEnabled": {
+          "type": "boolean"
+        },
+        "appPinHash": {
+          "type": "string",
+          "maxLength": 100
+        }
+      },
+      "required": [
+        "isRunning",
+        "isFilterEnabled"
+      ]
+    },
+    "Watchlist": {
+      "title": "Watchlist",
+      "description": "Company Watchlist",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "is_active": {
+          "type": "number"
+        },
+        "items": {
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "is_active",
+        "items"
+      ]
+    },
+    "Log": {
+      "title": "Log",
+      "description": "System Log",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "level": {
+          "type": "string",
+          "maxLength": 50
+        },
+        "module": {
+          "type": "string",
+          "maxLength": 50
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "timestamp": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "level",
+        "module",
+        "message",
+        "timestamp"
+      ]
+    }
+  },
+  "firestore": {
+    "/announcements/{announcementId}": {
+      "schema": {
+        "$ref": "#/entities/Announcement"
+      },
+      "description": "Stores globally processed BSE announcements"
+    },
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/Settings"
+      },
+      "description": "Stores user-specific app settings (replaces global settings)"
+    },
+    "/users/{userId}/watchlists/{watchlistId}": {
+      "schema": {
+        "$ref": "#/entities/Watchlist"
+      },
+      "description": "Stores user-specific watchlists"
+    },
+    "/users/{userId}/logs/{logId}": {
+      "schema": {
+        "$ref": "#/entities/Log"
+      },
+      "description": "Stores user-specific system logs"
+    }
+  }
+}

@@ -1,0 +1,347 @@
+@import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-display: 'Outfit', 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+
+  --animate-marquee: marquee 300s linear infinite;
+
+  @keyframes marquee {
+    0% { transform: translateX(100%); }
+    100% { transform: translateX(-100%); }
+  }
+}
+
+@keyframes tickerLoop {
+  0% { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(-50%, 0, 0); }
+}
+
+.animate-ticker-smooth {
+  display: flex;
+  width: max-content;
+  animation: tickerLoop 38s linear infinite;
+  will-change: transform;
+}
+
+.animate-ticker-smooth:hover,
+.animate-ticker-smooth:active {
+  animation-play-state: paused;
+}
+
+@keyframes priceTickGreen {
+  0% { background-color: rgba(16, 185, 129, 0.35); box-shadow: 0 0 12px rgba(16, 185, 129, 0.4); }
+  100% { background-color: transparent; box-shadow: none; }
+}
+
+@keyframes priceTickRed {
+  0% { background-color: rgba(244, 63, 94, 0.35); box-shadow: 0 0 12px rgba(244, 63, 94, 0.4); }
+  100% { background-color: transparent; box-shadow: none; }
+}
+
+.tick-flash-up {
+  animation: priceTickGreen 1.5s cubic-bezier(0, 0, 0.2, 1);
+}
+
+.tick-flash-down {
+  animation: priceTickRed 1.5s cubic-bezier(0, 0, 0.2, 1);
+}
+
+@keyframes liveHeartbeat {
+  0%, 100% { transform: scale(1); }
+  14% { transform: scale(1.18); }
+  28% { transform: scale(1); }
+  42% { transform: scale(1.1); }
+  70% { transform: scale(1); }
+}
+
+@keyframes liveWaveBar {
+  0%, 100% { height: 4px; opacity: 0.4; }
+  50% { height: 16px; opacity: 1; }
+}
+
+@keyframes lightningFlash {
+  0% { opacity: 0; transform: scaleX(0.2) skewX(-20deg); }
+  20% { opacity: 1; transform: scaleX(1.2) skewX(-20deg); filter: drop-shadow(0 0 20px #38bdf8); }
+  35% { opacity: 0.3; transform: scaleX(0.8) skewX(-20deg); }
+  50% { opacity: 1; transform: scaleX(1.3) skewX(-20deg); filter: drop-shadow(0 0 24px #67e8f9) drop-shadow(0 0 10px #10b981); }
+  75% { opacity: 0.6; transform: scaleX(1.05) skewX(-20deg); }
+  100% { opacity: 0; transform: scaleX(1.4) skewX(-20deg); }
+}
+
+@keyframes thunderstormStorm {
+  0% { transform: scale(1) rotate(0deg); filter: drop-shadow(0 0 0px rgba(16, 185, 129, 0)); }
+  15% { transform: scale(1.35) rotate(-18deg); filter: drop-shadow(0 0 16px #38bdf8) brightness(1.5); }
+  30% { transform: scale(0.9) rotate(14deg); filter: drop-shadow(0 0 24px #eab308) brightness(1.8); }
+  45% { transform: scale(1.4) rotate(-8deg); filter: drop-shadow(0 0 20px #38bdf8) brightness(2); }
+  60% { transform: scale(1.1) rotate(6deg); filter: drop-shadow(0 0 12px #10b981) brightness(1.4); }
+  80% { transform: scale(1.2) rotate(-3deg); filter: drop-shadow(0 0 8px #38bdf8); }
+  100% { transform: scale(1) rotate(0deg); filter: none; }
+}
+
+@keyframes zapCrackle {
+  0% { transform: scale(1) rotate(0deg); filter: drop-shadow(0 0 2px #eab308); }
+  20% { transform: scale(1.3) rotate(-15deg); filter: drop-shadow(0 0 12px #38bdf8); }
+  40% { transform: scale(0.9) rotate(15deg); filter: drop-shadow(0 0 16px #eab308); }
+  60% { transform: scale(1.2) rotate(-5deg); filter: drop-shadow(0 0 10px #10b981); }
+  80% { transform: scale(1.05) rotate(5deg); filter: drop-shadow(0 0 6px #38bdf8); }
+  100% { transform: scale(1) rotate(0deg); filter: none; }
+}
+
+@keyframes planeTakeoff {
+  0% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+  15% { transform: translate(-5px, 6px) rotate(-20deg) scale(0.9); opacity: 1; }
+  45% { transform: translate(45px, -35px) rotate(28deg) scale(1.3); opacity: 0.9; filter: drop-shadow(0 0 14px #38bdf8); }
+  75% { transform: translate(110px, -85px) rotate(38deg) scale(0.7); opacity: 0.3; }
+  90% { transform: translate(160px, -130px) rotate(45deg) scale(0.3); opacity: 0; }
+  91% { transform: translate(-30px, 30px) rotate(-10deg) scale(0.4); opacity: 0; }
+  100% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+}
+
+@keyframes watchlistLineTop {
+  0%, 100% { transform: translateX(0); }
+  30% { transform: translateX(5px); }
+  60% { transform: translateX(-3px); }
+}
+
+@keyframes watchlistLineMid {
+  0%, 100% { transform: translateX(0); }
+  30% { transform: translateX(-5px); }
+  60% { transform: translateX(4px); }
+}
+
+@keyframes watchlistLineBot {
+  0%, 100% { transform: translateX(0); }
+  30% { transform: translateX(4px); }
+  60% { transform: translateX(-2px); }
+}
+
+@keyframes calendarPageFlip {
+  0% { transform: perspective(800px) rotateX(0deg); transform-origin: top; opacity: 1; }
+  45% { transform: perspective(800px) rotateX(-75deg); transform-origin: top; opacity: 0.7; filter: drop-shadow(0 15px 10px rgba(0,0,0,0.25)); }
+  70% { transform: perspective(800px) rotateX(25deg); transform-origin: top; opacity: 0.9; }
+  100% { transform: perspective(800px) rotateX(0deg); transform-origin: top; opacity: 1; }
+}
+
+@keyframes calendarTearPulse {
+  0% { transform: scale(1); }
+  25% { transform: scale(0.92) rotate(-4deg); }
+  50% { transform: scale(1.15) rotate(3deg); filter: drop-shadow(0 4px 12px rgba(225, 29, 72, 0.45)); }
+  75% { transform: scale(1.05) rotate(-1deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+@keyframes aiNeuralPulse {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes aiOrbRotate {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.1); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+@keyframes starPop {
+  0% { transform: scale(0.8) rotate(-20deg); }
+  50% { transform: scale(1.35) rotate(25deg); filter: drop-shadow(0 0 10px #f59e0b); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+.animate-heartbeat {
+  animation: liveHeartbeat 1.6s ease-in-out infinite;
+}
+
+.animate-lightning {
+  animation: lightningFlash 0.75s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-zap-crackle {
+  animation: zapCrackle 0.6s ease-out;
+}
+
+.animate-thunderstorm {
+  animation: thunderstormStorm 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-plane-fly {
+  animation: planeTakeoff 1.1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.animate-calendar-flip {
+  animation: calendarPageFlip 0.55s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.animate-calendar-tear {
+  animation: calendarTearPulse 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.animate-watchlist-top {
+  animation: watchlistLineTop 0.75s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.animate-watchlist-mid {
+  animation: watchlistLineMid 0.75s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.animate-watchlist-bot {
+  animation: watchlistLineBot 0.75s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.animate-ai-gradient {
+  background-size: 200% 200%;
+  animation: aiNeuralPulse 3s ease infinite;
+}
+
+.animate-ai-orb {
+  animation: aiOrbRotate 4s linear infinite;
+}
+
+.animate-star-pop {
+  animation: starPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Accessibility & GPU optimization: Disable heavy decorative animations for reduced motion or mobile viewports */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .animate-lightning,
+  .animate-zap-crackle,
+  .animate-thunderstorm,
+  .animate-plane-fly {
+    animation: none !important;
+    filter: none !important;
+    transform: none !important;
+  }
+}
+
+.animate-wave-1 {
+  animation: liveWaveBar 1.2s ease-in-out infinite;
+  animation-delay: 0s;
+}
+.animate-wave-2 {
+  animation: liveWaveBar 1.2s ease-in-out infinite;
+  animation-delay: 0.2s;
+}
+.animate-wave-3 {
+  animation: liveWaveBar 1.2s ease-in-out infinite;
+  animation-delay: 0.4s;
+}
+.animate-wave-4 {
+  animation: liveWaveBar 1.2s ease-in-out infinite;
+  animation-delay: 0.6s;
+}
+.animate-wave-5 {
+  animation: liveWaveBar 1.2s ease-in-out infinite;
+  animation-delay: 0.3s;
+}
+
+/* Custom Scrollbar & Mobile Optimizations */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Rich Dark Navy-Brown / Deep Mocha Navy Theme Variables */
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* Item 8: Crisp, accessible focus rings across all interactive controls */
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #10B981, 0 0 0 4px rgba(16, 185, 129, 0.2);
+  border-radius: inherit;
+}
+
+/* Item 10: Smooth hover transitions on interactive elements */
+button, a, input, select, textarea {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* Prevent scroll chaining specifically inside open modals, drawers, and overlay popups */
+[role="dialog"],
+[role="dialog"] > div,
+[role="listbox"],
+[role="menu"],
+[aria-modal="true"],
+.modal-backdrop,
+.modal-container,
+.modal-body,
+.drawer-container,
+.overscroll-contain {
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+body {
+  background-color: #F8FAFC;
+  color: #0F172A;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.dark body {
+  background-color: #12131C;
+  color: #F1F5F9;
+}
+
+/* Global Dark Mode Palette Harmonizer (Rich Dark Mocha-Navy) */
+.dark {
+  color-scheme: dark;
+}
+
+.dark ::selection {
+  background-color: rgba(16, 185, 129, 0.35);
+  color: #ffffff;
+}
+
+/* Custom Scrollbar for dark mode */
+.dark ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.dark ::-webkit-scrollbar-track {
+  background: #12131C;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #2D283E;
+  border-radius: 4px;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #3D3754;
+}
+
+/* Safe area support for iOS / Android gestures */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+}
+
+/* Market News Touch Scroll Fix: ensure vertical scroll passes cleanly to window */
+.news-touch-scroll,
+.news-cards-grid,
+.news-feed-container {
+  touch-action: pan-y !important;
+  pointer-events: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+
+

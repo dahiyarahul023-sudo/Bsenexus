@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json.schemastore.org/web-manifest-combined.json",
+  "id": "/",
+  "name": "BSE Nexus - Indian Corporate Disclosures",
+  "short_name": "BSE Nexus",
+  "description": "Real-time BSE corporate disclosures tracker with AI financial YoY/QoQ breakdown, custom watchlists, and Telegram alert integration.",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui"
+  ],
+  "orientation": "any",
+  "background_color": "#0B0F19",
+  "theme_color": "#0B0F19",
+  "categories": [
+    "finance",
+    "business"
+  ],
+  "prefer_related_applications": false,
+  "related_applications": [],
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  },
+  "edge_side_panel": {
+    "preferred_width": 480
+  },
+  "share_target": {
+    "action": "/?tab=announcements",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "file_handlers": [
+    {
+      "action": "/?tab=announcements",
+      "name": "Corporate Financial Filing",
+      "accept": {
+        "application/pdf": [".pdf"],
+        "text/plain": [".txt"]
+      },
+      "icons": [
+        {
+          "src": "/pwa-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ],
+  "protocol_handlers": [
+    {
+      "protocol": "web+bse",
+      "url": "/?tab=announcements&q=%s"
+    }
+  ],
+  "widgets": [
+    {
+      "name": "BSE Filings Feed",
+      "short_name": "Filings",
+      "description": "Real-time BSE corporate disclosures and AI summary feed",
+      "tag": "bse-filings",
+      "template": "filings-widget",
+      "ms_ac_template": "/widgets/filings.json",
+      "data": "/widgets/filings.json",
+      "type": "application/json",
+      "screenshots": [
+        {
+          "src": "/screenshots/mobile.png",
+          "sizes": "750x1334",
+          "label": "Filings Widget Preview"
+        }
+      ]
+    }
+  ],
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "BSE Nexus Live Corporate Disclosures and Terminal View"
+    },
+    {
+      "src": "/screenshots/mobile.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "BSE Nexus Mobile Announcements and Alert Monitor"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Live Announcements",
+      "short_name": "Filings",
+      "description": "View real-time BSE corporate filings and disclosures",
+      "url": "/?tab=announcements",
+      "icons": [
+        {
+          "src": "/pwa-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Tracked Watchlist",
+      "short_name": "Watchlist",
+      "description": "Monitor your tracked stocks and alerts",
+      "url": "/?tab=watchlist",
+      "icons": [
+        {
+          "src": "/pwa-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Earnings Calendar",
+      "short_name": "Calendar",
+      "description": "Upcoming corporate quarterly results and board meetings",
+      "url": "/?tab=results",
+      "icons": [
+        {
+          "src": "/pwa-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Market News & Pulse",
+      "short_name": "News",
+      "description": "Indian stock market news synthesis and sector intelligence",
+      "url": "/?tab=news",
+      "icons": [
+        {
+          "src": "/pwa-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ]
+}

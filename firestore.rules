@@ -1,0 +1,84 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        (request.auth.token.email == 'dahiyarahul023@gmail.com' && request.auth.token.email_verified == true) ||
+        request.auth.token.role == 'admin' ||
+        request.auth.token.admin == true
+      );
+    }
+
+    // BSE Announcements: Public read, writes restricted to Admin/Server
+    match /announcements/{announcementId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Results Calendar: Public read, writes restricted to Admin/Server
+    match /results_calendar/{calendarId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // System Settings: Read & Write restricted to Admin/Server
+    match /settings/{settingId} {
+      allow read, write: if isAdmin();
+    }
+
+    // System Logs: Read restricted to Admin/Server, Writes restricted to Admin/Server
+    match /logs/{logId} {
+      allow read, write: if isAdmin();
+    }
+
+    // User Watchlists: Strict ownership enforcement (including subcollections)
+    match /user_watchlists/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+    match /user_watchlists/{userId}/{document=**} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+
+    // User Profiles & Subcollections (watchlists, logs, settings): Strict ownership enforcement
+    match /users/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+    match /users/{userId}/{document=**} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+
+    // Alert Rules: Read/write own rules, system presets readable, strictly guarded create/update/delete
+    match /alert_rules/{ruleId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == 'system' || 
+        resource.data.userId == request.auth.uid || 
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // Admins collection
+    match /admins/{adminId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Default catch-all: Deny all unauthenticated or unmapped access
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+  }
+}
+
+
+

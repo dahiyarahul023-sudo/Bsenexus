@@ -1,0 +1,16 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+data/
+firebase-applet-config.json
+*.corrupted.*
+*.keystore
+*.jks
+*.p12
+service-account*.json
+test.keystore

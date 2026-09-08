@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function() {
+        var isDev = window.location.hostname === 'localhost' || 
+                    window.location.hostname === '127.0.0.1' || 
+                    window.location.hostname.indexOf('-dev-') !== -1 || 
+                    window.location.hostname.indexOf('-pre-') !== -1 ||
+                    window.location.hostname.indexOf('run.app') !== -1 ||
+                    window.location.port === '3000';
+        if ('serviceWorker' in navigator) {
+          if (isDev) {
+            // In development or preview container environments, ensure no Service Worker intercepts Vite modules
+            if (navigator.serviceWorker.controller && !sessionStorage.getItem('__dev_sw_purged__')) {
+              sessionStorage.setItem('__dev_sw_purged__', '1');
+              navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                return Promise.all(registrations.map(function(r) { return r.unregister(); }));
+              }).then(function() {
+                if ('caches' in window) {
+                  return caches.keys().then(function(names) {
+                    return Promise.all(names.map(function(n) { return caches.delete(n); }));
+                  });
+                }
+              }).then(function() {
+                window.location.reload();
+              });
+            } else {
+              navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for (var i = 0; i < registrations.length; i++) {
+                  registrations[i].unregister();
+                }
+              });
+              if ('caches' in window) {
+                caches.keys().then(function(names) {
+                  for (var j = 0; j < names.length; j++) {
+                    caches.delete(names[j]);
+                  }
+                });
+              }
+            }
+          } else {
+            window.addEventListener('load', function() {
+              navigator.serviceWorker.register('/sw.js', { scope: '/' })
+                .then(function(registration) {
+                  console.log('[PWA] ServiceWorker registered with scope:', registration.scope);
+                })
+                .catch(function(error) {
+                  console.warn('[PWA] ServiceWorker registration failed:', error);
+                });
+            });
+          }
+        }
+      })();
+    </script>
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'" />
+    <noscript>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" />
+    </noscript>
+    <title>BSE Nexus | Real-Time BSE Corporate Filings &amp; AI Equity Terminal</title>
+    <link rel="canonical" href="https://bsenexus.in/" />
+    <link rel="alternate" type="text/plain" href="/llms.txt" title="LLMs.txt Specification" />
+    <meta name="description" content="Real-time BSE corporate disclosures tracker with AI financial YoY/QoQ breakdown, custom watchlists, and Telegram alert integration. Independent financial terminal for Indian equities (BSE)." />
+    <meta name="keywords" content="BSE Nexus, BSE Nexus Terminal, BSE corporate announcements, BSE results calendar, stock filings India, earnings conference calls, Gemini AI stock summary, Telegram stock alerts, NSE BSE trading holidays, Indian stock market clock, SEBI LODR 30" />
+    <meta name="author" content="BSE Nexus" />
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+    <meta name="theme-color" content="#0B0F19" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="BSE Nexus" />
+
+    <!-- Web App Manifest for Android Chrome & PWA -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Apple Touch Icon for iPhone / iPad Safari Suggestions & Bookmarks (Crisp PNG) -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-180x180.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/apple-touch-icon-152x152.png" />
+    <link rel="apple-touch-icon" sizes="120x120" href="/apple-touch-icon-120x120.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon-precomposed" href="/apple-touch-icon-precomposed.png" />
+
+    <!-- Standard Favicon Icons for Desktop & Mobile Browsers -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+
+    <!-- Microsoft Tiles -->
+    <meta name="msapplication-TileColor" content="#0B0F19" />
+    <meta name="msapplication-TileImage" content="/mstile-150x150.png" />
+
+    <!-- Open Graph / Facebook / WhatsApp -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://bsenexus.in/" />
+    <meta property="og:title" content="BSE Nexus | Real-Time BSE Corporate Filings &amp; AI Terminal" />
+    <meta property="og:description" content="Independent real-time BSE corporate disclosures tracker with AI financial YoY/QoQ breakdown, custom watchlists, and instant Telegram alert integration." />
+    <meta property="og:site_name" content="BSE Nexus" />
+    <meta property="og:locale" content="en_IN" />
+    <meta property="og:image" content="https://bsenexus.in/og-image.png" />
+    <meta property="og:image:secure_url" content="https://bsenexus.in/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="BSE Nexus - Real-Time Indian Equity Disclosures & AI Terminal" />
+
+    <!-- Twitter Cards -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://bsenexus.in/" />
+    <meta name="twitter:title" content="BSE Nexus | Real-Time BSE Corporate Filings &amp; AI Terminal" />
+    <meta name="twitter:description" content="Independent real-time BSE corporate disclosures tracker with AI financial YoY/QoQ breakdown, custom watchlists, and instant Telegram alert integration." />
+    <meta name="twitter:image" content="https://bsenexus.in/og-image.png" />
+    <meta name="twitter:image:alt" content="BSE Nexus - Real-Time Indian Equity Disclosures & AI Terminal" />
+
+    <!-- Schema.org JSON-LD Structured Data for Search Engine Rich Snippets & AI (AEO / GEO) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebApplication",
+          "@id": "https://bsenexus.in/#webapp",
+          "name": "BSE Nexus",
+          "alternateName": ["BSE Nexus Terminal", "BSENexus", "BSE Nexus India", "BSE Nexus AI"],
+          "url": "https://bsenexus.in/",
+          "description": "Real-time BSE corporate disclosures tracker with AI financial YoY/QoQ breakdown, custom watchlists, and Telegram alert integration.",
+          "disambiguatingDescription": "BSE Nexus is an independent financial technology analytics terminal for tracking Bombay Stock Exchange (BSE) corporate announcements and filings, distinct from Nexus Select Trust (REIT scrip 543913).",
+          "applicationCategory": "FinanceApplication",
+          "applicationSubCategory": "Stock Market Research Terminal",
+          "operatingSystem": "All modern browsers (Desktop & Mobile)",
+          "browserRequirements": "Requires JavaScript. Requires HTML5.",
+          "inLanguage": "en-IN",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "INR"
+          },
+          "featureList": [
+            "Real-time BSE Corporate Announcements Ingestion (<15s cycle)",
+            "Gemini AI Financial YoY/QoQ Extraction & Summarization",
+            "SEBI LODR Regulation 30 & 33 Categorization",
+            "Board Meeting & Earnings Calendar (Quarterly / Audited)",
+            "Personalized Watchlist with Custom Threshold Filters",
+            "Direct PDF Announcement Ingestion & Original Documents",
+            "Instant Telegram Bot Alert Dispatch"
+          ],
+          "publisher": {
+            "@type": "Organization",
+            "@id": "https://bsenexus.in/#organization",
+            "name": "BSE Nexus",
+            "url": "https://bsenexus.in/",
+            "logo": {
+              "@type": "ImageObject",
+              "url": "https://bsenexus.in/icon-512.png",
+              "width": 512,
+              "height": 512
+            }
+          }
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://bsenexus.in/#website",
+          "url": "https://bsenexus.in/",
+          "name": "BSE Nexus",
+          "alternateName": ["BSE Nexus Terminal", "BSENexus"],
+          "description": "Real-time BSE corporate disclosures tracker with AI financial YoY/QoQ breakdown.",
+          "publisher": {
+            "@id": "https://bsenexus.in/#organization"
+          },
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": {
+              "@type": "EntryPoint",
+              "urlTemplate": "https://bsenexus.in/?query={search_term_string}"
+            },
+            "query-input": "required name=search_term_string"
+          }
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://bsenexus.in/#faq",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "What is BSE Nexus?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "BSE Nexus is an independent real-time financial tracking terminal and web application designed for investors and traders tracking Bombay Stock Exchange (BSE) companies. It provides sub-15-second corporate filing alerts, Gemini AI earnings breakdowns, and custom watchlists."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Is BSE Nexus the same as Nexus Select Trust (REIT)?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "No. Nexus Select Trust is a publicly traded real estate investment trust (BSE Scrip: 543913). BSE Nexus is an independent financial technology research platform and corporate disclosure terminal."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How does BSE Nexus deliver real-time BSE announcements?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "BSE Nexus continuously monitors official regulatory feeds under SEBI LODR Regulations 30 and 33 with automated pipelines, parsing PDF attachments and extracting financial metrics in seconds."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Can I receive Telegram alerts for corporate filings on BSE Nexus?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes. BSE Nexus integrates directly with Telegram bots to deliver instantaneous push alerts whenever a company on your custom watchlist submits a regulatory disclosure."
+              }
+            }
+          ]
+        }
+      ]
+    }
+    </script>
+    <style>
+      @font-face {
+        font-family: 'Outfit';
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'Plus Jakarta Sans';
+        font-display: swap;
+      }
+      @font-face {
+        font-family: 'JetBrains Mono';
+        font-display: swap;
+      }
+      .critical-preloader {
+        min-height: 100vh;
+        background: #0D0C15;
+        color: #F8FAFC;
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        display: flex;
+        flex-direction: column;
+      }
+      .critical-header {
+        height: 56px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 20px;
+        background: rgba(21, 20, 31, 0.95);
+      }
+      .critical-logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 900;
+        font-size: 15px;
+        letter-spacing: -0.02em;
+      }
+      .critical-logo-icon {
+        width: 26px;
+        height: 26px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #10B981, #14B8A6);
+      }
+      .critical-badge {
+        font-size: 10px;
+        background: rgba(16, 185, 129, 0.12);
+        color: #10B981;
+        border: 1px solid rgba(16, 185, 129, 0.25);
+        border-radius: 9999px;
+        padding: 2px 8px;
+        font-weight: 700;
+      }
+      .critical-body {
+        max-width: 1280px;
+        margin: 0 auto;
+        width: 100%;
+        padding: 20px;
+        box-sizing: border-box;
+      }
+      .critical-shimmer {
+        background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.07) 50%, rgba(255,255,255,0.03) 75%);
+        background-size: 200% 100%;
+        animation: critical-loading 1.4s ease-in-out infinite;
+        border-radius: 8px;
+      }
+      @keyframes critical-loading {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div class="critical-preloader" aria-hidden="true">
+        <header class="critical-header">
+          <div class="critical-logo">
+            <div class="critical-logo-icon"></div>
+            <span>BSE<span style="color:#10B981;">NEXUS</span></span>
+            <span class="critical-badge">15s Live Feed</span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div class="critical-shimmer" style="width:68px;height:28px;border-radius:8px;"></div>
+            <div class="critical-shimmer" style="width:28px;height:28px;border-radius:8px;"></div>
+          </div>
+        </header>
+        <div class="critical-body">
+          <div class="critical-shimmer" style="width:200px;height:28px;margin-bottom:16px;"></div>
+          <div class="critical-shimmer" style="width:100%;height:100px;margin-bottom:14px;border-radius:14px;"></div>
+          <div class="critical-shimmer" style="width:100%;height:180px;border-radius:14px;"></div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
