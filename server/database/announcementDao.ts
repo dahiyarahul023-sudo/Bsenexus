@@ -711,15 +711,23 @@ export async function getRecentAnnouncements(limitNum: number = 1000, symbols?: 
   if (symbols && symbols.length > 0) {
     const cleanSymbols = symbols.map(s => String(s).trim().toUpperCase()).filter(Boolean);
     if (cleanSymbols.length > 0) {
-      // Per-stock allocation: each tracked stock contributes up to PER_STOCK of its
-      // newest filings. Without this, the most active stocks drown out quieter ones
-      // because the cache is sorted newest-first globally.
+      // Hybrid feed policy — "what's new", not an archive:
+      //   1. Time window: only filings from the last 7 days. Older items are not "news".
+      //   2. Per-stock cap: each tracked stock contributes up to PER_STOCK of its newest
+      //      filings, so a hyperactive stock can't flood the feed and quiet stocks stay visible.
+      // The cache is sorted newest-first, so we stop at the first item older than the
+      // window — no full-cache scan. (Archive needs are served by the per-company modal
+      // and the global All-Filings tab, not this feed.)
       const PER_STOCK = 25;
+      const WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+      const cutoff = Date.now() - WINDOW_MS;
       const buckets: any[][] = cleanSymbols.map(() => []);
       const counts = new Array<number>(cleanSymbols.length).fill(0);
       let allFull = false;
-      // announcementsMemoryCache is already maintained sorted newest-first on insert.
       for (const ann of announcementsMemoryCache) {
+        const ts = (typeof ann.bseTimestamp === 'number' && !isNaN(ann.bseTimestamp) && ann.bseTimestamp > 0)
+          ? ann.bseTimestamp : (ann.fetched_at || 0);
+        if (ts > 0 && ts < cutoff) break; // older than the window; rest is older too
         if (allFull) break;
         const comp = ann.companyName || ann.SLONGNAME || '';
         const subj = ann.subject || ann.NEWSSUB || '';
