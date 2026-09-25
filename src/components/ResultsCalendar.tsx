@@ -1699,14 +1699,18 @@ export function ResultsCalendar() {
             </div>
             <div className="space-y-1">
               <div className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100">
-                {uniqueWatchlistStocksCount === 0 
+                {searchQuery.trim()
+                  ? `No board meetings matching "${searchQuery.trim()}"`
+                  : uniqueWatchlistStocksCount === 0 
                   ? "Your Watchlist is Empty" 
                   : statusFilter === 'today' 
                   ? "No Board Meetings Scheduled for Today" 
                   : "No Matching Results in this View"}
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                {uniqueWatchlistStocksCount === 0
+                {searchQuery.trim()
+                  ? `No board meetings matching "${searchQuery.trim()}". Try a different company name or symbol.`
+                  : uniqueWatchlistStocksCount === 0
                   ? "You have removed all stocks from your watchlist. Add companies to your watchlist or restore defaults to track their upcoming and past board meetings and quarterly financial results."
                   : searchQuery 
                   ? `No board meetings matching "${searchQuery}".`
