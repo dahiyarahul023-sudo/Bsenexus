@@ -1843,13 +1843,13 @@ export function SettingsTab({
                         </span>
                         <span className={cn(
                           "px-1.5 py-0.2 rounded text-[10px] font-bold uppercase",
-                          !Boolean(profile?.telegramChatId || tgChatIdInput.trim())
+                          !Boolean(profile?.telegramChatId)
                             ? "bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
                             : tgAlertsEnabled
                             ? "bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200"
                             : "bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200"
                         )}>
-                          {!Boolean(profile?.telegramChatId || tgChatIdInput.trim())
+                          {!Boolean(profile?.telegramChatId)
                             ? 'Not Linked'
                             : tgAlertsEnabled
                             ? 'Active (ON)'
@@ -1857,7 +1857,7 @@ export function SettingsTab({
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-600 dark:text-slate-400">
-                        {!Boolean(profile?.telegramChatId || tgChatIdInput.trim())
+                        {!Boolean(profile?.telegramChatId)
                           ? 'Link your Telegram Chat ID below to receive live filing push notifications.'
                           : tgAlertsEnabled 
                           ? 'Real-time filings are automatically dispatched to your connected Telegram.' 
