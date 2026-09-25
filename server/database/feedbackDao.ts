@@ -42,15 +42,17 @@ export async function saveFeedback(entry: {
   if (feedbackCache.length > 1000) feedbackCache.length = 1000;
   scheduleFeedbackDiskSave();
 
-  try {
-    await adminDb.collection('feedback').doc(item.id).set(item);
-  } catch (err: any) {
+  // Firestore sync runs in the background — NEVER block the API response on it.
+  // A slow or unreachable Firestore must not keep the user staring at "sending".
+  // The item is already in the memory cache + scheduled for local disk write,
+  // and the admin Telegram notification is fire-and-forget in the route.
+  adminDb.collection('feedback').doc(item.id).set(item).catch((err: any) => {
     if (isQuotaError(err)) {
       setFirestoreQuotaExceeded(true);
     } else if (isPermissionDeniedError(err)) {
       setAdminPermissionDenied(true);
     }
-  }
+  });
   return item;
 }
 
