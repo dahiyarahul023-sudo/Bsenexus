@@ -35,6 +35,10 @@ export const AiSummaryViewer: React.FC<AiSummaryViewerProps> = ({
   onRegenerate,
   isGenerating = false
 }) => {
+  // Honest source labelling: the server falls back to a fast heuristic extraction
+  // ("Fast Filing Summary (Direct Extraction)") when Gemini is unavailable.
+  // Never claim Gemini synthesis when the heuristic was used.
+  const isHeuristicExtraction = /fast filing summary\s*\(direct extraction\)/i.test(summaryText || '');
   const [copied, setCopied] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
 
@@ -178,7 +182,7 @@ export const AiSummaryViewer: React.FC<AiSummaryViewerProps> = ({
         <div className="flex items-center gap-1.5">
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-[10px] font-bold uppercase tracking-wider">
             <Sparkles size={11} className="text-purple-500" />
-            <span>Gemini 3.8 Flash Synthesis</span>
+            <span>{isHeuristicExtraction ? 'Quick Extraction' : 'Gemini 3.8 Flash Synthesis'}</span>
           </span>
         </div>
 
@@ -219,8 +223,8 @@ export const AiSummaryViewer: React.FC<AiSummaryViewerProps> = ({
               loadingText=""
               variant="secondary"
               size="sm"
-              aria-label="Regenerate with Gemini"
-              title="Regenerate with Gemini"
+              aria-label={isHeuristicExtraction ? "Regenerate summary" : "Regenerate with Gemini"}
+              title={isHeuristicExtraction ? "Regenerate summary" : "Regenerate with Gemini"}
               icon={<RotateCw size={13} />}
             />
           )}
