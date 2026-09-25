@@ -1772,8 +1772,6 @@ apiRouter.get("/notifications", async (req, res) => {
     const unreadOnly = req.query.unreadOnly === 'true';
 
     const notifs = getAllNotifications(uid, limitParam, { watchlistOnly, type, unreadOnly });
-    const unreadCount = getUnreadNotificationCount(uid, false);
-    const watchlistUnreadCount = getUnreadNotificationCount(uid, true);
 
     let isMuted = false;
     if (uid && uid !== 'guest') {
@@ -1782,6 +1780,11 @@ apiRouter.get("/notifications", async (req, res) => {
         isMuted = Boolean(profile.muteInAppNotifications ?? profile.notificationPreferences?.muteInAppNotifications);
       }
     }
+
+    // While muted, the bell stays silent: unread badges report zero.
+    // (Existing notifications remain listed; only new triggers are suppressed.)
+    const unreadCount = isMuted ? 0 : getUnreadNotificationCount(uid, false);
+    const watchlistUnreadCount = isMuted ? 0 : getUnreadNotificationCount(uid, true);
 
     res.json({ notifications: notifs, unreadCount, watchlistUnreadCount, muteInAppNotifications: isMuted });
   } catch (err: any) {
@@ -1793,7 +1796,14 @@ apiRouter.get("/notifications/unread-count", async (req, res) => {
   try {
     const uid = getReqUserId(req);
     const watchlistOnly = req.query.watchlistOnly === 'true';
-    const count = getUnreadNotificationCount(uid, watchlistOnly);
+    let isMuted = false;
+    if (uid && uid !== 'guest') {
+      const profile = await getUserProfile(uid);
+      if (profile) {
+        isMuted = Boolean(profile.muteInAppNotifications ?? profile.notificationPreferences?.muteInAppNotifications);
+      }
+    }
+    const count = isMuted ? 0 : getUnreadNotificationCount(uid, watchlistOnly);
     res.json({ unreadCount: count });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -1844,13 +1854,37 @@ apiRouter.delete("/notifications", requireAuth, async (req, res) => {
 apiRouter.post("/notifications/toggle-mute", requireAuth, async (req, res) => {
   try {
     const uid = getReqUserId(req);
+    const explicitMute = typeof req.body?.mute === 'boolean' ? req.body.mute : null;
+
+    // Fast path (the app always sends an explicit value): respond INSTANTLY and
+    // persist in the background. Awaiting Firestore here used to leave the UI
+    // stuck on a disabled mute button for a minute or more.
+    if (uid && uid !== 'guest' && explicitMute !== null) {
+      res.json({ success: true, muteInAppNotifications: explicitMute });
+      (async () => {
+        try {
+          const userProfile = await getUserProfile(uid);
+          const updatedPrefs = {
+            ...(userProfile?.notificationPreferences || {}),
+            muteInAppNotifications: explicitMute
+          };
+          await saveUserProfile(uid, {
+            muteInAppNotifications: explicitMute,
+            notificationPreferences: updatedPrefs as any
+          }, true);
+          invalidateMonitorConfigCache(uid);
+        } catch {}
+      })();
+      return;
+    }
+
     let shouldMute: boolean;
     if (uid && uid !== 'guest') {
       const userProfile = await getUserProfile(uid);
       const currentMute = userProfile
         ? Boolean(userProfile.muteInAppNotifications ?? userProfile.notificationPreferences?.muteInAppNotifications)
         : false;
-      shouldMute = typeof req.body.mute === 'boolean' ? req.body.mute : !currentMute;
+      shouldMute = explicitMute !== null ? explicitMute : !currentMute;
 
       if (userProfile) {
         const updatedPrefs = {
@@ -1863,7 +1897,7 @@ apiRouter.post("/notifications/toggle-mute", requireAuth, async (req, res) => {
         }, true);
       }
     } else {
-      shouldMute = typeof req.body.mute === 'boolean' ? req.body.mute : true;
+      shouldMute = explicitMute !== null ? explicitMute : true;
     }
 
     res.json({ success: true, muteInAppNotifications: shouldMute });

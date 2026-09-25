@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Bell, BellOff, CheckCircle2, Trash2, Check, ExternalLink, 
   Sparkles, Filter, Clock, Building2, ChevronRight,
@@ -64,6 +64,11 @@ export function NotificationInbox({
   const [activeFilter, setActiveFilter] = useState<'WATCHLIST' | 'RESULTS' | 'ACTIONS' | 'UNREAD' | 'ALL'>('WATCHLIST');
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [isTogglingMute, setIsTogglingMute] = useState<boolean>(false);
+  // Race guard: panel open/filter change fires loadNotifications + fetchMuteStatus.
+  // If the user toggles mute before those slow responses arrive, the stale
+  // response must NOT overwrite the newer toggle — this was the "mute only
+  // shows after close/reopen" bug.
+  const muteSeqRef = useRef(0);
 
   useEffect(() => {
     if (isOpen) {
@@ -74,8 +79,10 @@ export function NotificationInbox({
 
   const fetchMuteStatus = async () => {
     if (!user && !profile) return;
+    const seq = muteSeqRef.current;
     try {
       const res = await customFetch('/api/settings');
+      if (muteSeqRef.current !== seq) return; // stale — a manual toggle happened since
       if (res.ok) {
         const data = await res.json();
         setIsMuted(Boolean(data.muteInAppNotifications ?? data.settings?.muteInAppNotifications));
@@ -88,7 +95,9 @@ export function NotificationInbox({
   const handleToggleMute = async () => {
     const prevState = isMuted;
     const nextState = !prevState;
-    // Optimistic UI update: toggle mute switch immediately
+    // Invalidate any in-flight mute-status/notification fetches before the
+    // optimistic update, so their late responses cannot undo this toggle.
+    muteSeqRef.current++;
     setIsMuted(nextState);
     try {
       setIsTogglingMute(true);
@@ -119,6 +128,7 @@ export function NotificationInbox({
       setLoading(false);
       return;
     }
+    const loadSeq = muteSeqRef.current;
     setLoading(true);
     try {
       let url = '/api/notifications?limit=100';
@@ -138,7 +148,7 @@ export function NotificationInbox({
       if (res.ok) {
         const data = await res.json();
         setNotifications(data.notifications || []);
-        if (typeof data.muteInAppNotifications === 'boolean') {
+        if (typeof data.muteInAppNotifications === 'boolean' && muteSeqRef.current === loadSeq) {
           setIsMuted(data.muteInAppNotifications);
         }
         onRefreshCount();

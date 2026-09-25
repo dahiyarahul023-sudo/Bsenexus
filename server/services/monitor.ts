@@ -4,10 +4,10 @@ import { fetchBSEAnnouncements, getLastBseError } from './bse.js';
 import { sendToTelegram } from './telegram.js';
 import { generateAndSendSummary } from './gemini.js';
 import { getActiveWatchlistSymbols, getActiveWatchlistSymbolMap } from '../database/watchlistDao.js';
-import { getUsersWithTelegram } from '../database/usersDao.js';
+import { getAllUserProfiles } from '../database/usersDao.js';
 import { isAnnouncementProcessed, isAnnouncementSent, markAnnouncementSent, saveAnnouncement, pruneAndCheckStorageCapacity, initAnnouncementCache } from '../database/announcementDao.js';
 import { escapeHTML, determinePriority, isSymbolMatch, parseBseDate, isMarketHoursIST } from '../utils/helpers.js';
-import { addNotification } from '../database/notificationDao.js';
+import { addNotification, initNotificationsFromFirestore } from '../database/notificationDao.js';
 import { evaluateAlertRulesForUser } from '../database/alertRulesDao.js';
 import { classifyMaterialEvent } from './timelineClassifier.js';
 
@@ -54,30 +54,33 @@ async function getCachedMonitorConfig() {
     return configCache;
   }
 
-  // 1. Fetch settings, global active symbols, and ONLY users with a registered Telegram Chat ID
-  const [settings, activeSymbols, activeSymbolMap, telegramUsers] = await Promise.all([
+  // 1. Fetch settings, global active symbols, and ALL user profiles.
+  // In-app notifications must work for every user — NOT only those with a
+  // linked Telegram chat ID. Telegram dispatch stays gated on chat ID
+  // separately in the per-user loop below.
+  const [settings, activeSymbols, activeSymbolMap, allProfiles] = await Promise.all([
     getSettings(),
     getActiveWatchlistSymbols('all'),
     getActiveWatchlistSymbolMap('all'),
-    getUsersWithTelegram()
+    getAllUserProfiles()
   ]);
 
+  const notifyUsers = (allProfiles || []).filter(u => u && u.uid && u.uid !== 'guest');
+
   const userWatchlistCache = new Map<string, { symbols: string[]; map: any }>();
-  if (telegramUsers.length > 0) {
+  if (notifyUsers.length > 0) {
     await Promise.all(
-      telegramUsers.map(async (u) => {
-        if (u.telegramChatId) {
-          const cached = monitorUserWatchlistCache.get(u.uid);
-          if (cached && (now - cached.fetchedAt < USER_WATCHLIST_CACHE_TTL_MS)) {
-            userWatchlistCache.set(u.uid, { symbols: cached.symbols, map: cached.map });
-          } else {
-            const [symbols, map] = await Promise.all([
-              getActiveWatchlistSymbols(u.uid),
-              getActiveWatchlistSymbolMap(u.uid)
-            ]);
-            monitorUserWatchlistCache.set(u.uid, { symbols, map, fetchedAt: now });
-            userWatchlistCache.set(u.uid, { symbols, map });
-          }
+      notifyUsers.map(async (u) => {
+        const cached = monitorUserWatchlistCache.get(u.uid);
+        if (cached && (now - cached.fetchedAt < USER_WATCHLIST_CACHE_TTL_MS)) {
+          userWatchlistCache.set(u.uid, { symbols: cached.symbols, map: cached.map });
+        } else {
+          const [symbols, map] = await Promise.all([
+            getActiveWatchlistSymbols(u.uid),
+            getActiveWatchlistSymbolMap(u.uid)
+          ]);
+          monitorUserWatchlistCache.set(u.uid, { symbols, map, fetchedAt: now });
+          userWatchlistCache.set(u.uid, { symbols, map });
         }
       })
     );
@@ -87,7 +90,7 @@ async function getCachedMonitorConfig() {
     settings,
     activeSymbols,
     activeSymbolMap,
-    allUsers: telegramUsers,
+    allUsers: notifyUsers,
     userWatchlistCache,
     lastFetched: now
   };
@@ -181,6 +184,8 @@ export async function processAnnouncements() {
   try {
     if (!isCacheInitialized) {
       await initAnnouncementCache();
+      // Restore in-app notifications from Firestore in the background (never blocks polling)
+      initNotificationsFromFirestore().catch(() => {});
       isCacheInitialized = true;
     }
 
@@ -477,10 +482,12 @@ export async function processAnnouncements() {
         }
 
         // 2. Dispatch to individual Pro/Registered Users (Strict Data Isolation & Per-User Filter Rules)
-        if (settings.isRunning && settings.botToken && allUsers.length > 0) {
+        // NOTE: in-app notifications are created for EVERY user with a matching
+        // watchlist or custom alert rule — a linked Telegram chat ID is NOT required.
+        // Only the Telegram dispatch below stays gated on rawUserChatId.
+        if (settings.isRunning && allUsers.length > 0) {
           for (const u of allUsers) {
             const rawUserChatId = u.telegramChatId ? String(u.telegramChatId).trim() : '';
-            if (!rawUserChatId) continue;
 
             const uPrefs = u.notificationPreferences;
             // Respect user toggle to turn OFF/ON Telegram alerts
@@ -488,15 +495,8 @@ export async function processAnnouncements() {
 
             const cachedUserWl = userWatchlistCache.get(u.uid);
             const userSymbols = cachedUserWl?.symbols || [];
-            
-            const effectiveScope = uPrefs?.telegramAlertScope || uPrefs?.alertScope || 'WATCHLIST_ONLY';
-            // Skip alert processing entirely for users whose watchlists are empty unless configured for All Market
-            if (userSymbols.length === 0 && effectiveScope === 'WATCHLIST_ONLY') {
-              continue;
-            }
-
             const userSymbolMap = cachedUserWl?.map || {};
-            
+
             // Check this specific user's active watchlist from memory cache
             let uWatchlistMatch = false;
             let uMatchedStockPriority: 'HIGH' | 'MEDIUM' | 'LOW' | null = null;
@@ -509,7 +509,7 @@ export async function processAnnouncements() {
               }
             }
 
-            // Evaluate user custom alert rules
+            // Evaluate user custom alert rules (in-memory, cheap)
             const userRuleEval = evaluateAlertRulesForUser({
               companyName,
               symbol: companyName,
@@ -520,6 +520,14 @@ export async function processAnnouncements() {
               priority: priority.level,
               isWatchlist: uWatchlistMatch
             }, u.uid);
+
+            const effectiveScope = uPrefs?.telegramAlertScope || uPrefs?.alertScope || 'WATCHLIST_ONLY';
+            // Skip alert processing entirely only when nothing could match:
+            // empty watchlist + watchlist-only scope + no custom rule matched.
+            if (userSymbols.length === 0 && effectiveScope === 'WATCHLIST_ONLY'
+                && !userRuleEval.shouldSendInApp && !userRuleEval.shouldSendTelegram) {
+              continue;
+            }
 
             const matchesUser = doesAnnouncementMatchUserPrefs(uPrefs, priority, uMatchedStockPriority, subject, details, uWatchlistMatch) || userRuleEval.shouldSendTelegram || userRuleEval.shouldSendInApp;
             
