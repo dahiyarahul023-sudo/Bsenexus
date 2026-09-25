@@ -2,6 +2,7 @@ import express from "express";
 import bcrypt from "bcryptjs";
 import { getSettings, saveSettings } from "../database/settingsDao.js";
 import { getLogs, addLog, clearLogs } from "../database/logDao.js";
+import { saveFeedback, getAllFeedback, markFeedbackRead } from "../database/feedbackDao.js";
 import { getRecentAnnouncements, markAnnouncementSent, getAnnouncementById, processedBloomFilter, sentBloomFilter, isAnnouncementProcessed, isAnnouncementSent, getBloomFilterDiagnostics } from "../database/announcementDao.js";
 import { generateDirectSummary, generateAndSendSummary, askAppHelpAI } from "../services/gemini.js";
 import { escapeHTML } from "../utils/helpers.js";
@@ -317,6 +318,47 @@ apiRouter.post("/client-log", requireAuth, async (req, res) => {
       );
     }
     res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// In-app user feedback: saves to Firestore/local and notifies admin on Telegram.
+apiRouter.post("/feedback", apiRateLimiter, async (req, res) => {
+  try {
+    const { type, message, email } = req.body || {};
+    const cleanType = ['feedback', 'bug', 'feature'].includes(type) ? type : 'feedback';
+    const cleanMessage = String(message || '').trim().slice(0, 2000);
+    if (!cleanMessage) {
+      return res.status(400).json({ success: false, error: 'Message is required.' });
+    }
+    const rawEmail = String(email || '').trim().slice(0, 120);
+    const cleanEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail) ? rawEmail : '';
+
+    const item = await saveFeedback({
+      type: cleanType,
+      message: cleanMessage,
+      email: cleanEmail || undefined,
+      userId: (req as any).user?.uid,
+    });
+
+    const typeLabel = cleanType === 'bug' ? '🐞 Bug Report' : cleanType === 'feature' ? '💡 Feature Idea' : '💬 Feedback';
+    // Fire-and-forget admin notification; feedback is already persisted above.
+    sendToTelegram(
+      `📩 <b>New ${typeLabel}</b>\n\n${escapeHTML(cleanMessage)}${cleanEmail ? `\n\n✉️ ${escapeHTML(cleanEmail)}` : ''}\n\n🕒 <i>${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</i>`
+    ).catch(() => {});
+
+    res.json({ success: true, id: item.id });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: 'Could not submit feedback. Please try again.' });
+  }
+});
+
+// Admin: list user feedback
+apiRouter.get("/feedback", requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(500, Math.max(1, parseInt(req.query.limit as string) || 100));
+    res.json({ success: true, items: getAllFeedback(limit) });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
