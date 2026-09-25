@@ -280,7 +280,7 @@ const NewsCardItem: React.FC<NewsCardProps> = React.memo(({
                     </div>
                   ) : (
                     <div className="text-slate-800 dark:text-slate-200 text-xs leading-relaxed font-normal whitespace-pre-line">
-                      {aiSummary}
+                      {sanitizeNewsText(aiSummary)}
                     </div>
                   )}
                 </div>
