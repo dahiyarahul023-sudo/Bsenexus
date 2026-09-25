@@ -356,8 +356,9 @@ apiRouter.get("/announcements",
   apiResponseCache.middleware({ ttlMs: 15 * 1000, publicCache: false }),
   async (req, res) => {
     res.setHeader('Cache-Control', 'private, max-age=10, stale-while-revalidate=20');
-    // Cap limit at 100 to protect Firestore read quota and memory
-    const limitParam = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
+    // Cap at 1000: DAO serves from in-memory cache (up to 10k items), so this
+    // does not add Firestore reads. Frontend requests limit=1000 for watchlists.
+    const limitParam = Math.min(1000, Math.max(1, parseInt(req.query.limit as string) || 50));
     let symbols: string[] | undefined;
     if (req.query.symbols && typeof req.query.symbols === 'string') {
       symbols = req.query.symbols.split(',').map(s => s.trim()).filter(Boolean);
