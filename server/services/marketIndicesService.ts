@@ -307,8 +307,10 @@ async function fetchDirectBseSensex(): Promise<MarketIndexItem | null> {
         if (!isNaN(curval) && curval > 1000) {
           const chg = parseFloat(data.chg || data.Chg || data.change || (Array.isArray(data) && data[0]?.chg) || '0');
           const pChg = parseFloat(data.pChg || data.PChg || data.percentChange || (Array.isArray(data) && data[0]?.pChg) || '0');
-          const high = parseFloat(data.high || data.High || curval);
-          const low = parseFloat(data.low || data.Low || curval);
+          const highRaw = data.high ?? data.High;
+          const lowRaw = data.low ?? data.Low;
+          const high = highRaw != null ? parseFloat(highRaw) : NaN;
+          const low = lowRaw != null ? parseFloat(lowRaw) : NaN;
           const prevClose = parseFloat(data.prevclose || data.PrevClose || (curval - chg));
 
           return {
@@ -319,8 +321,8 @@ async function fetchDirectBseSensex(): Promise<MarketIndexItem | null> {
             price: curval,
             change: isNaN(chg) ? 0 : chg,
             changePercent: isNaN(pChg) ? 0 : pChg,
-            dayHigh: isNaN(high) ? curval : high,
-            dayLow: isNaN(low) ? curval : low,
+            dayHigh: isNaN(high) ? undefined : high,
+            dayLow: isNaN(low) ? undefined : low,
             previousClose: isNaN(prevClose) ? (curval - chg) : prevClose,
             currency: 'INR',
             lastUpdated: new Date().toISOString(),
@@ -402,8 +404,10 @@ async function fetchDirectNseIndices(): Promise<Partial<Record<string, MarketInd
         const last = parseFloat(item.last || item.lastPrice);
         const change = parseFloat(item.change || 0);
         const percentChange = parseFloat(item.percentChange || item.pChange || 0);
-        const high = parseFloat(item.high || last);
-        const low = parseFloat(item.low || last);
+        const highRaw = item.high ?? null;
+        const lowRaw = item.low ?? null;
+        const high = highRaw != null ? parseFloat(highRaw) : NaN;
+        const low = lowRaw != null ? parseFloat(lowRaw) : NaN;
         const previousClose = parseFloat(item.previousClose || (last - change));
 
         if (!isNaN(last) && last > 0) {
@@ -416,8 +420,8 @@ async function fetchDirectNseIndices(): Promise<Partial<Record<string, MarketInd
               price: last,
               change,
               changePercent: percentChange,
-              dayHigh: high,
-              dayLow: low,
+              dayHigh: isNaN(high) ? undefined : high,
+              dayLow: isNaN(low) ? undefined : low,
               previousClose,
               currency: 'INR',
               lastUpdated: new Date().toISOString(),
@@ -433,8 +437,8 @@ async function fetchDirectNseIndices(): Promise<Partial<Record<string, MarketInd
               price: last,
               change,
               changePercent: percentChange,
-              dayHigh: high,
-              dayLow: low,
+              dayHigh: isNaN(high) ? undefined : high,
+              dayLow: isNaN(low) ? undefined : low,
               previousClose,
               currency: 'INR',
               lastUpdated: new Date().toISOString(),
@@ -450,8 +454,8 @@ async function fetchDirectNseIndices(): Promise<Partial<Record<string, MarketInd
               price: last,
               change,
               changePercent: percentChange,
-              dayHigh: high,
-              dayLow: low,
+              dayHigh: isNaN(high) ? undefined : high,
+              dayLow: isNaN(low) ? undefined : low,
               previousClose,
               currency: 'INR',
               lastUpdated: new Date().toISOString(),
@@ -467,8 +471,8 @@ async function fetchDirectNseIndices(): Promise<Partial<Record<string, MarketInd
               price: last,
               change,
               changePercent: percentChange,
-              dayHigh: high,
-              dayLow: low,
+              dayHigh: isNaN(high) ? undefined : high,
+              dayLow: isNaN(low) ? undefined : low,
               previousClose,
               currency: 'POINTS',
               lastUpdated: new Date().toISOString(),
