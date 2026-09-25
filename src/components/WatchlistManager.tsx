@@ -823,9 +823,14 @@ export function WatchlistManager() {
         ? activeSymbols
         : Array.from(new Set(watchlists.flatMap(l => (l.items || []).map((it: any) => parseSymbolItem(it).symbol).filter(Boolean))));
 
+      // Feed size scales with the watchlist: ~25 filings per tracked stock
+      // (same PER_STOCK_FILINGS as the per-company modal on the server).
+      // No random 100/1000 caps — the number is derived from what we show.
+      const PER_STOCK_FILINGS = 25;
       let url = '/api/announcements';
       if (symbolsToFetch.length > 0) {
-        url += `?limit=1000&symbols=${encodeURIComponent(symbolsToFetch.join(','))}`;
+        const limit = Math.min(2500, Math.max(PER_STOCK_FILINGS, symbolsToFetch.length * PER_STOCK_FILINGS));
+        url += `?limit=${limit}&symbols=${encodeURIComponent(symbolsToFetch.join(','))}`;
       } else {
         url += '?limit=50';
       }
