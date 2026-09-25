@@ -602,17 +602,17 @@ export function LandingPage({
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
                 </span>
-                <span>Continuous BSE India Corporate Disclosure Ingestion (15s Polling)</span>
+                <span>Continuous BSE India Corporate Disclosure Ingestion</span>
               </div>
 
               {/* Main Headline */}
               <h1 className="text-3xl sm:text-5xl lg:text-[52px] font-black text-slate-900 dark:text-white leading-[1.12] tracking-tight font-display">
-                Real-time <span className="text-emerald-600 dark:text-emerald-400">BSE India</span> Corporate Filings, Earnings Calendar & AI Intelligence
+                BSE India Corporate Filings, Earnings Calendar & AI Intelligence
               </h1>
 
               {/* Subheadline */}
               <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed max-w-2xl font-normal">
-                Never miss a market-moving announcement. Get instant Gemini AI financial summaries, YoY & QoQ metric breakdowns, custom watchlist filtering, and high-speed Telegram alerts the moment companies file on BSE.
+                Track market-moving announcements with AI financial summaries, YoY &amp; QoQ metric breakdowns, custom watchlist filtering, and Telegram alerts — sourced directly from official BSE India filings.
               </p>
 
               {/* Action Buttons */}
@@ -649,20 +649,20 @@ export function LandingPage({
               {/* Trust Metric Badges */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-slate-200/80 dark:border-[#2D283E]">
                 <div className="space-y-0.5">
-                  <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono">&lt; 15s</div>
-                  <div className="text-[11px] text-slate-700 dark:text-slate-300 font-medium">BSE Polling Cycle</div>
+                  <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white font-mono">Live</div>
+                  <div className="text-[11px] text-slate-700 dark:text-slate-300 font-medium">BSE Filing Ingestion</div>
                 </div>
                 <div className="space-y-0.5">
-                  <div className="text-xl sm:text-2xl font-black text-purple-600 dark:text-purple-400 font-mono">~3s</div>
-                  <div className="text-[11px] text-slate-700 dark:text-slate-300 font-medium">Gemini AI Synthesis</div>
+                  <div className="text-xl sm:text-2xl font-black text-purple-600 dark:text-purple-400 font-mono">AI</div>
+                  <div className="text-[11px] text-slate-700 dark:text-slate-300 font-medium">Filing Summaries</div>
                 </div>
                 <div className="space-y-0.5">
-                  <div className="text-xl sm:text-2xl font-black text-emerald-700 dark:text-emerald-400 font-mono">5,000+</div>
-                  <div className="text-[11px] text-slate-700 dark:text-slate-300 font-medium">Listed Scrips Tracked</div>
+                  <div className="text-xl sm:text-2xl font-black text-emerald-700 dark:text-emerald-400 font-mono">Coverage</div>
+                  <div className="text-[11px] text-slate-700 dark:text-slate-300 font-medium">BSE Announcements, One Feed</div>
                 </div>
                 <div className="space-y-0.5">
-                  <div className="text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-400 font-mono">~2s</div>
-                  <div className="text-[11px] text-slate-700 dark:text-slate-300 font-medium">Instant Bot Alerts</div>
+                  <div className="text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-400 font-mono">Telegram</div>
+                  <div className="text-[11px] text-slate-700 dark:text-slate-300 font-medium">Filing Alerts</div>
                 </div>
               </div>
             </div>
@@ -1047,7 +1047,7 @@ export function LandingPage({
                   Indian Indices & Session Hours Clock
                 </h3>
                 <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                  Real-time monitoring across BSE Sensex, Nifty 50, BSE Midcap, BSE Smallcap, and India VIX. Dynamic badges indicate Pre-Open, Regular Trading, and Post-Close market statuses.
+                  Continuous monitoring across BSE Sensex, Nifty 50, BSE Midcap, BSE Smallcap, and India VIX. Dynamic badges indicate Pre-Open, Regular Trading, and Post-Close market statuses.
                 </p>
                 <div className="flex flex-wrap gap-1.5 pt-1">
                   <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 whitespace-nowrap select-none">Sensex & Nifty</span>
@@ -1281,7 +1281,7 @@ export function LandingPage({
                       <div className="bg-white dark:bg-[#161D31] p-4 rounded-lg border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
                         <div className="flex items-center gap-2">
                           <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                          <span className="font-semibold text-slate-800 dark:text-slate-200">Continuous 15s BSE Polling Stream Active for {company.symbol}</span>
+                          <span className="font-semibold text-slate-800 dark:text-slate-200">Continuous BSE filing stream active for {company.symbol}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-slate-600 dark:text-slate-400 font-mono text-[11px]">Direct PDF Ingestion Enabled</span>
@@ -1298,7 +1298,7 @@ export function LandingPage({
                           Chronological Corporate Material Events (SEBI LODR)
                         </p>
                         <span className="text-[11px] font-mono text-emerald-700 dark:text-emerald-400 font-bold">
-                          Real-time Ingestion Active
+                          Continuous Ingestion Active
                         </span>
                       </div>
 
@@ -1500,7 +1500,7 @@ export function LandingPage({
               End-to-End Workflow
             </span>
             <h2 className="text-2xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
-              Connect your watchlist, receive real-time BSE announcements, and get Gemini AI summaries instantly
+              Connect your watchlist, receive BSE announcements, and get AI filing summaries
             </h2>
             <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">
               From raw exchange PDF submission to institutional-grade insights on your phone in seconds.
@@ -1993,7 +1993,7 @@ export function LandingPage({
               </div>
 
               <h2 className="text-2xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
-                Custom stock watchlists with real-time BSE corporate announcements
+                Custom stock watchlists with BSE corporate announcements
               </h2>
 
               <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed">
@@ -2228,7 +2228,7 @@ export function LandingPage({
             <div className="lg:col-span-5 space-y-5 order-1 lg:order-2">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-xs font-bold border border-blue-200 dark:border-blue-800">
                 <Send className="w-3.5 h-3.5" />
-                <span>Feature 04 • Real-Time Broadcast</span>
+                <span>Feature 04 • Telegram Broadcast</span>
               </div>
 
               <h2 className="text-2xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
@@ -2286,7 +2286,7 @@ export function LandingPage({
               <span>Launch Special • 100% Free Access</span>
             </div>
             <h2 className="text-2xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
-              Institutional Speed, Free For All Early Users
+              Fast Filing Alerts, Free For All Early Users
             </h2>
             <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">
               We are currently giving 100% free access to all Pro features — including unlimited watchlists, Telegram alerts, and AI financial breakdowns. No credit card required.
@@ -2317,7 +2317,7 @@ export function LandingPage({
                 <ul className="space-y-3 text-xs text-slate-600 dark:text-slate-300">
                   <li className="flex items-center gap-2.5">
                     <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span>Real-time BSE Announcements (15s polling cycle)</span>
+                    <span>BSE announcements, updated continuously</span>
                   </li>
                   <li className="flex items-center gap-2.5">
                     <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
@@ -2434,9 +2434,9 @@ export function LandingPage({
               </div>
 
               {[
-                { feature: 'BSE India 15s Disclosure Ingestion', free: 'Included', pro: 'Included (Priority Server)' },
+                { feature: 'BSE India disclosure ingestion', free: 'Included', pro: 'Included (Priority Server)' },
                 { feature: 'Coverage across 5,000+ Listed Scrips', free: 'Full 5,000+', pro: 'Full 5,000+' },
-                { feature: 'Gemini AI Metric Synthesis (~3s)', free: 'Standard', pro: 'High-Priority Instant' },
+                { feature: 'AI filing summaries', free: 'Standard', pro: 'High-Priority Instant' },
                 { feature: 'Watchlist Capacity', free: 'Up to 2 Lists', pro: 'Unlimited Lists' },
                 { feature: 'Telegram Notifications', free: '1 Personal Chat', pro: 'Unlimited Channels & Groups' },
                 { feature: 'Routine Administrative Filter', free: 'Basic', pro: 'Advanced Smart Mute' },
@@ -2530,13 +2530,13 @@ export function LandingPage({
                 <span>Institutional Equity Analytics &amp; AEO Knowledge Base</span>
               </div>
               <h2 id="about-heading" className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
-                About BSE Nexus: Real-Time Corporate Filings &amp; Market Intelligence
+                About BSE Nexus: Corporate Filings &amp; Market Intelligence
               </h2>
             </div>
 
             <div className="prose prose-slate dark:prose-invert max-w-none text-sm sm:text-base text-slate-700 dark:text-slate-300 leading-relaxed space-y-4">
               <p>
-                <strong>BSE Nexus</strong> is an independent financial technology analytics terminal and research platform engineered specifically for tracking Bombay Stock Exchange (BSE) corporate announcements, regulatory disclosures, and earnings releases in real time. Designed for active retail investors, equity research analysts, and institutional desks, BSE Nexus ingests corporate disclosures directly from the official portal of the <a href="https://www.bseindia.com" target="_blank" rel="noopener noreferrer" className="text-emerald-600 dark:text-emerald-400 font-semibold underline hover:text-emerald-500">Bombay Stock Exchange (BSE India)</a> within 15 seconds of filing.
+                <strong>BSE Nexus</strong> structures corporate announcements, regulatory disclosures, and earnings releases sourced directly from the official portal of the <a href="https://www.bseindia.com" target="_blank" rel="noopener noreferrer" className="text-emerald-600 dark:text-emerald-400 font-semibold underline hover:text-emerald-500">Bombay Stock Exchange (BSE India)</a>. Built for retail investors, equity research analysts, and market participants who track Indian listed companies.
               </p>
 
               <p>
@@ -2544,11 +2544,11 @@ export function LandingPage({
               </p>
 
               <p>
-                Beyond real-time disclosure feeds, BSE Nexus maintains an updated <a href="/results-calendar" className="text-emerald-600 dark:text-emerald-400 font-semibold underline hover:text-emerald-500">Quarterly Results Calendar</a> tracking scheduled board meetings, audited and unaudited earnings declarations, and historical corporate actions across 4,000+ listed Indian enterprises. Investors can navigate directly to dedicated company pages—such as <a href="/company/RELIANCE" className="text-emerald-600 dark:text-emerald-400 font-semibold underline hover:text-emerald-500">Reliance Industries</a>, <a href="/company/TCS" className="text-emerald-600 dark:text-emerald-400 font-semibold underline hover:text-emerald-500">Tata Consultancy Services (TCS)</a>, and HDFC Bank—to review comprehensive regulatory histories, price metrics, and peer group benchmarks.
+                Beyond the disclosure feed, BSE Nexus maintains an updated <a href="/results-calendar" className="text-emerald-600 dark:text-emerald-400 font-semibold underline hover:text-emerald-500">Quarterly Results Calendar</a> tracking scheduled board meetings, audited and unaudited earnings declarations, and historical corporate actions across 5,000+ BSE-listed companies. Investors can navigate directly to dedicated company pages—such as <a href="/company/RELIANCE" className="text-emerald-600 dark:text-emerald-400 font-semibold underline hover:text-emerald-500">Reliance Industries</a>, <a href="/company/TCS" className="text-emerald-600 dark:text-emerald-400 font-semibold underline hover:text-emerald-500">Tata Consultancy Services (TCS)</a>, and HDFC Bank—to review comprehensive regulatory histories, price metrics, and peer group benchmarks.
               </p>
 
               <p>
-                To empower investors with actionable domain expertise, our <a href="/guides" className="text-emerald-600 dark:text-emerald-400 font-semibold underline hover:text-emerald-500">Market Research Guides</a> offer step-by-step forensic playbooks on decoding corporate actions, analyzing balance sheets, auditing shareholding patterns under Regulation 31, and interpreting SEBI PIT insider trading disclosures. Users can also configure personalized watchlists and receive instant Telegram push notifications the moment target companies submit new filings.
+                To empower investors with actionable domain expertise, our <a href="/guides" className="text-emerald-600 dark:text-emerald-400 font-semibold underline hover:text-emerald-500">Market Research Guides</a> offer step-by-step forensic playbooks on decoding corporate actions, analyzing balance sheets, auditing shareholding patterns under Regulation 31, and interpreting SEBI PIT insider trading disclosures. Users can also configure personalized watchlists and receive Telegram push notifications shortly after target companies submit new filings.
               </p>
             </div>
           </div>
@@ -2559,10 +2559,10 @@ export function LandingPage({
                 01
               </div>
               <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-                Sub-15s Regulatory Ingestion
+                Continuous Regulatory Ingestion
               </h3>
               <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                BSE Nexus continuously tracks live regulatory feeds under SEBI LODR Regulation 30 &amp; 33. Announcements from 4,000+ BSE-listed companies are ingested, parsed, and categorized within 15 seconds of filing.
+                BSE Nexus continuously tracks live regulatory feeds under SEBI LODR Regulation 30 &amp; 33. Announcements from 5,000+ BSE-listed companies are ingested, parsed, and categorized within minutes of filing.
               </p>
               <div className="pt-2">
                 <a href="/guides/sebi-lodr-reg-30-disclosures" className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline">
@@ -2612,10 +2612,10 @@ export function LandingPage({
           <div className="mt-12 p-6 rounded-2xl bg-slate-100/70 dark:bg-[#111622] border border-slate-200 dark:border-slate-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="space-y-1">
               <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Entity Clarity &amp; Independence Notice
+                Entity Notice
               </p>
               <p className="text-xs text-slate-600 dark:text-slate-300">
-                BSE Nexus is an independent market research platform and is not affiliated with Nexus Select Trust (REIT Scrip: 543913), BSE India Ltd, or SEBI. We are not SEBI-registered financial advisors.
+                BSE Nexus is not affiliated with Nexus Select Trust (REIT Scrip: 543913), BSE India Ltd, or SEBI, and is not a SEBI-registered investment adviser.
               </p>
             </div>
             <div className="flex items-center gap-3 shrink-0">
@@ -2676,7 +2676,7 @@ export function LandingPage({
             </div>
             <div className="flex items-center gap-1.5">
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              <span>15s live polling stream</span>
+              <span>Live filing stream</span>
             </div>
             <div className="flex items-center gap-1.5">
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
@@ -2712,7 +2712,7 @@ export function LandingPage({
                 </span>
               </div>
               <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed max-w-sm">
-                Advanced financial intelligence platform indexing real-time Bombay Stock Exchange (BSE) corporate filings with neural Gemini AI summaries and instant multi-channel dispatch.
+                Advanced financial intelligence platform structuring Bombay Stock Exchange (BSE) corporate filings with AI summaries and Telegram alerts.
               </p>
               {(() => {
                 const now = new Date();
@@ -2780,7 +2780,7 @@ export function LandingPage({
           </div>
 
           <div className="border-t border-slate-200 dark:border-slate-800 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-slate-700 dark:text-slate-300 font-medium">
-            <div>© {new Date().getFullYear()} BSE Nexus. Independent BSE Disclosures Aggregator. Operator: Rahul Dahiya (admin@bsenexus.in).</div>
+            <div>© {new Date().getFullYear()} BSE Nexus. Not affiliated with BSE Limited or NSE. Built and operated by Rahul Dahiya (admin@bsenexus.in).</div>
             <div className="flex flex-wrap items-center gap-3">
               <a href="/about" className="hover:text-emerald-500 transition-colors">About</a>
               <span>•</span>
