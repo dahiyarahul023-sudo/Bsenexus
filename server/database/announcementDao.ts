@@ -711,13 +711,36 @@ export async function getRecentAnnouncements(limitNum: number = 1000, symbols?: 
   if (symbols && symbols.length > 0) {
     const cleanSymbols = symbols.map(s => String(s).trim().toUpperCase()).filter(Boolean);
     if (cleanSymbols.length > 0) {
-      const filtered = announcementsMemoryCache.filter(ann => {
+      // Per-stock allocation: each tracked stock contributes up to PER_STOCK of its
+      // newest filings. Without this, the most active stocks drown out quieter ones
+      // because the cache is sorted newest-first globally.
+      const PER_STOCK = 25;
+      const buckets: any[][] = cleanSymbols.map(() => []);
+      const counts = new Array<number>(cleanSymbols.length).fill(0);
+      let allFull = false;
+      // announcementsMemoryCache is already maintained sorted newest-first on insert.
+      for (const ann of announcementsMemoryCache) {
+        if (allFull) break;
         const comp = ann.companyName || ann.SLONGNAME || '';
         const subj = ann.subject || ann.NEWSSUB || '';
         const scrip = String(ann.scrip_cd || ann.SCRIP_CD || '');
-        return cleanSymbols.some(sym => isSymbolMatch(comp, subj, sym, scrip));
+        for (let i = 0; i < cleanSymbols.length; i++) {
+          if (counts[i] >= PER_STOCK) continue;
+          if (isSymbolMatch(comp, subj, cleanSymbols[i], scrip)) {
+            buckets[i].push(ann);
+            counts[i]++;
+            break; // assign to first matching symbol; avoids duplicates
+          }
+        }
+        allFull = counts.every(c => c >= PER_STOCK);
+      }
+      const merged = buckets.flat();
+      merged.sort((a, b) => {
+        const tsA = (typeof a.bseTimestamp === 'number' && !isNaN(a.bseTimestamp) && a.bseTimestamp > 0) ? a.bseTimestamp : (a.fetched_at || 0);
+        const tsB = (typeof b.bseTimestamp === 'number' && !isNaN(b.bseTimestamp) && b.bseTimestamp > 0) ? b.bseTimestamp : (b.fetched_at || 0);
+        return tsB - tsA;
       });
-      return filtered.slice(0, limitNum);
+      return merged.slice(0, limitNum);
     }
   }
   // announcementsMemoryCache is already maintained sorted on insert
