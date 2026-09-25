@@ -26,7 +26,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({
     document.title = 'Pricing & Plans — 100% Free Launch Access | BSE Nexus';
     const metaDesc = document.querySelector('meta[name="description"]');
     if (metaDesc) {
-      metaDesc.setAttribute('content', 'Explore BSE Nexus transparent pricing. 100% Free access to Community and Pro intelligence features during launch: real-time BSE filings, Gemini AI summaries, and Telegram alerts.');
+      metaDesc.setAttribute('content', 'Explore BSE Nexus transparent pricing. 100% Free access to Community and Pro intelligence features during launch: BSE filings, AI summaries, and Telegram alerts.');
     }
     let canonical = document.querySelector('link[rel="canonical"]');
     if (!canonical) {
@@ -89,7 +89,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({
             </div>
             
             <h1 className="text-3xl sm:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
-              Institutional Speed, Free For All Early Users
+              Fast Filing Alerts, Free For All Early Users
             </h1>
             
             <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed">
@@ -120,7 +120,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({
                 <ul className="space-y-3.5 text-xs text-slate-600 dark:text-slate-300">
                   <li className="flex items-center gap-2.5">
                     <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span>Real-time BSE Announcements (15s polling cycle)</span>
+                    <span>BSE announcements, updated continuously</span>
                   </li>
                   <li className="flex items-center gap-2.5">
                     <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
@@ -236,9 +236,9 @@ export const PricingPage: React.FC<PricingPageProps> = ({
 
               <div className="bg-white dark:bg-[#15141E] p-6 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2">
                 <ShieldCheck className="w-6 h-6 text-emerald-500" />
-                <h3 className="font-bold text-sm text-slate-900 dark:text-white">BSE & SEBI Compliant</h3>
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white">Sourced from Official Filings</h3>
                 <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                  Direct processing of exchange feeds adhering strictly to SEBI LODR Regulation 30 & 33 frameworks.
+                  Source: official BSE India disclosures. Structured per SEBI LODR Regulation 30 &amp; 33.
                 </p>
               </div>
 
@@ -311,7 +311,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({
             BSE Nexus is an informational research terminal. We are not SEBI registered investment advisors. Financial metric summaries and AI extractions are for research purposes only.
           </p>
           <p className="text-[11px] text-slate-400">
-            © {new Date().getFullYear()} BSE Nexus Technologies. Real-time Indian Equity Intelligence.
+            © {new Date().getFullYear()} BSE Nexus Technologies. Indian Equity Intelligence.
           </p>
         </div>
       </footer>
