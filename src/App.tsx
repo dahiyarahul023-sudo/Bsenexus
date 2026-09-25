@@ -144,6 +144,21 @@ function AppContent() {
   } = useAuth();
   const [serverAuth, setServerAuth] = useState<{ isAuthenticated: boolean; hasPin: boolean } | null>(null);
 
+  // Terminal-entry intent: when a logged-out visitor taps "Launch Terminal" (or any
+  // terminal entry) on the landing page, we open the auth modal instead of entering
+  // silently — guest sessions are ONLY ever created by the dedicated guest button
+  // inside that modal. After a successful explicit login, we complete the entry.
+  const pendingTerminalTabRef = useRef<string | null>(null);
+  const prevAuthModalOpenRef = useRef(false);
+  useEffect(() => {
+    // If the modal was closed without a successful login, drop the pending intent
+    // so a later unrelated sign-in doesn't unexpectedly jump into the terminal.
+    if (prevAuthModalOpenRef.current && !isAuthModalOpen && !user) {
+      pendingTerminalTabRef.current = null;
+    }
+    prevAuthModalOpenRef.current = isAuthModalOpen;
+  }, [isAuthModalOpen, user]);
+
   // Apple-Grade Scroll State & Restoration System ("Scroll is state")
   const { restoredInfo, scrollToTop } = useScrollRestoration({
     activeKey: activeTab,
@@ -561,6 +576,13 @@ function AppContent() {
       <>
         <LandingPage
           onEnterTerminal={(tab) => {
+            // No silent entry for logged-out visitors: open the auth modal so they
+            // explicitly choose Sign in / Create account / Continue as Guest.
+            if (!user) {
+              pendingTerminalTabRef.current = tab || 'dashboard';
+              setIsAuthModalOpen(true);
+              return;
+            }
             if (tab) {
               const safeTab = (tab === 'diagnostics' || tab === 'logs' || tab === 'storage' || tab === 'seo-suite') && !isAdmin
                 ? 'dashboard'
@@ -575,7 +597,16 @@ function AppContent() {
           bseHealth={health.bse}
           telegramHealth={health.telegram}
         />
-        {isAuthModalOpen && <AuthModal />}
+        {isAuthModalOpen && (
+          <AuthModal
+            onSuccess={() => {
+              // Complete the pending terminal entry after an explicit login.
+              const t = pendingTerminalTabRef.current;
+              pendingTerminalTabRef.current = null;
+              if (t) handleTabChange(t);
+            }}
+          />
+        )}
         {isProModalOpen && <ProUpgradeModal />}
         {isAdminPinModalOpen && <AdminPinModal />}
       </>
@@ -588,6 +619,13 @@ function AppContent() {
       <>
         <LandingPage
           onEnterTerminal={(tab) => {
+            // No silent entry for logged-out visitors: open the auth modal so they
+            // explicitly choose Sign in / Create account / Continue as Guest.
+            if (!user) {
+              pendingTerminalTabRef.current = tab || 'dashboard';
+              setIsAuthModalOpen(true);
+              return;
+            }
             if (tab) {
               const safeTab = (tab === 'diagnostics' || tab === 'logs' || tab === 'storage' || tab === 'seo-suite') && !isAdmin
                 ? 'dashboard'
@@ -602,7 +640,16 @@ function AppContent() {
           bseHealth={health.bse}
           telegramHealth={health.telegram}
         />
-        {isAuthModalOpen && <AuthModal />}
+        {isAuthModalOpen && (
+          <AuthModal
+            onSuccess={() => {
+              // Complete the pending terminal entry after an explicit login.
+              const t = pendingTerminalTabRef.current;
+              pendingTerminalTabRef.current = null;
+              if (t) handleTabChange(t);
+            }}
+          />
+        )}
         {isProModalOpen && <ProUpgradeModal />}
         {isAdminPinModalOpen && <AdminPinModal />}
       </>
