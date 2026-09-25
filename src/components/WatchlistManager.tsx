@@ -825,7 +825,8 @@ export function WatchlistManager() {
 
       // Feed size scales with the watchlist: ~25 filings per tracked stock
       // (same PER_STOCK_FILINGS as the per-company modal on the server).
-      // No random 100/1000 caps — the number is derived from what we show.
+      // The server further applies the "what's new" policy: last 7 days only,
+      // max 25 per stock — so this limit is just a safety backstop.
       const PER_STOCK_FILINGS = 25;
       let url = '/api/announcements';
       if (symbolsToFetch.length > 0) {
