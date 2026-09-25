@@ -3,7 +3,19 @@ import YahooFinance from 'yahoo-finance2';
 let yfClient: any = null;
 function getYF() {
   if (!yfClient) {
-    yfClient = new (YahooFinance as any)({ suppressNotices: ['yahooSurvey'] });
+    const rawModule = YahooFinance as any;
+    const YFClass = rawModule?.default?.default || rawModule?.default || rawModule;
+    if (typeof YFClass === 'function') {
+      try {
+        yfClient = new YFClass({ suppressNotices: ['yahooSurvey'] });
+      } catch {
+        yfClient = YFClass;
+      }
+    } else if (typeof rawModule?.quote === 'function') {
+      yfClient = rawModule;
+    } else {
+      yfClient = YFClass;
+    }
   }
   return yfClient;
 }

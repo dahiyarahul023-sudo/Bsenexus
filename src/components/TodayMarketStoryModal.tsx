@@ -2,12 +2,14 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, ChevronLeft, ChevronRight, Pause, Play, 
-  ArrowUpRight, ArrowDownRight
+  ArrowUpRight, ArrowDownRight, RotateCw
 } from 'lucide-react';
 import { springSnappy, buttonTap } from '../utils/motionTokens';
 import { 
   StoryChapter, 
   DEFAULT_STORY_CHAPTERS, 
+  getInitialStoryChapters,
+  getISTMarketSession,
   getAllSlides, 
   fetchLiveStoryChapters 
 } from './story/storyData';
@@ -31,7 +33,8 @@ export function TodayMarketStoryModal({
   onStoryViewed,
   onOpenCompanyIntel 
 }: TodayMarketStoryModalProps) {
-  const [chapters, setChapters] = useState<StoryChapter[]>(DEFAULT_STORY_CHAPTERS);
+  const marketSession = useMemo(() => getISTMarketSession(), []);
+  const [chapters, setChapters] = useState<StoryChapter[]>(() => getInitialStoryChapters());
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -94,17 +97,36 @@ export function TodayMarketStoryModal({
     };
   }, [isOpen]);
 
-  // Hydrate dynamic live market data on mount
-  useEffect(() => {
-    if (!isOpen) return;
-    let isMounted = true;
-    fetchLiveStoryChapters().then(liveChapters => {
-      if (isMounted && liveChapters?.length) {
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Hydrate dynamic live market data on mount & periodic 60s check
+  const loadFreshStory = useCallback(async (showIndicator = false) => {
+    if (showIndicator) setIsRefreshing(true);
+    try {
+      const liveChapters = await fetchLiveStoryChapters();
+      if (liveChapters?.length) {
         setChapters(liveChapters);
       }
-    });
-    return () => { isMounted = false; };
-  }, [isOpen]);
+    } catch (e) {
+      console.warn('Failed to refresh story feed:', e);
+    } finally {
+      if (showIndicator) {
+        setTimeout(() => setIsRefreshing(false), 500);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    loadFreshStory(false);
+
+    // Auto-refresh every 60s while open so morning radar & closing moves transition seamlessly
+    const interval = setInterval(() => {
+      loadFreshStory(false);
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, [isOpen, loadFreshStory]);
 
   // Advance to next slide
   const handleNext = useCallback(() => {
@@ -277,16 +299,33 @@ export function TodayMarketStoryModal({
           {/* Removed 1 2 3 switcher pills as requested                */}
           {/* ======================================================== */}
           <div className="pt-3 px-4 pb-2 shrink-0 bg-gradient-to-b from-black/90 via-black/60 to-transparent z-20">
-            {/* Top Row: Category dot + Chapter Name + Controls */}
+            {/* Top Row: Category dot + Chapter Name + Session Badge + Controls */}
             <div className="flex items-center justify-between gap-2 mb-2.5">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
                 <h2 className="text-sm font-bold text-white tracking-tight truncate drop-shadow-sm">
                   {currentChapter.title}
                 </h2>
+                <span className="hidden sm:inline-block text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/10 text-slate-300 border border-white/10 whitespace-nowrap">
+                  {marketSession.editionBadge}
+                </span>
               </div>
 
               <div className="flex items-center gap-1.5 shrink-0">
+                {/* Manual Story Feed Refresh */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    loadFreshStory(true);
+                  }}
+                  className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 active:bg-white/30 flex items-center justify-center text-white/80 transition-colors cursor-pointer"
+                  title="Refresh Story with latest market data & news (< 18h)"
+                  aria-label="Refresh Story Feed"
+                >
+                  <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-emerald-400' : ''}`} />
+                </button>
+
                 {/* Play / Pause indicator */}
                 <button 
                   type="button"
@@ -380,6 +419,14 @@ export function TodayMarketStoryModal({
                   {currentSlide.title}
                 </h1>
 
+                {/* Metric / Stat Highlight Pill */}
+                {currentSlide.statsValue && (
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-white/10 border border-white/15 backdrop-blur-md self-start text-[11px] text-slate-200 shadow-sm">
+                    {currentSlide.statsLabel && <span className="text-slate-400 font-medium">{currentSlide.statsLabel}:</span>}
+                    <span className="font-bold text-white tracking-wide">{currentSlide.statsValue}</span>
+                  </div>
+                )}
+
                 {/* 3. REAL HIGH-RES PHOTOGRAPHIC IMAGE (Authentic Industry Photography) */}
                 <RealStoryHeroImage
                   src={currentSlide.imageUrl}
@@ -390,6 +437,13 @@ export function TodayMarketStoryModal({
                   aspectRatio="aspect-[16/9]"
                   className="w-full shrink-0 shadow-lg"
                 />
+
+                {/* Rich Story Narrative / Context */}
+                {currentSlide.description && (
+                  <p className="text-xs text-slate-300/95 leading-relaxed line-clamp-2 px-0.5 font-sans">
+                    {currentSlide.description}
+                  </p>
+                )}
 
                 {/* 4. DIRECT STRUCTURED DATA CARDS */}
                 
@@ -472,21 +526,30 @@ export function TodayMarketStoryModal({
                 {currentSlide.fiiDiiData && (
                   <div className="bg-white/5 border border-white/10 rounded-xl p-2.5 flex flex-col gap-2">
                     <div className="grid grid-cols-2 gap-2 text-center">
-                      <div className="p-2 rounded-lg bg-rose-500/10 border border-rose-500/20">
-                        <span className="text-[10px] font-bold text-rose-300 block">FII Net Outflow</span>
-                        <span className="text-xs sm:text-sm font-black text-rose-400 font-mono mt-0.5 block">
-                          -₹{Math.abs(currentSlide.fiiDiiData.fiiNet).toLocaleString('en-IN')} Cr
+                      <div className={`p-2 rounded-lg border ${currentSlide.fiiDiiData.fiiNet >= 0 ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-rose-500/10 border-rose-500/20'}`}>
+                        <span className={`text-[10px] font-bold block ${currentSlide.fiiDiiData.fiiNet >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+                          {currentSlide.fiiDiiData.fiiNet >= 0 ? 'FII Net Inflow' : 'FII Net Outflow'}
+                        </span>
+                        <span className={`text-xs sm:text-sm font-black font-mono mt-0.5 block ${currentSlide.fiiDiiData.fiiNet >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {currentSlide.fiiDiiData.fiiNet >= 0 ? '+' : '-'}₹{Math.abs(Math.round(currentSlide.fiiDiiData.fiiNet)).toLocaleString('en-IN')} Cr
                         </span>
                       </div>
-                      <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                        <span className="text-[10px] font-bold text-emerald-300 block">DII Net Inflow</span>
-                        <span className="text-xs sm:text-sm font-black text-emerald-400 font-mono mt-0.5 block">
-                          +₹{currentSlide.fiiDiiData.diiNet.toLocaleString('en-IN')} Cr
+                      <div className={`p-2 rounded-lg border ${currentSlide.fiiDiiData.diiNet >= 0 ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-rose-500/10 border-rose-500/20'}`}>
+                        <span className={`text-[10px] font-bold block ${currentSlide.fiiDiiData.diiNet >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+                          {currentSlide.fiiDiiData.diiNet >= 0 ? 'DII Net Inflow' : 'DII Net Outflow'}
+                        </span>
+                        <span className={`text-xs sm:text-sm font-black font-mono mt-0.5 block ${currentSlide.fiiDiiData.diiNet >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          {currentSlide.fiiDiiData.diiNet >= 0 ? '+' : '-'}₹{Math.abs(Math.round(currentSlide.fiiDiiData.diiNet)).toLocaleString('en-IN')} Cr
                         </span>
                       </div>
                     </div>
-                    <div className="text-center text-[10px] font-medium text-slate-300 bg-white/5 py-1 px-2 rounded-md">
-                      {currentSlide.fiiDiiData.flowInsight}
+                    <div className="flex items-center justify-between text-[10px] font-medium text-slate-300 bg-white/5 py-1 px-2.5 rounded-md">
+                      <span className="truncate">{currentSlide.fiiDiiData.flowInsight}</span>
+                      {currentSlide.fiiDiiData.dateStr && (
+                        <span className="text-[9px] font-bold text-slate-400 shrink-0 ml-2">
+                          {currentSlide.fiiDiiData.dateStr}
+                        </span>
+                      )}
                     </div>
                   </div>
                 )}
@@ -581,41 +644,43 @@ export function TodayMarketStoryModal({
           {/* ======================================================== */}
           {/* FLOATING BOTTOM ACTION PILL (Direct 360° Intelligence)   */}
           {/* ======================================================== */}
-          <div className="absolute bottom-3 left-4 right-4 z-30 pointer-events-auto">
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={buttonTap}
-              transition={springSnappy}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (currentSlide.actionPill) {
-                  handleOpenCompanyHub(
-                    currentSlide.actionPill.scripCode,
-                    currentSlide.actionPill.symbol,
-                    currentSlide.actionPill.name
-                  );
-                }
-              }}
-              className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 active:bg-white/30 backdrop-blur-xl border border-white/25 shadow-xl text-white cursor-pointer transition-all duration-150"
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <CompanyBrandLogo 
-                  symbol={currentSlide.actionPill.symbol} 
-                  scripCode={currentSlide.actionPill.scripCode}
-                  name={currentSlide.actionPill.name}
-                  size="sm" 
-                  className="shadow-sm ring-1 ring-white/30" 
-                />
-                <span className="text-xs font-bold text-white truncate drop-shadow-sm">
-                  {currentSlide.actionPill.name}
-                </span>
-              </div>
-              <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-300 shrink-0 ml-1">
-                <span>View 360° Hub</span>
-                <ChevronRight className="w-4 h-4 text-white/80" />
-              </div>
-            </motion.button>
-          </div>
+          {currentSlide.actionPill && (
+            <div className="absolute bottom-3 left-4 right-4 z-30 pointer-events-auto">
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={buttonTap}
+                transition={springSnappy}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (currentSlide.actionPill) {
+                    handleOpenCompanyHub(
+                      currentSlide.actionPill.scripCode,
+                      currentSlide.actionPill.symbol,
+                      currentSlide.actionPill.name
+                    );
+                  }
+                }}
+                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 active:bg-white/30 backdrop-blur-xl border border-white/25 shadow-xl text-white cursor-pointer transition-all duration-150"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <CompanyBrandLogo 
+                    symbol={currentSlide.actionPill.symbol} 
+                    scripCode={currentSlide.actionPill.scripCode}
+                    name={currentSlide.actionPill.name}
+                    size="sm" 
+                    className="shadow-sm ring-1 ring-white/30" 
+                  />
+                  <span className="text-xs font-bold text-white truncate drop-shadow-sm">
+                    {currentSlide.actionPill.name}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-300 shrink-0 ml-1">
+                  <span>View 360° Hub</span>
+                  <ChevronRight className="w-4 h-4 text-white/80" />
+                </div>
+              </motion.button>
+            </div>
+          )}
         </motion.div>
       </div>
     </AnimatePresence>

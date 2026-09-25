@@ -2,6 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { sendReplyToTelegram } from "./telegram.js";
 import { addLog } from "../database/logDao.js";
 import { updateAnnouncementSummary, getAnnouncementById } from "../database/announcementDao.js";
+import { geminiCircuitBreaker } from "../utils/circuitBreaker.js";
 // pdf-parse loaded dynamically when needed
 
 let aiClient: GoogleGenAI | null = null;
@@ -113,19 +114,19 @@ export async function generateDirectSummary(company: string, subject: string, de
       return generateInstantHeuristicSummary(company, subject, details, category);
     }
 
-  // Fast-fail if quota is temporarily exhausted with heuristic summary fallback
-  const elapsedCooldown = Date.now() - lastGeminiQuotaExhaustedTime;
-  if (elapsedCooldown < GEMINI_QUOTA_COOLDOWN_MS) {
-    addLog('INFO', 'GEMINI', `[${company}] Gemini cooldown active (${Math.ceil((GEMINI_QUOTA_COOLDOWN_MS - elapsedCooldown)/1000)}s remaining). Providing instant extraction summary.`);
-    const fallbackSummary = generateInstantHeuristicSummary(company, subject, details, category);
-    if (newsId) {
-      try { await updateAnnouncementSummary(newsId, fallbackSummary); } catch {}
+    // Fast-fail if circuit breaker is OPEN with heuristic summary fallback
+    if (geminiCircuitBreaker.getState() === 'OPEN') {
+      const remainingCooldown = Math.round(geminiCircuitBreaker.getStatus().resetTimeoutMs / 1000);
+      addLog('INFO', 'GEMINI', `[${company}] Gemini circuit breaker is OPEN (${remainingCooldown}s cooldown). Providing instant extraction summary.`);
+      const fallbackSummary = generateInstantHeuristicSummary(company, subject, details, category);
+      if (newsId) {
+        try { await updateAnnouncementSummary(newsId, fallbackSummary); } catch {}
+      }
+      return fallbackSummary;
     }
-    return fallbackSummary;
-  }
 
-  const startTime = Date.now();
-  addLog('INFO', 'GEMINI', `[${company}] Starting AI summary generation (${category})${pdfLink ? ' with PDF attachment' : ''}`);
+    const startTime = Date.now();
+    addLog('INFO', 'GEMINI', `[${company}] Starting AI summary generation (${category})${pdfLink ? ' with PDF attachment' : ''}`);
 
   try {
     let pdfData: any = null;
@@ -265,32 +266,38 @@ Details: ${combinedDetails}`;
     let lastError: any = null;
     let successfulModel = "";
 
-    for (const modelName of modelsToTry) {
-      for (let attempt = 1; attempt <= 2; attempt++) {
-        try {
-          response = await ai.models.generateContent({
-            model: modelName,
-            contents: contents
-          });
-          if (response && response.text) {
-            successfulModel = modelName;
-            break;
-          }
-        } catch (err: any) {
-          lastError = err;
-          const errStr = err?.message || String(err);
-          const is429 = errStr.includes("429") || errStr.includes("RESOURCE_EXHAUSTED") || errStr.includes("Quota exceeded") || errStr.includes("quota");
-          
-          if (is429) {
-            addLog('WARNING', 'GEMINI', `[${company}] Free tier rate limit on ${modelName} (Attempt ${attempt}). Trying fallback...`);
-            await new Promise(r => setTimeout(r, 2000));
-          } else {
-            addLog('WARNING', 'GEMINI', `[${company}] Model ${modelName} returned error: ${errStr.substring(0, 100)}`);
-            break; // Try next model in list
+    try {
+      response = await geminiCircuitBreaker.execute(async () => {
+        for (const modelName of modelsToTry) {
+          for (let attempt = 1; attempt <= 2; attempt++) {
+            try {
+              const res = await ai.models.generateContent({
+                model: modelName,
+                contents: contents
+              });
+              if (res && res.text) {
+                successfulModel = modelName;
+                return res;
+              }
+            } catch (err: any) {
+              lastError = err;
+              const errStr = err?.message || String(err);
+              const is429 = errStr.includes("429") || errStr.includes("RESOURCE_EXHAUSTED") || errStr.includes("Quota exceeded") || errStr.includes("quota");
+              
+              if (is429) {
+                addLog('WARNING', 'GEMINI', `[${company}] Free tier rate limit on ${modelName} (Attempt ${attempt}). Trying fallback...`);
+                await new Promise(r => setTimeout(r, 1500));
+              } else {
+                addLog('WARNING', 'GEMINI', `[${company}] Model ${modelName} returned error: ${errStr.substring(0, 100)}`);
+                break; // Try next model in list
+              }
+            }
           }
         }
-      }
-      if (response && response.text) break;
+        throw (lastError || new Error("All Gemini models returned empty output"));
+      }, undefined, 18000);
+    } catch (cbErr: any) {
+      lastError = cbErr;
     }
 
     if (!response || !response.text) {
@@ -399,6 +406,10 @@ Your job is to guide users, explain all app features, and help them configure an
    - Mute routine spam filings (loss of share certificates, trading window closures) via Noise Filter.
 
 Provide direct, actionable, step-by-step guidance. Be polite, precise, and supportive.`;
+
+  if (geminiCircuitBreaker.getState() === 'OPEN') {
+    return "The AI Assistant is currently in protective cooldown due to upstream rate limits. Please try asking again in a few moments, or check Settings to verify your Gemini API key.";
+  }
 
   try {
     const formattedContents: any[] = [];

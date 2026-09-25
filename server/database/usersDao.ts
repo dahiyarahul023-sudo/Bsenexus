@@ -1,6 +1,6 @@
 import { adminDb } from './firebase.js';
 import { readLocalJson, writeLocalJson, isFirestoreQuotaExceeded, setFirestoreQuotaExceeded, isQuotaError, isOfflineOrNetworkError, isPermissionDeniedError, setAdminPermissionDenied, isAdminPermissionDenied } from './localStore.js';
-import { UserProfile, UserNotificationPreferences } from '../../src/types.js';
+import { UserProfile } from '../../src/types.js';
 import { withRetry } from '../utils/retry.js';
 import { addLog } from './logDao.js';
 

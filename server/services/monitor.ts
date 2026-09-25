@@ -1,19 +1,20 @@
 import { getSettings } from '../database/settingsDao.js';
 import { addLog } from '../database/logDao.js';
-import { fetchBSEAnnouncements } from './bse.js';
-import { sendToTelegram, pingTelegram } from './telegram.js';
+import { fetchBSEAnnouncements, getLastBseError } from './bse.js';
+import { sendToTelegram } from './telegram.js';
 import { generateAndSendSummary } from './gemini.js';
 import { getActiveWatchlistSymbols, getActiveWatchlistSymbolMap } from '../database/watchlistDao.js';
 import { getUsersWithTelegram } from '../database/usersDao.js';
 import { isAnnouncementProcessed, isAnnouncementSent, markAnnouncementSent, saveAnnouncement, pruneAndCheckStorageCapacity, initAnnouncementCache } from '../database/announcementDao.js';
-import { escapeHTML, nseToBseMap, determinePriority, isSymbolMatch, parseBseDate } from '../utils/helpers.js';
+import { escapeHTML, determinePriority, isSymbolMatch, parseBseDate, isMarketHoursIST } from '../utils/helpers.js';
 import { addNotification } from '../database/notificationDao.js';
-import { evaluateAlertRules, evaluateAlertRulesForUser } from '../database/alertRulesDao.js';
+import { evaluateAlertRulesForUser } from '../database/alertRulesDao.js';
 import { classifyMaterialEvent } from './timelineClassifier.js';
 
 export { pruneAndCheckStorageCapacity };
 
 let consecutiveFailures = 0;
+let isBseOutageActive = false;
 let lastAlertTime = 0;
 const ALERT_COOLDOWN_MS = 60 * 60 * 1000;
 
@@ -65,7 +66,7 @@ async function getCachedMonitorConfig() {
   if (telegramUsers.length > 0) {
     await Promise.all(
       telegramUsers.map(async (u) => {
-        if (u.telegramChatId && u.telegramChatId !== settings.chatId) {
+        if (u.telegramChatId) {
           const cached = monitorUserWatchlistCache.get(u.uid);
           if (cached && (now - cached.fetchedAt < USER_WATCHLIST_CACHE_TTL_MS)) {
             userWatchlistCache.set(u.uid, { symbols: cached.symbols, map: cached.map });
@@ -104,7 +105,8 @@ function doesAnnouncementMatchUserPrefs(
   if (!prefs) return true;
 
   // 1. Alert Scope Filter (Watchlist Only vs All Market)
-  if (prefs.alertScope === 'WATCHLIST_ONLY' && !isWatchlistMatch) {
+  const effectiveScope = prefs.telegramAlertScope || prefs.alertScope || 'WATCHLIST_ONLY';
+  if (effectiveScope === 'WATCHLIST_ONLY' && !isWatchlistMatch) {
     return false;
   }
 
@@ -186,21 +188,33 @@ export async function processAnnouncements() {
     
     if (!announcements) {
       consecutiveFailures++;
-      if (consecutiveFailures >= 5) {
+      // Fire outage alert ONLY when both primary AND backup fail and outage is not yet active
+      if (consecutiveFailures >= 5 && !isBseOutageActive) {
         const settings = await getSettings();
         if (settings.botToken && settings.chatId) {
-          const now = Date.now();
-          if (now - lastAlertTime > ALERT_COOLDOWN_MS) {
-            lastAlertTime = now;
-            const alertMsg = `⚠️ <b>System Alert</b>\n\nUnable to fetch data from BSE. The API might have changed or servers are down.`;
-            await sendToTelegram(alertMsg);
-            await addLog('CRITICAL', 'SYSTEM', 'Sent API Failure Alert to Telegram');
-          }
+          isBseOutageActive = true;
+          lastAlertTime = Date.now();
+          const errDetail = getLastBseError();
+          const alertMsg = `⚠️ <b>BSE Nexus System Alert</b>\n\nUnable to fetch live feed from BSE India (${errDetail}). Both primary and backup endpoints failed.\n\n<b>Diagnostics:</b>\n• Exchange API unreachable or cloud IP filtered.\n• Exponential backoff retries active.\n• Recovery notification will be sent automatically upon reconnection.\n\n<i>No further outage alerts will be sent during this episode.</i>`;
+          await sendToTelegram(alertMsg);
+          await addLog('CRITICAL', 'SYSTEM', `Sent BSE Outage Alert to Telegram: ${errDetail}`);
         }
       }
       return;
     }
     
+    // If the feed was previously in an outage state, send one recovery notice!
+    if (isBseOutageActive) {
+      isBseOutageActive = false;
+      const settings = await getSettings();
+      if (settings.botToken && settings.chatId) {
+        const isMarket = isMarketHoursIST();
+        const recoveryMsg = `✅ <b>BSE Live Feed Restored</b>\n\nLive corporate filings feed has successfully reconnected to BSE India. Normal ${isMarket ? 'Live (30s)' : 'Relaxed (5m)'} polling resumed.`;
+        await sendToTelegram(recoveryMsg);
+        await addLog('INFO', 'SYSTEM', 'Sent BSE Feed Recovery Notice to Telegram');
+      }
+    }
+
     consecutiveFailures = 0;
 
     // Instant in-memory configuration read (~60s TTL) - Zero DB latency on critical path
@@ -249,13 +263,22 @@ export async function processAnnouncements() {
         
         let shouldSendAdminTelegram = true;
 
-        // 0. Strict Live Real-Time Age Check: Do not send Telegram notifications for items older than 2 hours
+        // 0. Strict Live Real-Time Age Check & Ingestion Delay Telemetry
         const bseTimeStr = item.News_submission_dt || item.DT_TM || item.NEWS_DT || "";
         const itemTs = parseBseDate(bseTimeStr);
         const now = Date.now();
+        const ingestLagSec = itemTs > 0 ? Math.max(0, Math.round((now - itemTs) / 1000)) : 0;
+        const sourceName = item._source || 'BSE_PRIMARY';
 
+        // Ingest telemetry logging
         if (itemTs > 0) {
           const ageHours = (now - itemTs) / (1000 * 60 * 60);
+          
+          if (ingestLagSec > 90) {
+            // Diagnostic logging for filings that exceed the 90s delay threshold
+            addLog('WARNING', 'DELAY_DIAGNOSTIC', `Filing latency alert: ${companyName} (${newsId}) took ${ingestLagSec}s to reach platform. BSE Time: ${bseTimeStr} | Source: ${sourceName} | Fetch Latency: ${item._fetchLatency || 0}ms.`);
+          }
+
           // If older than 2 hours or in the future by > 5 min, do not send to Telegram
           if (ageHours > 2 || ageHours < -0.1) {
             shouldSendAdminTelegram = false;
@@ -424,7 +447,7 @@ export async function processAnnouncements() {
         const dispatchPromises: Promise<void>[] = [];
         const sentTelegramChatIds = new Set<string>();
 
-        if (settings.isRunning && settings.botToken && settings.chatId && shouldSendAdminTelegram) {
+        if (settings.isRunning && settings.botToken && settings.chatId && settings.telegramAlertsEnabled !== false && shouldSendAdminTelegram) {
           const adminChatId = String(settings.chatId).trim();
           sentTelegramChatIds.add(adminChatId);
 
@@ -440,7 +463,7 @@ export async function processAnnouncements() {
                 }
                 addLog('SUCCESS', 'TELEGRAM', `Dispatched Admin ${priority.level} alert for ${companyName} (${priority.category})`);
                 
-                if (result.messageId) {
+                if (result.messageId && settings.telegramAiSummaryEnabled !== false) {
                   generateAndSendSummary(result.messageId, companyName, subject, details, priority.category, pdfLink, newsId, adminChatId)
                     .catch(e => addLog('ERROR', 'GEMINI', `[${companyName}] Summary dispatch exception: ${e.message}`));
                 }
@@ -459,16 +482,20 @@ export async function processAnnouncements() {
             const rawUserChatId = u.telegramChatId ? String(u.telegramChatId).trim() : '';
             if (!rawUserChatId) continue;
 
+            const uPrefs = u.notificationPreferences;
+            // Respect user toggle to turn OFF/ON Telegram alerts
+            const isUserTelegramActive = uPrefs?.telegramAlertsEnabled !== false;
+
             const cachedUserWl = userWatchlistCache.get(u.uid);
             const userSymbols = cachedUserWl?.symbols || [];
             
-            // Skip alert processing entirely for users whose watchlists are empty
-            if (userSymbols.length === 0) {
+            const effectiveScope = uPrefs?.telegramAlertScope || uPrefs?.alertScope || 'WATCHLIST_ONLY';
+            // Skip alert processing entirely for users whose watchlists are empty unless configured for All Market
+            if (userSymbols.length === 0 && effectiveScope === 'WATCHLIST_ONLY') {
               continue;
             }
 
             const userSymbolMap = cachedUserWl?.map || {};
-            const uPrefs = u.notificationPreferences;
             
             // Check this specific user's active watchlist from memory cache
             let uWatchlistMatch = false;
@@ -517,15 +544,18 @@ export async function processAnnouncements() {
                 });
               }
 
-              // Deduplicate Telegram dispatch: Skip if no chat ID or already sent to this chat ID for this announcement
-              if (rawUserChatId && !sentTelegramChatIds.has(rawUserChatId)) {
+              // Deduplicate Telegram dispatch: Skip if user disabled Telegram, no chat ID, or already sent
+              if (isUserTelegramActive && rawUserChatId && !sentTelegramChatIds.has(rawUserChatId)) {
                 sentTelegramChatIds.add(rawUserChatId);
                 dispatchPromises.push((async () => {
                   try {
                     const userRes = await sendToTelegram(message, rawUserChatId);
                     if (userRes.success && userRes.messageId) {
-                      generateAndSendSummary(userRes.messageId, companyName, subject, details, priority.category, pdfLink, newsId, rawUserChatId)
-                        .catch(() => {});
+                      const userWantsAiSummary = uPrefs?.telegramAiSummaryEnabled !== false;
+                      if (userWantsAiSummary) {
+                        generateAndSendSummary(userRes.messageId, companyName, subject, details, priority.category, pdfLink, newsId, rawUserChatId)
+                          .catch(() => {});
+                      }
                     }
                   } catch (userErr: any) {
                     console.warn(`Failed sending user telegram to ${rawUserChatId}:`, userErr?.message);

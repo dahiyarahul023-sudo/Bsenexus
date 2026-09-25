@@ -19,7 +19,11 @@ import { getSafePdfUrl } from '../utils/pdfHelper';
 import { checkIfDateIsTradingHoliday, generateGoogleCalendarUrl, downloadIcsCalendarFile, downloadMultiIcsCalendarFile } from '../utils/marketHolidays';
 import { MarketHolidaysModal } from './ui/MarketHolidaysModal';
 import { CustomDropdown, DropdownOption } from './ui/CustomDropdown';
+import { ActionButton } from './ui/ActionButton';
+import { HonestProgressBar } from './ui/HonestProgressBar';
 import { QuarterlyResultsLedger } from './QuarterlyResultsLedger';
+import { CommonQuestionsFAQ } from './ui/CommonQuestionsFAQ';
+import { ShareActionMenu } from './ui/motion/ShareActionMenu';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { useSwipeGesture } from '../hooks/useSwipeGesture';
@@ -122,6 +126,7 @@ export interface ResultCalendarItem {
 
 export function ResultsCalendar() {
   const { user, profile, isAdmin, isPro, adminUnlocked, setIsAuthModalOpen, setIsProModalOpen } = useAuth();
+  const isSuperAdmin = Boolean(isAdmin || adminUnlocked || profile?.tier === 'admin' || user?.isAdmin);
   const { isDeveloperMode } = useDeveloperMode();
   // SWR: Initialize calendar items immediately from client cache for 0ms transition
   const [items, setItems] = useState<ResultCalendarItem[]>(() => {
@@ -465,6 +470,10 @@ export function ResultsCalendar() {
   };
 
   const fetchWatchlists = async () => {
+    if (!user && !profile) {
+      setWatchlists([]);
+      return;
+    }
     try {
       const res = await customFetch('/api/watchlists');
       if (res.ok) {
@@ -477,6 +486,18 @@ export function ResultsCalendar() {
   };
 
   useEffect(() => {
+    document.title = 'BSE Results Calendar — Upcoming Quarterly Results & Earnings Dates | BSE Nexus';
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) {
+      metaDesc.setAttribute('content', 'Track upcoming BSE quarterly results, board meeting dates, earnings releases, and financial result disclosures for Indian listed companies live on BSE Nexus.');
+    }
+    let canonical = document.querySelector('link[rel="canonical"]');
+    if (!canonical) {
+      canonical = document.createElement('link');
+      canonical.setAttribute('rel', 'canonical');
+      document.head.appendChild(canonical);
+    }
+    canonical.setAttribute('href', 'https://bsenexus.in/results-calendar');
     fetchWatchlists();
   }, []);
 
@@ -504,13 +525,13 @@ export function ResultsCalendar() {
     const isGuestUser = !user || user.isAnonymous;
     if (isGuestUser) {
       setIsAuthModalOpen(true);
-      alert('🔒 Google Sign-In Required: Sign in with Google to get 30 days of Free Pro AI summaries!');
+      alert('🔒 Google Sign-In Required: Sign in with Google to get 1 week (7 days) of Free Pro AI summaries!');
       return;
     }
 
     if (!isProOrAdmin) {
       setIsProModalOpen(true);
-      alert('🔒 30-Day Free Pro trial has ended. Upgrade to Pro for unlimited Gemini AI summaries!');
+      alert('🔒 1-Week Free Pro trial has ended. Upgrade to Pro (₹499/mo) for unlimited Gemini AI summaries!');
       return;
     }
 
@@ -527,7 +548,7 @@ export function ResultsCalendar() {
 
       if (res.status === 401 || data?.authRequired) {
         setIsAuthModalOpen(true);
-        alert(data?.error || '🔒 Google Sign-In Required: Sign in to enjoy 30 days of Free Pro AI features.');
+        alert(data?.error || '🔒 Google Sign-In Required: Sign in to enjoy 1 week of Free Pro AI features.');
         return;
       }
 
@@ -568,13 +589,13 @@ export function ResultsCalendar() {
     const isGuestUser = !user || user.isAnonymous;
     if (isGuestUser) {
       setIsAuthModalOpen(true);
-      alert('🔒 Google Sign-In Required: Sign in with Google to activate your 30-Day Free Pro trial to broadcast to Telegram!');
+      alert('🔒 Google Sign-In Required: Sign in with Google to activate your 1-Week Free Pro trial to broadcast to Telegram!');
       return;
     }
 
     if (!isProOrAdmin) {
       setIsProModalOpen(true);
-      alert('🔒 Direct Telegram Broadcasting is a Pro & Admin feature.\n\nYour 30-Day Free Pro trial has ended. Upgrade to Pro to dispatch alerts to Telegram!');
+      alert('🔒 Direct Telegram Broadcasting is a Pro & Admin feature.\n\nYour 1-Week Free Pro trial has ended. Upgrade to Pro (₹499/mo) to dispatch alerts to Telegram!');
       return;
     }
 
@@ -698,13 +719,13 @@ export function ResultsCalendar() {
     const isGuestUser = !user || user.isAnonymous;
     if (isGuestUser) {
       setIsAuthModalOpen(true);
-      alert('🔒 Google Sign-In Required: Sign in with Google to activate your 30-Day Free Pro trial to broadcast to Telegram!');
+      alert('🔒 Google Sign-In Required: Sign in with Google to activate your 1-Week Free Pro trial to broadcast to Telegram!');
       return;
     }
 
     if (!isProOrAdmin) {
       setIsProModalOpen(true);
-      alert('🔒 Telegram Broadcasting is a Pro feature.\n\nYour 30-Day Free Pro trial has ended. Upgrade to Pro to broadcast to Telegram!');
+      alert('🔒 Telegram Broadcasting is a Pro feature.\n\nYour 1-Week Free Pro trial has ended. Upgrade to Pro (₹499/mo) to broadcast to Telegram!');
       return;
     }
 
@@ -745,13 +766,13 @@ export function ResultsCalendar() {
     const isGuestUser = !user || user.isAnonymous;
     if (isGuestUser) {
       setIsAuthModalOpen(true);
-      alert('🔒 Google Sign-In Required: Sign in with Google to activate your 30-Day Free Pro trial to broadcast to Telegram!');
+      alert('🔒 Google Sign-In Required: Sign in with Google to activate your 1-Week Free Pro trial to broadcast to Telegram!');
       return;
     }
 
     if (!isProOrAdmin) {
       setIsProModalOpen(true);
-      alert('🔒 Telegram Broadcasting is a Pro feature.\n\nYour 30-Day Free Pro trial has ended. Upgrade to Pro to broadcast to Telegram!');
+      alert('🔒 Telegram Broadcasting is a Pro feature.\n\nYour 1-Week Free Pro trial has ended. Upgrade to Pro (₹499/mo) to broadcast to Telegram!');
       return;
     }
 
@@ -783,6 +804,7 @@ export function ResultsCalendar() {
   // Filter and sort items with useMemo
   const filteredAndSortedItems = useMemo(() => {
     let result = [...items];
+    const isSearching = Boolean(searchQuery.trim());
 
     // Build active watchlist symbols & scrips
     const activeWatchlistSymbols = new Set<string>();
@@ -801,18 +823,19 @@ export function ResultsCalendar() {
       });
     });
 
-    // If watchlists are loaded and active watchlist is empty (0 stocks), return empty array
-    if (watchlists.length > 0 && activeWatchlistSymbols.size === 0) {
-      return [];
-    }
+    // If NOT searching, filter by active watchlist stocks
+    if (!isSearching) {
+      if (watchlists.length > 0 && activeWatchlistSymbols.size === 0 && selectedWatchlistId) {
+        return [];
+      }
 
-    // Filter strictly by active watchlist stocks
-    if (activeWatchlistSymbols.size > 0) {
-      result = result.filter(item => {
-        const sym = (item.symbol || '').toUpperCase().trim();
-        const scrip = item.scripCode ? String(item.scripCode).trim() : '';
-        return activeWatchlistSymbols.has(sym) || (scrip && activeWatchlistScrips.has(scrip));
-      });
+      if (activeWatchlistSymbols.size > 0) {
+        result = result.filter(item => {
+          const sym = (item.symbol || '').toUpperCase().trim();
+          const scrip = item.scripCode ? String(item.scripCode).trim() : '';
+          return activeWatchlistSymbols.has(sym) || (scrip && activeWatchlistScrips.has(scrip));
+        });
+      }
     }
 
     // 1. Status Filter
@@ -1050,7 +1073,7 @@ export function ResultsCalendar() {
           <div className="flex items-center gap-1.5 shrink-0">
             <CalendarDays className="w-4 h-4 text-slate-700 dark:text-slate-300 shrink-0" />
             <h1 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white font-display whitespace-nowrap">
-              {statusFilter === 'upcoming' ? 'Earnings Calendar' : statusFilter === 'today' ? "Today's Results" : 'Results Archive'}
+              BSE Results Calendar
             </h1>
             <span className="text-xs text-slate-500 font-mono">
               ({filteredAndSortedItems.length})
@@ -1229,69 +1252,92 @@ export function ResultsCalendar() {
                 </button>
               </div>
 
-              {/* Section 1: Developer/Operator Only Operations */}
-              {isDeveloperMode && (
+              {/* Section 1: Developer/Operator Only Operations (Admin Only) */}
+              {isSuperAdmin && (
                 <div className="space-y-2 p-3 rounded-xl bg-slate-50 dark:bg-[#15141F] border border-slate-200 dark:border-[#2D283E]">
                   <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                     <span>Operator Controls</span>
                     <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300">TERMINAL</span>
                   </label>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    <button
-                      type="button"
+                    <ActionButton
                       onClick={() => fetchCalendar(true, 'quick')}
-                      disabled={refreshing || loading}
-                      className="min-h-[44px] px-3 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      isLoading={refreshing}
+                      loadingText="Syncing..."
+                      variant="primary"
+                      size="md"
+                      className="min-h-[44px] justify-center"
                     >
-                      <RefreshCw size={13} className={cn(refreshing && "animate-spin")} />
-                      <span>{refreshing ? 'Syncing...' : 'Quick Sync'}</span>
-                    </button>
+                      Quick Sync
+                    </ActionButton>
 
                     <button
                       type="button"
                       onClick={() => fetchCalendar(true, 'full')}
                       disabled={refreshing || loading}
-                      className="min-h-[44px] px-3 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 dark:bg-[#201E2E] dark:hover:bg-[#2D283E] text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-[#2D283E] transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      className="min-h-[44px] px-3 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 dark:bg-[#201E2E] dark:hover:bg-[#2D283E] text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-[#2D283E] transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-[0.97]"
                     >
                       <Zap size={13} className="text-amber-500" />
                       <span>Full Audit</span>
                     </button>
 
-                    <button
-                      type="button"
+                    <ActionButton
                       onClick={() => handleBroadcastAllUpcoming(false)}
-                      disabled={isBulkBroadcasting || summaryStats.upcomingFutureCount === 0}
-                      className="min-h-[44px] px-3 rounded-xl text-xs font-bold bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 col-span-2 sm:col-span-1"
+                      isLoading={isBulkBroadcasting}
+                      loadingText="Broadcasting..."
+                      disabled={summaryStats.upcomingFutureCount === 0}
+                      variant="secondary"
+                      size="md"
+                      className="min-h-[44px] justify-center col-span-2 sm:col-span-1 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800"
+                      icon={<SendHorizonal size={13} />}
                     >
-                      <SendHorizonal size={13} className={cn(isBulkBroadcasting && "animate-pulse")} />
-                      <span>Broadcast</span>
-                    </button>
+                      Broadcast
+                    </ActionButton>
                   </div>
 
                   {/* Deep Sync 1-5 Years */}
-                  <div className="flex items-center gap-2 pt-1">
-                    <div className="flex-1">
-                      <CustomDropdown
-                        options={[
-                          { value: 1, label: '1Y History' },
-                          { value: 2, label: '2Y History' },
-                          { value: 3, label: '3Y History' },
-                          { value: 5, label: '5Y History' }
-                        ]}
-                        value={watchlistDeepSyncYears}
-                        onChange={(val) => setWatchlistDeepSyncYears(Number(val))}
-                        size="sm"
-                      />
+                  <div className="space-y-2 pt-1">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1">
+                        <CustomDropdown
+                          options={[
+                            { value: 1, label: '1Y History' },
+                            { value: 2, label: '2Y History' },
+                            { value: 3, label: '3Y History' },
+                            { value: 5, label: '5Y History' }
+                          ]}
+                          value={watchlistDeepSyncYears}
+                          onChange={(val) => setWatchlistDeepSyncYears(Number(val))}
+                          size="sm"
+                        />
+                      </div>
+                      <ActionButton
+                        onClick={() => handleDeepSyncWatchlist(watchlistDeepSyncYears)}
+                        isLoading={isSyncingWatchlistHistory}
+                        loadingText="Syncing..."
+                        variant="secondary"
+                        size="md"
+                        className="min-h-[44px] bg-slate-800 hover:bg-slate-700 dark:bg-[#2E2942] text-white"
+                        icon={<History size={13} />}
+                      >
+                        Deep Sync
+                      </ActionButton>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleDeepSyncWatchlist(watchlistDeepSyncYears)}
-                      disabled={isSyncingWatchlistHistory}
-                      className="min-h-[44px] px-3.5 bg-slate-800 hover:bg-slate-700 dark:bg-[#2E2942] text-white rounded-xl text-xs font-bold transition-all disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
-                    >
-                      <History size={13} className={cn(isSyncingWatchlistHistory && "animate-spin")} />
-                      <span>{isSyncingWatchlistHistory ? 'Syncing...' : 'Deep Sync'}</span>
-                    </button>
+
+                    {isSyncingWatchlistHistory && (
+                      <div className="animate-in fade-in duration-200">
+                        <HonestProgressBar
+                          color="indigo"
+                          isRunning={true}
+                          simulatedSteps={[
+                            { label: `Connecting to BSE archives for ${watchlistDeepSyncYears}Y meeting history...`, durationMs: 1400 },
+                            { label: 'Syncing board meeting notices & agenda notes...', durationMs: 2200 },
+                            { label: 'Reconstructing historical quarterly calendar...', durationMs: 2000 },
+                            { label: 'Updating watchlist timeline cache...', durationMs: 1000 }
+                          ]}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1552,16 +1598,19 @@ export function ResultsCalendar() {
                 <span>Add Selected ({selectedIds.size}) to Calendar</span>
               </button>
 
-              <button
+              <ActionButton
                 type="button"
                 onClick={handleBulkSendSelectedTelegram}
-                disabled={isBulkBroadcasting}
-                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-lg border border-slate-700 shadow-2xs flex items-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer"
+                isLoading={isBulkBroadcasting}
+                loadingText="Broadcasting..."
+                variant="secondary"
+                size="sm"
+                icon={<Send size={13} className="text-sky-400" />}
+                className="bg-slate-800 hover:bg-slate-700 text-white border-slate-700"
                 title="Broadcast selected board meetings to Telegram channel"
               >
-                <Send size={13} />
-                <span>Broadcast to Telegram ({selectedIds.size})</span>
-              </button>
+                Broadcast to Telegram ({selectedIds.size})
+              </ActionButton>
 
               <button
                 type="button"
@@ -1617,24 +1666,46 @@ export function ResultsCalendar() {
         )}
 
         {loading ? (
-          <div className="p-12 text-center text-xs font-semibold text-slate-500">
-            <RefreshCw className="animate-spin mx-auto mb-2 text-slate-400" size={20} />
-            Fetching BSE Result Calendar for your watchlist stocks...
+          <div className="space-y-3 p-3 sm:p-4 animate-pulse">
+            <div className="flex items-center justify-between text-xs text-slate-500 font-mono px-1">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                <span>Fetching BSE Result Calendar for your watchlist stocks...</span>
+              </span>
+              <span className="text-[11px] text-slate-400">Loading schedule...</span>
+            </div>
+            {[1, 2, 3, 4].map((sk) => (
+              <div
+                key={`cal-skeleton-${sk}`}
+                className="p-4 rounded-xl border border-slate-200/80 dark:border-[#2D283E] bg-white dark:bg-[#181624] space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-slate-200 dark:bg-slate-800" />
+                    <div className="space-y-1.5">
+                      <div className="h-4 w-36 bg-slate-200 dark:bg-slate-800 rounded" />
+                      <div className="h-3 w-20 bg-slate-200/60 dark:bg-slate-800/60 rounded" />
+                    </div>
+                  </div>
+                  <div className="h-6 w-24 bg-slate-200/70 dark:bg-slate-800/70 rounded-full" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : filteredAndSortedItems.length === 0 ? (
-          <div className="p-10 sm:p-12 text-center space-y-3 text-slate-400">
-            <div className="w-12 h-12 mx-auto rounded-2xl bg-slate-100 dark:bg-[#201D30] flex items-center justify-center text-slate-400 border border-slate-200 dark:border-[#352F48]">
-              <CalendarDays size={24} className="text-slate-400" />
+          <div className="my-8 p-6 sm:p-8 max-w-lg mx-auto bg-white dark:bg-[#161422] border border-slate-200/90 dark:border-[#2C2740] rounded-2xl shadow-xs space-y-4 text-left">
+            <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-[#201D30] flex items-center justify-center text-slate-400 border border-slate-200/80 dark:border-[#352F48]">
+              <CalendarDays size={20} className="text-slate-400" />
             </div>
-            <div>
-              <div className="text-sm font-bold text-slate-800 dark:text-slate-200">
+            <div className="space-y-1">
+              <div className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100">
                 {uniqueWatchlistStocksCount === 0 
                   ? "Your Watchlist is Empty" 
                   : statusFilter === 'today' 
                   ? "No Board Meetings Scheduled for Today" 
                   : "No Matching Results in this View"}
               </div>
-              <p className="text-xs max-w-md mx-auto text-slate-500 dark:text-slate-400 mt-1">
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                 {uniqueWatchlistStocksCount === 0
                   ? "You have removed all stocks from your watchlist. Add companies to your watchlist or restore defaults to track their upcoming and past board meetings and quarterly financial results."
                   : searchQuery 
@@ -1651,7 +1722,7 @@ export function ResultsCalendar() {
 
             {/* Next upcoming highlight card if today is empty */}
             {statusFilter === 'today' && upcomingItems.length > 0 && (
-              <div className="max-w-sm mx-auto p-3 rounded-xl bg-slate-50 dark:bg-[#201D30] border border-slate-200 dark:border-[#352F48] text-left text-xs space-y-1.5">
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#201D30] border border-slate-200 dark:border-[#352F48] text-left text-xs space-y-2">
                 <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400">
                   <span>Next Scheduled Board Meeting</span>
                   <span className="font-mono text-emerald-600 dark:text-emerald-400">{upcomingItems[0]?.daysLeft}d left</span>
@@ -1667,7 +1738,7 @@ export function ResultsCalendar() {
                     setDeclarationFilter('all');
                     setSearchQuery('');
                   }}
-                  className="w-full mt-1 py-1.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg text-xs font-bold transition-all cursor-pointer text-center"
+                  className="w-full py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl text-xs font-bold transition-all cursor-pointer text-center hover:opacity-90 active:scale-95"
                 >
                   View All {upcomingItems.length} Upcoming Meetings →
                 </button>
@@ -1775,6 +1846,7 @@ export function ResultsCalendar() {
 
               return (
                 <motion.div
+                  id={`calendar-item-${item.id || item.scripCode || idx}`}
                   key={`${item.id || 'cal'}-${idx}`}
                   variants={itemFadeUpVariants}
                   whileHover={{ backgroundColor: viewMode === 'grid' ? undefined : 'rgba(248, 250, 252, 0.6)' }}
@@ -2198,6 +2270,11 @@ export function ResultsCalendar() {
         )}
       </div>
 
+      {/* Common questions FAQ Section */}
+      <div className="pt-4 pb-4">
+        <CommonQuestionsFAQ id="results-calendar-faq" compact />
+      </div>
+
       {/* DETAIL MODAL FOR CALENDAR & EARNINGS ITEM */}
       <AnimatePresence>
         {selectedModalItem && (
@@ -2239,6 +2316,16 @@ export function ResultsCalendar() {
                       <Building2 size={13} />
                       <span>Stock 360°</span>
                     </button>
+                    <ShareActionMenu
+                      title={`${selectedModalItem.companyName} (${selectedModalItem.symbol || selectedModalItem.scripCode || 'BSE'})`}
+                      headline={`Board Meeting scheduled on ${selectedModalItem.meetingDate}. Purpose: ${selectedModalItem.purpose || 'Financial Results'}`}
+                      companyName={selectedModalItem.companyName}
+                      scripCode={selectedModalItem.scripCode}
+                      symbol={selectedModalItem.symbol}
+                      pdfUrl={selectedModalItem.declarationPdfLink}
+                      url={`https://bsenexus.in/results-calendar?scrip=${selectedModalItem.scripCode || ''}`}
+                      size="xs"
+                    />
                   </div>
                   <div className="text-xs text-slate-500 font-mono mt-0.5">
                     Scheduled Board Meeting: <strong className="text-slate-800 dark:text-slate-200">{selectedModalItem.meetingDate}</strong>
@@ -2407,15 +2494,17 @@ export function ResultsCalendar() {
                           <span>{expandedRunupDate === selectedModalItem.meetingDate ? `Hide ${runupWindowDays}D Filings` : `View ${runupWindowDays}D Filings`}</span>
                         </button>
 
-                        <button
-                          type="button"
+                        <ActionButton
                           onClick={() => handleBoostRunupPriority(selectedModalItem.scripCode, selectedModalItem.symbol, selectedModalItem.meetingDate, runupWindowDays)}
-                          disabled={isBoostingRunup}
-                          className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-bold rounded-lg shadow-xs flex items-center gap-1.5 disabled:opacity-50 transition-all cursor-pointer"
+                          isLoading={isBoostingRunup}
+                          loadingText="Boosting..."
+                          variant="primary"
+                          size="sm"
+                          className="bg-amber-500 hover:bg-amber-600 text-white"
+                          icon={<Zap size={13} />}
                         >
-                          <Zap size={13} className={cn(isBoostingRunup && "animate-spin")} />
-                          <span>{isBoostingRunup ? "Boosting..." : `⚡ Set ${runupWindowDays}D to HIGH`}</span>
-                        </button>
+                          Set {runupWindowDays}D to HIGH
+                        </ActionButton>
                       </div>
                     </div>
 
@@ -2441,9 +2530,13 @@ export function ResultsCalendar() {
                         </div>
 
                         {loadingRunupAnnouncements ? (
-                          <div className="py-3 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
-                            <RefreshCw size={13} className="animate-spin text-amber-500" />
-                            <span>Scanning {runupWindowDays}-day pre-result announcements...</span>
+                          <div className="space-y-2 py-1 animate-pulse">
+                            {[1, 2].map((sk) => (
+                              <div key={sk} className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-lg space-y-1.5">
+                                <div className="h-3.5 w-3/4 bg-slate-200 dark:bg-slate-700 rounded" />
+                                <div className="h-2.5 w-1/3 bg-slate-200/70 dark:bg-slate-700/70 rounded" />
+                              </div>
+                            ))}
                           </div>
                         ) : runupAnnouncements.length > 0 ? (
                           <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
@@ -2575,30 +2668,37 @@ export function ResultsCalendar() {
                         )}
 
                         {selectedModalItem.declarationAnnouncementId && !selectedModalItem.aiSummary && (
-                          <button
+                          <ActionButton
                             onClick={() => handleGenerateSummary(selectedModalItem.declarationAnnouncementId)}
-                            disabled={isGeneratingAi}
-                            className="px-3 py-1 bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-bold rounded-md disabled:opacity-50 transition-all flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95"
+                            isLoading={isGeneratingAi}
+                            loadingText="Extracting..."
+                            variant="primary"
+                            size="sm"
+                            className="bg-emerald-500 hover:bg-emerald-600 text-white"
+                            icon={<Sparkles size={12} />}
                           >
-                            <Sparkles size={12} className={cn(isGeneratingAi && "animate-spin")} />
-                            <span>{isGeneratingAi ? "Extracting..." : "Generate AI Summary"}</span>
-                          </button>
+                            Generate AI Summary
+                          </ActionButton>
                         )}
                       </div>
                     </div>
 
                     {isGeneratingAi ? (
-                      <div className="py-4 space-y-3">
-                        <div className="flex items-center gap-2 text-xs font-bold text-emerald-700 dark:text-emerald-300">
-                          <div className="relative flex items-center justify-center w-5 h-5">
-                            <div className="absolute inset-0 rounded-full bg-emerald-400/40 animate-ping" />
-                            <Bot size={15} className="text-emerald-600 dark:text-emerald-400 relative z-10 animate-bounce" />
-                          </div>
-                          <span className="animate-pulse">{AI_THINKING_STEPS[aiStepIndex]}</span>
-                        </div>
-                        {/* Animated Hologram Bar */}
-                        <div className="h-1.5 w-full bg-emerald-100 dark:bg-emerald-900/40 rounded-full overflow-hidden">
-                          <div className="h-full bg-linear-to-r from-emerald-400 via-teal-400 to-blue-500 rounded-full animate-ai-pulse" />
+                      <div className="py-2 min-h-[140px] space-y-3">
+                        <HonestProgressBar
+                          color="emerald"
+                          isRunning={true}
+                          simulatedSteps={[
+                            { label: 'Connecting to BSE corporate filing PDF...', durationMs: 1400 },
+                            { label: 'Extracting Revenue, EBITDA & Net Profit...', durationMs: 2200 },
+                            { label: 'Calculating YoY & QoQ variance...', durationMs: 1800 },
+                            { label: 'Formulating executive analysis takeaway...', durationMs: 1200 }
+                          ]}
+                        />
+                        <div className="space-y-2 pt-2 animate-pulse">
+                          <div className="h-3 w-3/4 bg-emerald-100 dark:bg-emerald-950/40 rounded" />
+                          <div className="h-3 w-5/6 bg-emerald-100 dark:bg-emerald-950/40 rounded" />
+                          <div className="h-3 w-2/3 bg-emerald-100 dark:bg-emerald-950/40 rounded" />
                         </div>
                       </div>
                     ) : selectedModalItem.aiSummary ? (
@@ -2752,9 +2852,13 @@ export function ResultsCalendar() {
                     </div>
 
                     {loadingHistory ? (
-                      <div className="py-4 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
-                        <RefreshCw size={13} className="animate-spin text-blue-500" />
-                        <span>Fetching historical board meeting intimations...</span>
+                      <div className="space-y-2 py-1 animate-pulse">
+                        {[1, 2].map((sk) => (
+                          <div key={sk} className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-lg space-y-1.5 border border-slate-100 dark:border-slate-800">
+                            <div className="h-3.5 w-3/5 bg-slate-200 dark:bg-slate-700 rounded" />
+                            <div className="h-2.5 w-1/4 bg-slate-200/70 dark:bg-slate-700/70 rounded" />
+                          </div>
+                        ))}
                       </div>
                     ) : boardMeetingsHistory.length > 0 ? (
                       <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
@@ -2845,20 +2949,36 @@ export function ResultsCalendar() {
               ) : <div />}
 
               <div className="flex flex-wrap items-center gap-2">
+                {/* 1-Tap Share Menu */}
+                <ShareActionMenu
+                  title={`${selectedModalItem.companyName} (${selectedModalItem.symbol || selectedModalItem.scripCode || 'BSE'})`}
+                  headline={`Board Meeting date: ${selectedModalItem.meetingDate}. Purpose: ${selectedModalItem.purpose || 'Financial Results'}`}
+                  companyName={selectedModalItem.companyName}
+                  scripCode={selectedModalItem.scripCode}
+                  symbol={selectedModalItem.symbol}
+                  pdfUrl={selectedModalItem.declarationPdfLink}
+                  url={`https://bsenexus.in/results-calendar?scrip=${selectedModalItem.scripCode || ''}`}
+                  size="sm"
+                />
+
                 {/* 1-Click Share via Email (Mailto) */}
-                <button
+                <motion.button
+                  whileTap={buttonTap}
+                  transition={springSnappy}
                   onClick={() => handleShareEmail(selectedModalItem)}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-700 transition-colors shadow-2xs cursor-pointer active:scale-95"
+                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 transition-colors shadow-2xs cursor-pointer touch-manipulation min-h-[38px]"
                   title="Send 1-Click Calendar Invite via Email"
                 >
                   <Mail size={14} className="text-amber-500" />
                   <span>Share via Email</span>
-                </button>
+                </motion.button>
 
                 {/* Copy 1-Click Calendar URL */}
-                <button
+                <motion.button
+                  whileTap={buttonTap}
+                  transition={springSnappy}
                   onClick={() => handleCopyCalendarLink(selectedModalItem)}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-700 transition-colors shadow-2xs cursor-pointer active:scale-95"
+                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 transition-colors shadow-2xs cursor-pointer touch-manipulation min-h-[38px]"
                   title="Copy direct Google Calendar add link"
                 >
                   {copiedCalendarId === selectedModalItem.id ? (
@@ -2872,20 +2992,26 @@ export function ResultsCalendar() {
                       <span>Copy Calendar Link</span>
                     </>
                   )}
-                </button>
+                </motion.button>
 
                 {/* Dispatch to Telegram with Calendar Link */}
-                <button
+                <ActionButton
+                  type="button"
                   onClick={() => handleManualSendTelegram(selectedModalItem)}
-                  disabled={isSendingTelegram}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold rounded-lg transition-all disabled:opacity-50 relative overflow-hidden shadow-xs cursor-pointer active:scale-95"
+                  isLoading={isSendingTelegram}
+                  loadingText="Broadcasting..."
+                  variant="primary"
+                  size="sm"
+                  icon={
+                    <span className={cn("flex items-center transition-transform", isPlaneFlying && "animate-plane-fly")}>
+                      <Send size={14} className="text-white" />
+                    </span>
+                  }
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
                   title="Broadcast to Telegram with 1-Click Calendar Link"
                 >
-                  <span className={cn("flex items-center gap-1.5 transition-transform", isPlaneFlying && "animate-plane-fly")}>
-                    <Send size={14} />
-                  </span>
-                  <span>{isSendingTelegram ? "Broadcasting..." : "Dispatch to Telegram"}</span>
-                </button>
+                  Dispatch to Telegram
+                </ActionButton>
               </div>
             </div>
           </motion.div>

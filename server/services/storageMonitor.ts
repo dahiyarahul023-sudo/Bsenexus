@@ -3,7 +3,7 @@ import path from 'path';
 import { readLocalJson, writeLocalJson, isFirestoreQuotaExceeded } from '../database/localStore.js';
 import { sendToTelegram } from './telegram.js';
 import { addLog } from '../database/logDao.js';
-import { getAllWatchlists, getActiveWatchlistSymbols, getAllActiveWatchlistsAcrossUsers } from '../database/watchlistDao.js';
+import { getActiveWatchlistSymbols, getAllActiveWatchlistsAcrossUsers } from '../database/watchlistDao.js';
 
 import { deleteAnnouncementsFromStorageAndFirestore } from '../database/announcementDao.js';
 
@@ -145,7 +145,6 @@ export async function runAutoStorageCleanup(force: boolean = false): Promise<{
 
   // 1. Process Announcements Pruning
   const announcements = readLocalJson<any[]>(ANNOUNCEMENTS_FILE, []);
-  const initialCount = announcements.length;
   const now = Date.now();
   const sixtyDaysMs = 60 * 24 * 60 * 60 * 1000;
   const twoYearsMs = 730 * 24 * 60 * 60 * 1000;

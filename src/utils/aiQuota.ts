@@ -28,18 +28,8 @@ const getTodayKey = (): string => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
-function getUserIdentifier(user?: any | null, profile?: UserProfile | null): string {
-  if (!user && !profile) return 'guest';
-  return profile?.uid || user?.uid || 'user';
-}
-
-/**
- * Updates the client's cached quota from the server response.
- * Server is the single source of truth.
- */
 export function updateServerAiQuota(
-  data: { remainingQuota?: number; remaining?: number; dailyLimit?: number; isPro?: boolean },
-  userIdentifier: string = 'current'
+  data: { remainingQuota?: number; remaining?: number; dailyLimit?: number; isPro?: boolean }
 ) {
   if (!data) return;
   const remaining = typeof data.remainingQuota === 'number' ? data.remainingQuota : (typeof data.remaining === 'number' ? data.remaining : undefined);
@@ -87,8 +77,8 @@ export async function fetchServerAiQuota(): Promise<AiQuotaStatus | null> {
         message: data.tier === 'admin'
           ? 'Unlimited AI Summaries (Admin Active)'
           : data.tier === 'pro'
-          ? `${data.remaining ?? 100}/${data.dailyLimit ?? 100} AI summaries remaining today (30-Day Pro Trial)`
-          : 'Google Sign-In Required for 30-Day Free Pro AI Access'
+          ? `${data.remaining ?? 100}/${data.dailyLimit ?? 100} AI summaries remaining today (1-Week Pro Trial)`
+          : 'Google Sign-In Required for 1-Week Free Pro AI Access'
       };
     }
   } catch (e) {}
@@ -124,7 +114,7 @@ export function getAiQuotaStatus(
       remaining: 0,
       canGenerate: false,
       allowed: false,
-      message: 'Google Sign-In Required: Sign in with Google to get 30 days of Free Pro AI summaries!'
+      message: 'Google Sign-In Required: Sign in with Google to get 1 week (7 days) of Free Pro AI summaries!'
     };
   }
 
@@ -161,12 +151,12 @@ export function getAiQuotaStatus(
       canGenerate,
       allowed: canGenerate,
       message: canGenerate
-        ? `${remaining}/${dailyLimit} AI summaries remaining today (30-Day Pro Trial)`
+        ? `${remaining}/${dailyLimit} AI summaries remaining today (1-Week Pro Trial)`
         : 'Daily Pro trial limit reached (100/100 used). Resets at 00:00 IST.'
     };
   }
 
-  // 4. Authenticated user whose 30-day trial has expired
+  // 4. Authenticated user whose 1-week trial has expired
   return {
     tier: 'free',
     dailyLimit: 0,
@@ -174,7 +164,7 @@ export function getAiQuotaStatus(
     remaining: 0,
     canGenerate: false,
     allowed: false,
-    message: 'Your 30-Day Free Pro trial has ended. Upgrade to Pro for unlimited AI summaries.'
+    message: 'Your 1-Week Free Pro trial has ended. Upgrade to Pro (₹499/mo) for unlimited AI summaries.'
   };
 }
 

@@ -141,4 +141,119 @@ export const pulseTransition: Transition = {
   ease: 'easeInOut'
 };
 
+// Physics-Based Micro-Interaction Springs (from Apple & High-Craft design specs)
+export const springBouncy: Transition = {
+  type: 'spring',
+  stiffness: 450,
+  damping: 20,
+  mass: 0.7
+};
+
+export const springElastic: Transition = {
+  type: 'spring',
+  stiffness: 520,
+  damping: 16,
+  mass: 0.6
+};
+
+export const springSmoothPill: Transition = {
+  type: 'spring',
+  stiffness: 480,
+  damping: 28,
+  mass: 0.75
+};
+
+// Tab Bar Icon Bounce (squash & stretch anticipation on activate)
+export const tabIconBounceVariants: Variants = {
+  idle: {
+    scale: 1,
+    y: 0,
+    rotate: 0,
+    transition: {
+      type: 'spring',
+      stiffness: 450,
+      damping: 24,
+    },
+  },
+  active: {
+    scale: 1.14,
+    y: -1.5,
+    rotate: 0,
+    transition: springBouncy,
+  },
+};
+
+// Star / Bookmark Pop & Sparkle
+export const starPopVariants: Variants = {
+  idle: {
+    scale: 1,
+    rotate: 0,
+    transition: {
+      type: 'spring',
+      stiffness: 450,
+      damping: 24,
+    },
+  },
+  popped: {
+    scale: 1.16,
+    rotate: 10,
+    transition: springElastic,
+  },
+};
+
+// Origin-based Spatial Expansion (for menus, action bars, share sheets)
+export const originExpansionVariants: Variants = {
+  hidden: {
+    opacity: 0,
+    scale: 0.7,
+    y: 6,
+    transformOrigin: 'bottom center',
+    filter: 'blur(4px)',
+  },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    filter: 'blur(0px)',
+    transition: {
+      type: 'spring',
+      stiffness: 420,
+      damping: 25,
+      staggerChildren: 0.04,
+      delayChildren: 0.02,
+    },
+  },
+  exit: {
+    opacity: 0,
+    scale: 0.85,
+    y: 4,
+    filter: 'blur(2px)',
+    transition: {
+      duration: 0.12,
+      ease: 'easeOut',
+    },
+  },
+};
+
+// Numeric Stepper / Rolling Number Variants
+export const numberScrollVariants: Variants = {
+  initial: (direction: number = 1) => ({
+    y: direction > 0 ? 12 : -12,
+    opacity: 0,
+    filter: 'blur(2px)',
+  }),
+  animate: {
+    y: 0,
+    opacity: 1,
+    filter: 'blur(0px)',
+    transition: springBouncy,
+  },
+  exit: (direction: number = 1) => ({
+    y: direction > 0 ? -12 : 12,
+    opacity: 0,
+    filter: 'blur(2px)',
+    transition: { duration: 0.12, ease: 'easeIn' },
+  }),
+};
+
 

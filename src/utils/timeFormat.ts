@@ -1,5 +1,3 @@
-import { format } from 'date-fns';
-
 function parseDateInput(input: string | number | Date | undefined | null): Date | null {
   if (!input && input !== 0) return null;
   if (input instanceof Date) {

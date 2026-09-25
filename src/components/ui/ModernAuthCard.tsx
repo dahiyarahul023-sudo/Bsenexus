@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Mail, Lock, User, Sparkles, 
-  ArrowRight, ShieldCheck,
+  ArrowRight, ShieldCheck, ShieldAlert, Shield, RotateCcw,
   AtSign, Check, Eye, EyeOff, CheckCircle2,
-  X
+  X, AlertCircle, ExternalLink, Copy
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 import { BseNexusLogo } from './BseNexusLogo';
+import { loadRecaptchaScript, executeRecaptcha, hideRecaptchaBadge } from '../../utils/recaptcha';
 
 interface ModernAuthCardProps {
   mode?: 'modal' | 'fullscreen';
@@ -45,6 +46,11 @@ export function ModernAuthCard({
   const [showPassword, setShowPassword] = useState(false);
   
   const [error, setError] = useState<string | null>(null);
+  const [authErrorCode, setAuthErrorCode] = useState<string | null>(null);
+  const [unauthorizedDomain, setUnauthorizedDomain] = useState<string | null>(null);
+  const [copiedDomain, setCopiedDomain] = useState(false);
+  const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
+
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingUsername, setIsCheckingUsername] = useState(false);
   const [usernameAvailability, setUsernameAvailability] = useState<{
@@ -57,6 +63,45 @@ export function ModernAuthCard({
   useEffect(() => {
     setAuthMode(initialTab);
   }, [initialTab]);
+
+  // reCAPTCHA Truthful Assessment State: 'idle' | 'checking' | 'verified' | 'blocked' | 'error'
+  const [recaptchaStatus, setRecaptchaStatus] = useState<'idle' | 'checking' | 'verified' | 'blocked' | 'error'>('idle');
+  const [recaptchaErrorMsg, setRecaptchaErrorMsg] = useState<string | null>(null);
+
+  // Preload reCAPTCHA script on modal display without consuming tokens or showing fake verified status
+  useEffect(() => {
+    let isMounted = true;
+    setRecaptchaStatus('idle');
+    setRecaptchaErrorMsg(null);
+
+    loadRecaptchaScript()
+      .catch(() => {
+        // Will be cleanly reported on submission
+      })
+      .finally(() => {
+        if (isMounted) hideRecaptchaBadge();
+      });
+
+    return () => {
+      isMounted = false;
+      hideRecaptchaBadge();
+    };
+  }, [authMode]);
+
+  const handleRetrySecurity = () => {
+    setError(null);
+    setAuthErrorCode(null);
+    setUnauthorizedDomain(null);
+    setRecaptchaErrorMsg(null);
+    setRecaptchaStatus('idle');
+  };
+
+  // Clean up reCAPTCHA floating badges when auth modal is unmounted / closed
+  useEffect(() => {
+    return () => {
+      hideRecaptchaBadge();
+    };
+  }, []);
 
   // Debounced check during signup for username
   useEffect(() => {
@@ -98,6 +143,7 @@ export function ModernAuthCard({
   }, [username, authMode]);
 
   const handleClose = () => {
+    hideRecaptchaBadge();
     if (onClose) {
       onClose();
     } else {
@@ -106,32 +152,160 @@ export function ModernAuthCard({
   };
 
   const handleGoogleLogin = async () => {
+    if (isLoading) return;
     setError(null);
+    setAuthErrorCode(null);
+    setUnauthorizedDomain(null);
+    setRecaptchaErrorMsg(null);
     setIsLoading(true);
-    const res = await loginWithGoogle();
-    setIsLoading(false);
-    if (res.success) {
-      handleClose();
-      onSuccess?.();
-    } else {
-      setError(res.error || 'Google sign-in was cancelled or encountered an error.');
+
+    try {
+      // Direct call within user event turn so browsers do not block popup
+      const res = await loginWithGoogle();
+      if (res.success) {
+        handleClose();
+        onSuccess?.();
+      } else {
+        setError(res.error || 'Google sign-in was cancelled or encountered an error.');
+        if (res.code) {
+          setAuthErrorCode(res.code);
+        }
+        if (res.domain) {
+          setUnauthorizedDomain(res.domain);
+        }
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Google sign-in encountered an error.');
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  const renderErrorAlert = () => {
+    if (!error) return null;
+
+    const isUnauthorizedDomain = authErrorCode === 'auth/unauthorized-domain' || error.includes('Authorized Domains');
+    const isPopupBlocked = authErrorCode === 'auth/popup-blocked' || error.includes('Popup was blocked') || error.includes('preview frame');
+    const currentHost = unauthorizedDomain || (typeof window !== 'undefined' ? window.location.hostname : '');
+
+    return (
+      <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl font-medium space-y-2.5">
+        <div className="flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+          <p className="leading-relaxed font-semibold text-rose-900">{error}</p>
+        </div>
+
+        {/* Copy domain helper if domain is not added to Firebase */}
+        {isUnauthorizedDomain && currentHost && (
+          <div className="pt-2 border-t border-rose-200/70 space-y-1.5">
+            <p className="text-[11px] text-rose-700 font-normal">
+              To allow Google sign-in from this environment, add this domain to Firebase:
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(currentHost);
+                  setCopiedDomain(true);
+                  setTimeout(() => setCopiedDomain(false), 2500);
+                }}
+                className="px-2.5 py-1.5 bg-white border border-rose-300 hover:border-rose-400 text-rose-800 rounded-lg text-[11px] font-bold shadow-xs cursor-pointer flex items-center gap-1.5 transition-colors"
+              >
+                {copiedDomain ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copiedDomain ? 'Domain Copied!' : `Copy "${currentHost.length > 25 ? currentHost.slice(0, 22) + '...' : currentHost}"`}</span>
+              </button>
+              <span className="text-[10px] text-rose-600">
+                In Firebase Console → Auth → Settings → Authorized Domains
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Open in new tab helper if popup was blocked or in iframe */}
+        {(isPopupBlocked || isInIframe) && (
+          <div className="pt-2 border-t border-rose-200/70 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  window.open(window.location.href, '_blank');
+                }
+              }}
+              className="px-3 py-1.5 bg-[#1C362A] hover:bg-[#162a21] text-white rounded-lg text-[11px] font-bold shadow-xs cursor-pointer flex items-center gap-1.5 transition-colors"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Open in New Tab for Google Sign In</span>
+            </button>
+            <span className="text-[10px] text-rose-600">
+              Browsers restrict OAuth popups inside embedded iframes.
+            </span>
+          </div>
+        )}
+      </div>
+    );
   };
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading || recaptchaStatus === 'checking') return;
+
     if (!email || !password) {
       setError('Please enter your email or username and password.');
       return;
     }
     setError(null);
+    setRecaptchaErrorMsg(null);
     setIsLoading(true);
+    setRecaptchaStatus('checking');
+
+    // 1. Strictly verify bot risk via Google reCAPTCHA Enterprise on server
+    try {
+      const recaptcha = await executeRecaptcha('LOGIN');
+      if (recaptcha.blocked || !recaptcha.token) {
+        setIsLoading(false);
+        setRecaptchaStatus('blocked');
+        const userMsg = 'Security check could not be completed. Please disable content filters or ad-blockers and try again.';
+        setRecaptchaErrorMsg(userMsg);
+        setError(userMsg);
+        return;
+      }
+      
+      const verifyRes = await fetch('/api/security/verify-recaptcha', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: recaptcha.token, action: 'LOGIN' })
+      });
+      const verifyData = await verifyRes.json();
+      
+      if (!verifyRes.ok || !verifyData.success) {
+        setIsLoading(false);
+        setRecaptchaStatus('error');
+        const userMsg = verifyData.userMessage || verifyData.error || 'Security check could not be completed. Please try again.';
+        setRecaptchaErrorMsg(userMsg);
+        setError(userMsg);
+        return;
+      }
+
+      // ONLY marked verified after successful server assessment
+      setRecaptchaStatus('verified');
+    } catch {
+      setIsLoading(false);
+      setRecaptchaStatus('error');
+      const userMsg = 'Security check could not be completed. Please try again.';
+      setRecaptchaErrorMsg(userMsg);
+      setError(userMsg);
+      return;
+    } finally {
+      hideRecaptchaBadge();
+    }
+
     const res = await loginWithEmail(email, password);
     setIsLoading(false);
     if (res.success) {
       handleClose();
       onSuccess?.();
     } else {
+      setRecaptchaStatus('idle'); // Reset token state so fresh token is generated on retry
       if (res.error?.includes('operation-not-allowed') || res.error?.includes('auth/operation-not-allowed')) {
         setError('Email/Password provider is not enabled on this Firebase project. Please use Google Sign-In.');
       } else {
@@ -142,6 +316,8 @@ export function ModernAuthCard({
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading || recaptchaStatus === 'checking') return;
+
     if (!email || !password) {
       setError('Please provide an email and password.');
       return;
@@ -151,7 +327,51 @@ export function ModernAuthCard({
       return;
     }
     setError(null);
+    setRecaptchaErrorMsg(null);
     setIsLoading(true);
+    setRecaptchaStatus('checking');
+
+    // 1. Strictly verify bot risk via Google reCAPTCHA Enterprise on server
+    try {
+      const recaptcha = await executeRecaptcha('SIGNUP');
+      if (recaptcha.blocked || !recaptcha.token) {
+        setIsLoading(false);
+        setRecaptchaStatus('blocked');
+        const userMsg = 'Security check could not be completed. Please disable content filters or ad-blockers and try again.';
+        setRecaptchaErrorMsg(userMsg);
+        setError(userMsg);
+        return;
+      }
+      
+      const verifyRes = await fetch('/api/security/verify-recaptcha', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: recaptcha.token, action: 'SIGNUP' })
+      });
+      const verifyData = await verifyRes.json();
+      
+      if (!verifyRes.ok || !verifyData.success) {
+        setIsLoading(false);
+        setRecaptchaStatus('error');
+        const userMsg = verifyData.userMessage || verifyData.error || 'Security check could not be completed. Please try again.';
+        setRecaptchaErrorMsg(userMsg);
+        setError(userMsg);
+        return;
+      }
+
+      // ONLY marked verified after successful server assessment
+      setRecaptchaStatus('verified');
+    } catch {
+      setIsLoading(false);
+      setRecaptchaStatus('error');
+      const userMsg = 'Security check could not be completed. Please try again.';
+      setRecaptchaErrorMsg(userMsg);
+      setError(userMsg);
+      return;
+    } finally {
+      hideRecaptchaBadge();
+    }
+
     const cleanUsername = username ? username.replace(/^@/, '').toLowerCase().replace(/[^a-z0-9_]/g, '') : '';
     const res = await signupWithEmail(email, password, name, cleanUsername);
     setIsLoading(false);
@@ -159,6 +379,7 @@ export function ModernAuthCard({
       handleClose();
       onSuccess?.();
     } else {
+      setRecaptchaStatus('idle'); // Reset token state for retry
       if (res.error?.includes('operation-not-allowed') || res.error?.includes('auth/operation-not-allowed')) {
         setError('Email/Password provider is not enabled on this Firebase project. Please use Google Sign-In.');
       } else {
@@ -195,17 +416,22 @@ export function ModernAuthCard({
       {/* ========================================================================= */}
       {/* Mobile view: Stacked / Switchable tabs */}
       <div className="md:hidden flex flex-col w-full max-h-[calc(100dvh-1.5rem)] sm:max-h-[92dvh] overflow-hidden">
-        {/* Top banner - Sleek and compact on mobile */}
-        <div className="bg-[#1C362A] text-white px-4 py-3 sm:px-6 sm:py-5 relative overflow-hidden text-center shrink-0">
+        {/* Top banner - Sleek and left-anchored on mobile */}
+        <div className="bg-[#1C362A] text-white px-5 py-4 sm:px-6 sm:py-5 relative overflow-hidden text-left shrink-0">
           <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
-          <div className="inline-flex items-center justify-center p-1.5 rounded-lg bg-white/10 mb-1">
-            <BseNexusLogo className="w-5 h-5 sm:w-6 sm:h-6" />
+          <div className="flex items-center gap-2.5 mb-2">
+            <div className="inline-flex items-center justify-center p-1.5 rounded-lg bg-white/10">
+              <BseNexusLogo className="w-5 h-5 sm:w-6 sm:h-6" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold tracking-widest uppercase text-emerald-400 leading-none">BSE NEXUS</p>
+              <p className="text-[10px] text-emerald-200/70 leading-none mt-0.5">Capital Markets</p>
+            </div>
           </div>
-          <p className="text-[10px] font-bold tracking-widest uppercase text-emerald-400">BSE NEXUS</p>
-          <h2 className="text-lg sm:text-xl font-bold tracking-tight mt-0.5 text-white">
+          <h2 className="text-lg sm:text-xl font-bold tracking-tight text-white">
             {isSignIn ? 'Welcome back.' : 'Start the first page.'}
           </h2>
-          <p className="text-[11px] sm:text-xs text-emerald-100/75 mt-0.5 max-w-[280px] sm:max-w-xs mx-auto line-clamp-1 sm:line-clamp-none">
+          <p className="text-[11px] sm:text-xs text-emerald-100/80 mt-1 max-w-sm leading-relaxed">
             {isSignIn 
               ? 'Your corporate watchlists, filings & alerts are saved.' 
               : 'One account for real-time BSE filings, AI summaries & alerts.'}
@@ -240,11 +466,7 @@ export function ModernAuthCard({
 
         {/* Mobile Form Body - Smoothly scrollable with no clipping */}
         <div className="p-4 sm:p-6 overflow-y-auto flex-1 overscroll-contain">
-          {error && (
-            <div className="mb-3 p-2.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-medium">
-              <p>{error}</p>
-            </div>
-          )}
+          {renderErrorAlert()}
 
           {isSignIn ? (
             <form onSubmit={handleEmailLogin} className="space-y-3">
@@ -294,19 +516,31 @@ export function ModernAuthCard({
                 </label>
                 <button
                   type="button"
-                  onClick={handleGoogleLogin}
+                  onClick={() => setError('Please sign in using Google or enter your registered account credentials.')}
                   className="text-slate-500 hover:text-slate-800"
                 >
                   Forgot password?
                 </button>
               </div>
 
+              <RecaptchaVerificationBox status={recaptchaStatus} onRetry={handleRetrySecurity} />
+
               <button
                 type="submit"
-                disabled={isLoading}
-                className="w-full py-2.5 sm:py-3 px-4 bg-[#1C362A] hover:bg-[#162a21] text-white font-bold rounded-xl text-sm transition-transform active:scale-98 shadow-sm cursor-pointer disabled:opacity-50 min-h-[42px] flex items-center justify-center"
+                disabled={isLoading || recaptchaStatus === 'checking'}
+                aria-busy={isLoading || recaptchaStatus === 'checking'}
+                className="w-full py-2.5 sm:py-3 px-4 bg-[#1C362A] hover:bg-[#162a21] text-white font-bold rounded-xl text-sm transition-transform active:scale-98 shadow-sm cursor-pointer disabled:opacity-50 min-h-[42px] flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-[#1C362A] focus:ring-offset-1"
               >
-                {isLoading ? 'Signing in...' : 'Sign in'}
+                {recaptchaStatus === 'checking' ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+                    <span>Verifying security...</span>
+                  </>
+                ) : isLoading ? (
+                  <span>Signing in...</span>
+                ) : (
+                  <span>Sign in</span>
+                )}
               </button>
 
               <div className="relative flex items-center justify-center my-2 sm:my-3">
@@ -318,18 +552,24 @@ export function ModernAuthCard({
                 type="button"
                 onClick={handleGoogleLogin}
                 disabled={isLoading}
-                className="w-full py-2.5 px-4 bg-white hover:bg-slate-50 border border-slate-300 hover:border-emerald-500 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-2 cursor-pointer active:scale-98 shadow-2xs min-h-[42px] transition-all"
+                className="w-full py-2.5 px-4 bg-white hover:bg-slate-50 border border-slate-300 hover:border-emerald-500 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-2 cursor-pointer active:scale-98 shadow-2xs min-h-[42px] transition-all disabled:opacity-75 focus:outline-none focus:ring-2 focus:ring-slate-400"
               >
-                <svg className="w-4 h-4" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-                </svg>
-                <span>Continue with Google</span>
-                <span className="ml-1 text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded-full">
-                  30D Free Pro
-                </span>
+                {isLoading ? (
+                  <>
+                    <span className="animate-spin inline-block w-3.5 h-3.5 border-2 border-slate-600 border-t-transparent rounded-full" />
+                    <span>Signing in...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" viewBox="0 0 24 24">
+                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                    </svg>
+                    <span>Continue with Google</span>
+                  </>
+                )}
               </button>
 
               <div className="pt-1 flex flex-col gap-1 text-center">
@@ -343,30 +583,35 @@ export function ModernAuthCard({
                     Create account
                   </button>
                 </p>
-                <div className="pt-2 border-t border-slate-100">
+                <div className="pt-2 border-t border-slate-100 space-y-2">
                   <button
                     type="button"
                     onClick={async () => {
+                      if (isLoading) return;
                       setIsLoading(true);
                       if (typeof window !== 'undefined') {
                         sessionStorage.setItem('bse_guest_active_session', 'true');
                       }
-                      await quickDemoLogin('Guest');
-                      setIsLoading(false);
-                      handleClose();
-                      onSuccess?.();
+                      try {
+                        await quickDemoLogin('Guest');
+                        handleClose();
+                        onSuccess?.();
+                      } finally {
+                        setIsLoading(false);
+                      }
                     }}
                     disabled={isLoading}
-                    className="w-full py-2.5 px-3 rounded-xl border border-slate-200 hover:border-emerald-500 bg-slate-50 hover:bg-emerald-50/40 text-slate-700 hover:text-emerald-900 text-xs font-semibold flex items-center justify-between cursor-pointer transition-all"
+                    className="w-full py-2.5 px-3 rounded-xl border border-slate-200 hover:border-emerald-500 bg-slate-50 hover:bg-emerald-50/40 text-slate-700 hover:text-emerald-900 text-xs font-semibold flex items-center justify-between cursor-pointer transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     title="View-only access to live BSE filings without account"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                      <span>Continue as Guest (View-Only)</span>
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${isLoading ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500'}`} />
+                      <span>{isLoading ? 'Starting Guest Session...' : 'Continue as Guest (View-Only)'}</span>
                     </div>
                     <span className="text-[11px] font-bold text-emerald-700 shrink-0">Guest Mode →</span>
                   </button>
                 </div>
+                <RecaptchaNotice />
               </div>
             </form>
           ) : (
@@ -456,12 +701,24 @@ export function ModernAuthCard({
                 <p className="text-[10px] text-slate-400 mt-1">Use 8 characters or more.</p>
               </div>
 
+              <RecaptchaVerificationBox status={recaptchaStatus} onRetry={handleRetrySecurity} />
+
               <button
                 type="submit"
-                disabled={isLoading}
-                className="w-full py-2.5 sm:py-3 px-4 bg-[#1C362A] hover:bg-[#162a21] text-white font-bold rounded-xl text-sm transition-transform active:scale-98 shadow-sm cursor-pointer disabled:opacity-50 min-h-[42px] flex items-center justify-center"
+                disabled={isLoading || recaptchaStatus === 'checking'}
+                aria-busy={isLoading || recaptchaStatus === 'checking'}
+                className="w-full py-2.5 sm:py-3 px-4 bg-[#1C362A] hover:bg-[#162a21] text-white font-bold rounded-xl text-sm transition-transform active:scale-98 shadow-sm cursor-pointer disabled:opacity-50 min-h-[42px] flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-[#1C362A] focus:ring-offset-1"
               >
-                {isLoading ? 'Creating account...' : 'Create account'}
+                {recaptchaStatus === 'checking' ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+                    <span>Verifying security...</span>
+                  </>
+                ) : isLoading ? (
+                  <span>Creating account...</span>
+                ) : (
+                  <span>Create account</span>
+                )}
               </button>
 
               <div className="relative flex items-center justify-center my-2 sm:my-3">
@@ -473,18 +730,27 @@ export function ModernAuthCard({
                 type="button"
                 onClick={handleGoogleLogin}
                 disabled={isLoading}
-                className="w-full py-2 sm:py-2.5 px-4 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-2 cursor-pointer active:scale-98 shadow-2xs min-h-[40px]"
+                className="w-full py-2 sm:py-2.5 px-4 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-2 cursor-pointer active:scale-98 shadow-2xs min-h-[40px] disabled:opacity-75 focus:outline-none focus:ring-2 focus:ring-slate-400"
               >
-                <svg className="w-4 h-4" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-                </svg>
-                <span>Sign up with Google</span>
+                {isLoading ? (
+                  <>
+                    <span className="animate-spin inline-block w-3.5 h-3.5 border-2 border-slate-600 border-t-transparent rounded-full" />
+                    <span>Signing in...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" viewBox="0 0 24 24">
+                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                    </svg>
+                    <span>Sign up with Google</span>
+                  </>
+                )}
               </button>
 
-              <div className="pt-1 text-center">
+              <div className="pt-1 text-center space-y-2">
                 <p className="text-xs text-slate-600">
                   Already have an account?{' '}
                   <button
@@ -495,6 +761,7 @@ export function ModernAuthCard({
                     Sign in
                   </button>
                 </p>
+                <RecaptchaNotice />
               </div>
             </form>
           )}
@@ -603,11 +870,7 @@ export function ModernAuthCard({
                     <p className="text-xs text-slate-500 mt-0.5">Enter your account credentials to continue</p>
                   </div>
 
-                  {error && (
-                    <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-medium">
-                      <p>{error}</p>
-                    </div>
-                  )}
+                  {renderErrorAlert()}
 
                   <form onSubmit={handleEmailLogin} className="space-y-3.5">
                     <div>
@@ -666,12 +929,24 @@ export function ModernAuthCard({
                       </button>
                     </div>
 
+                    <RecaptchaVerificationBox status={recaptchaStatus} onRetry={handleRetrySecurity} />
+
                     <button
                       type="submit"
-                      disabled={isLoading}
-                      className="w-full py-2.5 px-4 bg-[#1C362A] hover:bg-[#162a21] text-white font-bold rounded-xl text-sm transition-all active:scale-98 shadow-sm cursor-pointer disabled:opacity-50"
+                      disabled={isLoading || recaptchaStatus === 'checking'}
+                      aria-busy={isLoading || recaptchaStatus === 'checking'}
+                      className="w-full py-2.5 px-4 bg-[#1C362A] hover:bg-[#162a21] text-white font-bold rounded-xl text-sm transition-all active:scale-98 shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-[#1C362A] focus:ring-offset-1"
                     >
-                      {isLoading ? 'Signing in...' : 'Sign in'}
+                      {recaptchaStatus === 'checking' ? (
+                        <>
+                          <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+                          <span>Verifying security...</span>
+                        </>
+                      ) : isLoading ? (
+                        <span>Signing in...</span>
+                      ) : (
+                        <span>Sign in</span>
+                      )}
                     </button>
 
                     <div className="pt-2 text-center">
@@ -693,42 +968,55 @@ export function ModernAuthCard({
                         type="button"
                         onClick={handleGoogleLogin}
                         disabled={isLoading}
-                        className="w-full py-2.5 px-3 border border-slate-200 hover:border-emerald-500 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-2 cursor-pointer transition-colors bg-white hover:bg-slate-50"
+                        className="w-full py-2.5 px-3 border border-slate-200 hover:border-emerald-500 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-2 cursor-pointer transition-colors bg-white hover:bg-slate-50 min-h-[38px] disabled:opacity-75 focus:outline-none focus:ring-2 focus:ring-slate-400"
                       >
-                        <svg className="w-4 h-4" viewBox="0 0 24 24">
-                          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-                        </svg>
-                        <span>Sign in with Google</span>
-                        <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded-full">30D Free Pro</span>
+                        {isLoading ? (
+                          <>
+                            <span className="animate-spin inline-block w-3.5 h-3.5 border-2 border-slate-600 border-t-transparent rounded-full" />
+                            <span>Signing in...</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" viewBox="0 0 24 24">
+                              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                            </svg>
+                            <span>Sign in with Google</span>
+                          </>
+                        )}
                       </button>
 
                       {/* The single dedicated Guest login option */}
                       <button
                         type="button"
+                        disabled={isLoading}
                         onClick={async () => {
+                          if (isLoading) return;
                           setIsLoading(true);
                           if (typeof window !== 'undefined') {
                             sessionStorage.setItem('bse_guest_active_session', 'true');
                           }
-                          await quickDemoLogin('Guest');
-                          setIsLoading(false);
-                          handleClose();
-                          onSuccess?.();
+                          try {
+                            await quickDemoLogin('Guest');
+                            handleClose();
+                            onSuccess?.();
+                          } finally {
+                            setIsLoading(false);
+                          }
                         }}
-                        disabled={isLoading}
-                        className="w-full py-2.5 px-3 rounded-xl border border-slate-200 hover:border-emerald-500 bg-slate-50 hover:bg-emerald-50/40 text-slate-700 hover:text-emerald-900 text-xs font-semibold flex items-center justify-between cursor-pointer transition-all"
+                        className="w-full py-2.5 px-3 rounded-xl border border-slate-200 hover:border-emerald-500 bg-slate-50 hover:bg-emerald-50/40 text-slate-700 hover:text-emerald-900 text-xs font-semibold flex items-center justify-between cursor-pointer transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         title="View-only access to live BSE filings without account"
                       >
                         <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                          <span>Continue as Guest (View-Only)</span>
+                          <span className={`w-2 h-2 rounded-full shrink-0 ${isLoading ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500'}`} />
+                          <span>{isLoading ? 'Starting Guest Session...' : 'Continue as Guest (View-Only)'}</span>
                         </div>
                         <span className="text-[11px] font-bold text-emerald-700 shrink-0">Guest Mode →</span>
                       </button>
                     </div>
+                    <RecaptchaNotice />
                   </form>
                 </motion.div>
               ) : (
@@ -746,11 +1034,7 @@ export function ModernAuthCard({
                     <p className="text-xs text-slate-500 mt-0.5">Join BSE Nexus to track market filings & alerts</p>
                   </div>
 
-                  {error && (
-                    <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-medium">
-                      <p>{error}</p>
-                    </div>
-                  )}
+                  {renderErrorAlert()}
 
                   <form onSubmit={handleSignup} className="space-y-3">
                     <div>
@@ -829,12 +1113,24 @@ export function ModernAuthCard({
                       <p className="text-[10px] text-slate-400 mt-1">Use 8 characters or more.</p>
                     </div>
 
+                    <RecaptchaVerificationBox status={recaptchaStatus} onRetry={handleRetrySecurity} />
+
                     <button
                       type="submit"
-                      disabled={isLoading}
-                      className="w-full py-2.5 px-4 bg-[#1C362A] hover:bg-[#162a21] text-white font-bold rounded-xl text-sm transition-all active:scale-98 shadow-sm cursor-pointer disabled:opacity-50"
+                      disabled={isLoading || recaptchaStatus === 'checking'}
+                      aria-busy={isLoading || recaptchaStatus === 'checking'}
+                      className="w-full py-2.5 px-4 bg-[#1C362A] hover:bg-[#162a21] text-white font-bold rounded-xl text-sm transition-all active:scale-98 shadow-sm cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-[#1C362A] focus:ring-offset-1"
                     >
-                      {isLoading ? 'Creating account...' : 'Create account'}
+                      {recaptchaStatus === 'checking' ? (
+                        <>
+                          <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+                          <span>Verifying security...</span>
+                        </>
+                      ) : isLoading ? (
+                        <span>Creating account...</span>
+                      ) : (
+                        <span>Create account</span>
+                      )}
                     </button>
 
                     <div className="pt-1 text-center">
@@ -849,6 +1145,25 @@ export function ModernAuthCard({
                         </button>
                       </p>
                     </div>
+
+                    <div className="pt-2 border-t border-slate-100 space-y-2">
+                      <button
+                        type="button"
+                        onClick={handleGoogleLogin}
+                        disabled={isLoading}
+                        className="w-full py-2.5 px-3 border border-slate-200 hover:border-emerald-500 rounded-xl text-xs font-bold text-slate-700 flex items-center justify-center gap-2 cursor-pointer transition-colors bg-white hover:bg-slate-50 min-h-[38px] disabled:opacity-75 focus:outline-none focus:ring-2 focus:ring-slate-400"
+                      >
+                        <svg className="w-4 h-4" viewBox="0 0 24 24">
+                          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                        </svg>
+                        <span>Sign up with Google</span>
+                      </button>
+                    </div>
+
+                    <RecaptchaNotice />
                   </form>
                 </motion.div>
               )}
@@ -856,6 +1171,149 @@ export function ModernAuthCard({
           </div>
         </motion.div>
       </div>
+    </div>
+  );
+}
+
+function RecaptchaNotice() {
+  return (
+    <p className="pt-2 text-center text-[10px] sm:text-[11px] text-slate-500 leading-normal select-none">
+      This site is protected by reCAPTCHA and the Google{' '}
+      <a 
+        href="https://policies.google.com/privacy" 
+        target="_blank" 
+        rel="noopener noreferrer" 
+        className="underline text-slate-600 hover:text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-400 rounded"
+      >
+        Privacy Policy
+      </a>{' '}
+      and{' '}
+      <a 
+        href="https://policies.google.com/terms" 
+        target="_blank" 
+        rel="noopener noreferrer" 
+        className="underline text-slate-600 hover:text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-400 rounded"
+      >
+        Terms of Service
+      </a>{' '}
+      apply.
+    </p>
+  );
+}
+
+interface RecaptchaVerificationBoxProps {
+  status: 'idle' | 'checking' | 'verified' | 'blocked' | 'error';
+  onRetry?: () => void;
+}
+
+function RecaptchaVerificationBox({ status, onRetry }: RecaptchaVerificationBoxProps) {
+  if (status === 'idle') {
+    return (
+      <div 
+        className="py-2 px-3 rounded-xl border border-slate-200 bg-slate-50/70 flex items-center justify-between text-xs my-1 select-none"
+        aria-live="polite"
+      >
+        <div className="flex items-center gap-2">
+          <Shield className="w-4 h-4 text-slate-400 shrink-0" aria-hidden="true" />
+          <div>
+            <p className="font-semibold text-slate-700 text-[11px] leading-tight">
+              reCAPTCHA Enterprise Protection
+            </p>
+            <p className="text-[9.5px] text-slate-500 leading-tight">
+              Assessment verifies on submission
+            </p>
+          </div>
+        </div>
+        <span className="text-[10px] font-medium text-slate-600 bg-slate-200/70 px-2 py-0.5 rounded-md">
+          Ready
+        </span>
+      </div>
+    );
+  }
+
+  if (status === 'checking') {
+    return (
+      <div 
+        className="py-2 px-3 rounded-xl border border-amber-200 bg-amber-50/80 flex items-center justify-between text-xs my-1"
+        role="status"
+        aria-live="polite"
+      >
+        <div className="flex items-center gap-2">
+          <span className="w-4 h-4 border-2 border-amber-600 border-t-transparent rounded-full animate-spin shrink-0" aria-hidden="true" />
+          <div>
+            <p className="font-semibold text-amber-900 text-[11px] leading-tight">
+              Verifying Security...
+            </p>
+            <p className="text-[9.5px] text-amber-700 leading-tight">
+              Assessing reCAPTCHA Enterprise risk score
+            </p>
+          </div>
+        </div>
+        <span className="text-[10px] font-semibold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-md">
+          Checking
+        </span>
+      </div>
+    );
+  }
+
+  if (status === 'verified') {
+    return (
+      <div 
+        className="py-2 px-3 rounded-xl border border-emerald-200 bg-emerald-50/80 flex items-center justify-between text-xs my-1"
+        role="status"
+        aria-live="polite"
+      >
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-300 flex items-center justify-center shrink-0">
+            <Check className="w-3 h-3 stroke-[2.5]" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="font-semibold text-emerald-950 text-[11px] leading-tight">
+              reCAPTCHA Verified
+            </p>
+            <p className="text-[9.5px] text-emerald-700 leading-tight">
+              Security assessment confirmed by server
+            </p>
+          </div>
+        </div>
+        <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-md">
+          ✓ Verified
+        </span>
+      </div>
+    );
+  }
+
+  // 'blocked' or 'error' state
+  return (
+    <div 
+      className="py-2 px-3 rounded-xl border border-rose-200 bg-rose-50/90 flex items-center justify-between text-xs my-1"
+      role="alert"
+      aria-live="assertive"
+    >
+      <div className="flex items-center gap-2">
+        <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" aria-hidden="true" />
+        <div>
+          <p className="font-semibold text-rose-900 text-[11px] leading-tight">
+            Security Check Incomplete
+          </p>
+          <p className="text-[9.5px] text-rose-700 leading-tight">
+            {status === 'blocked' 
+              ? 'Script blocked by browser filter. Please retry.' 
+              : 'Verification did not complete. Please retry.'}
+          </p>
+        </div>
+      </div>
+      {onRetry && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="text-[10px] font-semibold text-rose-800 bg-white hover:bg-rose-100/60 border border-rose-300 px-2 py-0.5 rounded-md flex items-center gap-1 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-1"
+          aria-label="Retry security verification"
+        >
+          <RotateCcw className="w-2.5 h-2.5" aria-hidden="true" />
+          <span>Retry</span>
+        </button>
+      )}
     </div>
   );
 }

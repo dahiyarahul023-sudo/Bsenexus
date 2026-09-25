@@ -6,8 +6,8 @@ import { addLog } from '../database/logDao.js';
 import { 
   getRecentAnnouncements, 
   saveAnnouncement, 
+  saveAnnouncementsBatch,
   flushLocalDiskSave, 
-  getTotalAnnouncementsCount,
   boostAnnouncementsPriorityForWindow,
   getAnnouncementsForStockInWindow
 } from '../database/announcementDao.js';
@@ -17,6 +17,7 @@ import { determinePriority } from '../utils/helpers.js';
 import { isFirestoreQuotaExceeded, setFirestoreQuotaExceeded, isQuotaError, isPermissionDeniedError, setAdminPermissionDenied, isAdminPermissionDenied } from '../database/localStore.js';
 import { adminDb } from '../database/firebase.js';
 import { getBseISTDate } from './bse.js';
+import { externalFeedsCircuitBreaker } from '../utils/circuitBreaker.js';
 
 export interface ResultCalendarItem {
   id: string;
@@ -137,32 +138,36 @@ export async function fetchNSEEventCalendarForSymbol(symbol: string): Promise<NS
   if (!symbol) return [];
   const cleanSym = symbol.trim().toUpperCase();
   const url = `https://www.nseindia.com/api/event-calendar?symbol=${encodeURIComponent(cleanSym)}`;
-  try {
-    const res = await fetch(url, { headers: NSE_HEADERS, signal: AbortSignal.timeout(8000) });
-    if (!res.ok) return [];
-    const text = await res.text();
-    if (!text || text.trim() === '[]' || text.trim() === '{}' || text.includes('Resource not found')) return [];
-    const data = JSON.parse(text);
-    if (Array.isArray(data)) return data;
-    return [];
-  } catch (err: any) {
-    return [];
-  }
+  return await externalFeedsCircuitBreaker.execute(
+    async (signal) => {
+      const res = await fetch(url, { headers: NSE_HEADERS, signal: signal || AbortSignal.timeout(8000) });
+      if (!res.ok) return [];
+      const text = await res.text();
+      if (!text || text.trim() === '[]' || text.trim() === '{}' || text.includes('Resource not found')) return [];
+      const data = JSON.parse(text);
+      if (Array.isArray(data)) return data;
+      return [];
+    },
+    (_err) => [],
+    8000
+  );
 }
 
 export async function fetchGeneralNSEEventCalendar(): Promise<NSECalendarEvent[]> {
   const url = `https://www.nseindia.com/api/event-calendar`;
-  try {
-    const res = await fetch(url, { headers: NSE_HEADERS, signal: AbortSignal.timeout(9000) });
-    if (!res.ok) return [];
-    const text = await res.text();
-    if (!text || text.trim() === '[]' || text.trim() === '{}') return [];
-    const data = JSON.parse(text);
-    if (Array.isArray(data)) return data;
-    return [];
-  } catch (err: any) {
-    return [];
-  }
+  return await externalFeedsCircuitBreaker.execute(
+    async (signal) => {
+      const res = await fetch(url, { headers: NSE_HEADERS, signal: signal || AbortSignal.timeout(9000) });
+      if (!res.ok) return [];
+      const text = await res.text();
+      if (!text || text.trim() === '[]' || text.trim() === '{}') return [];
+      const data = JSON.parse(text);
+      if (Array.isArray(data)) return data;
+      return [];
+    },
+    (_err) => [],
+    9000
+  );
 }
 
 // IST (Indian Standard Time = UTC+5:30) helper for precise market day comparison
@@ -1336,13 +1341,14 @@ export async function fetchDeepHistoricalResultsForStock(
     if (bmRes.ok) {
       const bmJson = await bmRes.json();
       if (bmJson && Array.isArray(bmJson.Table)) {
+        const bmAnnouncements: any[] = [];
         for (const bm of bmJson.Table) {
           const mDate = bm.meeting_date || '';
           const purpose = bm.Purpose_name || 'Board Meeting';
           if (mDate) {
             const safeDateKey = mDate.replace(/[^a-zA-Z0-9]/g, '_');
             const newsId = `bm_${cleanTargetScrip}_${safeDateKey}`;
-            await saveAnnouncement({
+            bmAnnouncements.push({
               newsId,
               companyName: bm.Long_Name || targetSym || "BSE Stock",
               subject: `Board Meeting Intimation - ${purpose}`,
@@ -1354,8 +1360,11 @@ export async function fetchDeepHistoricalResultsForStock(
               category: 'BOARD_MEETING',
               isWatchlist: true
             });
-            totalSaved++;
           }
+        }
+        if (bmAnnouncements.length > 0) {
+          const res = await saveAnnouncementsBatch(bmAnnouncements);
+          totalSaved += (res.inserted + res.updated);
         }
       }
     }
@@ -1412,6 +1421,7 @@ export async function fetchDeepHistoricalResultsForStock(
         continue;
       }
 
+      const historicalAnnouncements: any[] = [];
       for (const item of items) {
         const newsId = item.NEWSID;
         if (!newsId) continue;
@@ -1429,7 +1439,7 @@ export async function fetchDeepHistoricalResultsForStock(
           reachedCutoff = true;
         }
 
-        await saveAnnouncement({
+        historicalAnnouncements.push({
           newsId,
           companyName,
           subject,
@@ -1441,7 +1451,11 @@ export async function fetchDeepHistoricalResultsForStock(
           category: priority.category,
           isWatchlist: true
         });
-        totalSaved++;
+      }
+
+      if (historicalAnnouncements.length > 0) {
+        const res = await saveAnnouncementsBatch(historicalAnnouncements);
+        totalSaved += (res.inserted + res.updated);
       }
     }
   }

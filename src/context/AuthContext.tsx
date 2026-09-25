@@ -1,8 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { 
   signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword,
   updateProfile,
@@ -15,6 +13,7 @@ import { auth, googleProvider } from '../firebase';
 import { UserProfile, UserNotificationPreferences } from '../types';
 import { customFetch } from '../api';
 import { reportSyncStatus, withRetry } from '../utils/retry';
+import { executeRecaptcha } from '../utils/recaptcha';
 
 const ADMIN_EMAIL = 'dahiyarahul023@gmail.com';
 const STORAGE_SESSION_KEY = 'bse_nexus_auth_session';
@@ -34,10 +33,22 @@ const defaultNotificationPreferences: UserNotificationPreferences = {
   insiderTradingAndSAST: false,
   creditRatingChanges: true,
   annualReportsAndAudits: false,
+  telegramAlertsEnabled: true,
+  telegramAiSummaryEnabled: true,
+  telegramAlertScope: 'WATCHLIST_ONLY',
   alertPriority: 'HIGH_ONLY',
   alertScope: 'WATCHLIST_ONLY',
   alertCategory: 'RESULTS_ONLY',
 };
+
+export interface UpdateTelegramOptions {
+  chatId?: string | null;
+  username?: string | null;
+  alertsEnabled?: boolean;
+  aiSummaryEnabled?: boolean;
+  alertScope?: 'WATCHLIST_ONLY' | 'ALL_MARKET';
+  unlink?: boolean;
+}
 
 export interface UpdateProfileParams {
   displayName?: string;
@@ -62,7 +73,13 @@ interface AuthContextType {
   isPro: boolean;
   proDaysLeft: number;
   adminUnlocked: boolean;
-  loginWithGoogle: (forceRedirect?: boolean) => Promise<{ success: boolean; error?: string; isIframeBlocked?: boolean }>;
+  loginWithGoogle: (forceRedirect?: boolean) => Promise<{ 
+    success: boolean; 
+    error?: string; 
+    code?: string; 
+    domain?: string; 
+    isIframeBlocked?: boolean 
+  }>;
   loginWithEmail: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
   signupWithEmail: (email: string, pass: string, name: string, username?: string) => Promise<{ success: boolean; error?: string; needsEmailVerification?: boolean }>;
   quickDemoLogin: (role?: 'user' | 'admin') => Promise<{ success: boolean; error?: string }>;
@@ -74,6 +91,7 @@ interface AuthContextType {
   checkUsernameAvailability: (username: string) => Promise<{ available: boolean; cleanUsername: string; reason?: string; suggestion?: string }>;
   updateNotificationPreferences: (prefs: Partial<UserNotificationPreferences>) => Promise<boolean>;
   updateTelegramChatId: (chatId: string, username?: string) => Promise<boolean>;
+  updateTelegramPreferences: (options: UpdateTelegramOptions) => Promise<boolean>;
   upgradeToPro: (plan?: string) => Promise<boolean>;
   isAuthModalOpen: boolean;
   setIsAuthModalOpen: (open: boolean) => void;
@@ -84,6 +102,9 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// In-flight concurrency lock for anonymous guest sessions to prevent duplicate calls
+let inFlightGuestLoginPromise: Promise<{ success: boolean; error?: string }> | null = null;
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Read cached session synchronously to allow instant First Contentful Paint without blocking visitors
@@ -219,7 +240,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+      const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
       const now = Date.now();
 
       let userProfile: UserProfile | null = null;
@@ -235,7 +256,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               localStorage.setItem(`bse_user_handle_${uid}`, resolvedUsername);
             }
 
-            // Determine Pro status and 30-day trial expiry
+            // Determine Pro status and 1-week (7-day) trial expiry
             let proExpiresAt = 0;
             let resolvedTier: 'free' | 'pro' | 'admin' = 'free';
 
@@ -247,9 +268,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               if (data.profile.proExpiresAt) {
                 proExpiresAt = data.profile.proExpiresAt;
               } else {
-                // Initialize 30-day Pro trial for new authenticated users
+                // Initialize 1-week (7-day) Pro trial for new authenticated users
                 const storedTrial = typeof window !== 'undefined' ? localStorage.getItem(`bse_pro_expires_${uid}`) : null;
-                proExpiresAt = storedTrial ? parseInt(storedTrial, 10) : (now + THIRTY_DAYS_MS);
+                proExpiresAt = storedTrial ? parseInt(storedTrial, 10) : (now + SEVEN_DAYS_MS);
                 if (typeof window !== 'undefined') {
                   localStorage.setItem(`bse_pro_expires_${uid}`, String(proExpiresAt));
                 }
@@ -300,7 +321,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           proExpiresAt = now + 365 * 24 * 60 * 60 * 1000;
         } else if (!isGuestUser) {
           const storedTrial = typeof window !== 'undefined' ? localStorage.getItem(`bse_pro_expires_${uid}`) : null;
-          proExpiresAt = storedTrial ? parseInt(storedTrial, 10) : (now + THIRTY_DAYS_MS);
+          proExpiresAt = storedTrial ? parseInt(storedTrial, 10) : (now + SEVEN_DAYS_MS);
           if (typeof window !== 'undefined') {
             localStorage.setItem(`bse_pro_expires_${uid}`, String(proExpiresAt));
           }
@@ -353,21 +374,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    // Check if coming back from redirect login
-    try {
-      getRedirectResult(auth)
-        .then(async (res) => {
-          if (res && res.user) {
-            await syncUserProfile(res.user);
-            setIsAuthModalOpen(false);
-            if (res.user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
-              setIsAdminPinModalOpen(true);
-            }
-          }
-        })
-        .catch((e) => console.warn('Redirect auth result info:', e?.message || e));
-    } catch {}
-
     // Authoritative source of truth: Firebase onAuthStateChanged with saved local fallback
     let unsubscribe = () => {};
     try {
@@ -480,6 +486,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Google Sign-In with standard rock-solid popup authentication across Desktop & Mobile
   const loginWithGoogle = async () => {
+    const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
+    const currentHost = typeof window !== 'undefined' ? window.location.hostname : 'current domain';
+
     try {
       const result = await signInWithPopup(auth, googleProvider);
       if (result && result.user) {
@@ -492,74 +501,120 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       return { success: false, error: 'Google sign-in was cancelled.' };
     } catch (error: any) {
-      console.warn('Google Sign In Error:', error?.code || error?.message);
-      const currentHost = typeof window !== 'undefined' ? window.location.hostname : 'current domain';
+      console.warn('Google Sign In Error:', error?.code || error?.message, error);
 
       if (error?.code === 'auth/unauthorized-domain') {
         return { 
           success: false, 
+          code: 'auth/unauthorized-domain',
+          domain: currentHost,
           error: `Domain "${currentHost}" is not added to Firebase Authorized Domains. In Firebase Console > Authentication > Settings > Authorized Domains, please add "${currentHost}".` 
         };
       }
-      if (error?.code === 'auth/popup-closed-by-user' || error?.code === 'auth/cancelled-popup-request') {
+      if (
+        error?.code === 'auth/popup-closed-by-user' || 
+        error?.code === 'auth/cancelled-popup-request' ||
+        error?.message?.includes('Pending promise was never set')
+      ) {
         return { 
           success: false, 
+          code: error?.code || 'auth/popup-closed-by-user',
           error: 'Google sign-in window was closed. Please click "Sign in with Google" to try again.' 
         };
       }
       if (error?.code === 'auth/popup-blocked') {
         return { 
           success: false, 
-          error: 'Popup was blocked by your browser. Please allow popups for this site (click the popup icon in your browser address bar) and try again.' 
+          code: 'auth/popup-blocked',
+          isIframeBlocked: isInIframe,
+          error: isInIframe 
+            ? 'Popup was blocked by your browser or the preview frame. Please open the app in a new tab to complete Google sign-in.'
+            : 'Popup was blocked by your browser. Please allow popups for this site (click the popup icon in your browser address bar) and try again.' 
+        };
+      }
+      if (isInIframe && (error?.code === 'auth/internal-error' || error?.code === 'auth/network-request-failed')) {
+        return {
+          success: false,
+          code: error?.code,
+          isIframeBlocked: true,
+          error: 'Browser security prevented sign-in inside the preview frame. Please open the app in a new tab to complete Google sign-in.'
         };
       }
       return { 
         success: false, 
+        code: error?.code,
         error: error?.message || 'Google sign-in encountered an error. Please try again.' 
       };
     }
   };
 
-  // Instant Trader Access: Real persistent Firebase anonymous auth with valid ID Token and dev fallback
-  const quickDemoLogin = async (customName?: string) => {
-    try {
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('bse_guest_active_session', 'true');
-      }
-      const traderName = (typeof customName === 'string' && customName.trim()) ? customName.trim() : 'Pro Trader';
-      let firebaseUser: any = null;
+  // Instant Trader Access: Real persistent Firebase anonymous auth with session reuse, in-flight lock, and idempotency
+  const quickDemoLogin = async (customName?: string): Promise<{ success: boolean; error?: string }> => {
+    // 1. In-flight concurrency lock: return existing pending promise if user clicks multiple times
+    if (inFlightGuestLoginPromise) {
+      return inFlightGuestLoginPromise;
+    }
 
+    const runGuestLogin = async (): Promise<{ success: boolean; error?: string }> => {
       try {
-        const result = await signInAnonymously(auth);
-        if (result && result.user) {
-          firebaseUser = result.user;
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('bse_guest_active_session', 'true');
+        }
+        const traderName = (typeof customName === 'string' && customName.trim()) ? customName.trim() : 'Pro Trader';
+
+        // 2. Idempotent check: If already authenticated as an anonymous guest in current state, reuse session
+        if (user && user.isAnonymous) {
+          setIsAuthModalOpen(false);
+          return { success: true };
+        }
+
+        let firebaseUser: any = null;
+
+        // 3. Existing anonymous user reuse: Re-use auth.currentUser if already an anonymous session
+        if (auth?.currentUser && auth.currentUser.isAnonymous) {
+          firebaseUser = auth.currentUser;
           if (!firebaseUser.displayName && traderName) {
             await updateProfile(firebaseUser, { displayName: traderName }).catch(() => {});
           }
+        } else {
+          try {
+            const result = await signInAnonymously(auth);
+            if (result && result.user) {
+              firebaseUser = result.user;
+              if (!firebaseUser.displayName && traderName) {
+                await updateProfile(firebaseUser, { displayName: traderName }).catch(() => {});
+              }
+            }
+          } catch (fbErr: any) {
+            console.info('[Auth] Anonymous firebase auth note:', fbErr?.code || fbErr?.message);
+            // Fallback local trader session if offline or blocked
+            firebaseUser = {
+              uid: 'trader_' + Math.random().toString(36).substring(2, 10),
+              displayName: traderName,
+              email: `${traderName.toLowerCase().replace(/\s+/g, '_')}@bse-trader.local`,
+              isAnonymous: true,
+              photoURL: null,
+              getIdToken: async () => ''
+            };
+          }
         }
-      } catch (fbErr: any) {
-        console.info('[Auth] Anonymous firebase auth note:', fbErr?.code || fbErr?.message);
-        // Fallback local trader session
-        firebaseUser = {
-          uid: 'trader_' + Math.random().toString(36).substring(2, 10),
-          displayName: traderName,
-          email: `${traderName.toLowerCase().replace(/\s+/g, '_')}@bse-trader.local`,
-          isAnonymous: true,
-          photoURL: null,
-          getIdToken: async () => ''
-        };
-      }
 
-      if (firebaseUser) {
-        await syncUserProfile(firebaseUser);
-        setIsAuthModalOpen(false);
-        return { success: true };
+        if (firebaseUser) {
+          await syncUserProfile(firebaseUser);
+          setIsAuthModalOpen(false);
+          return { success: true };
+        }
+        return { success: false, error: 'Could not initialize trader session.' };
+      } catch (e: any) {
+        console.warn('Trader access error:', e?.message || e);
+        return { success: false, error: e?.message || 'Login failed' };
+      } finally {
+        inFlightGuestLoginPromise = null;
       }
-      return { success: false, error: 'Could not initialize trader session.' };
-    } catch (e: any) {
-      console.warn('Trader access error:', e?.message || e);
-      return { success: false, error: e?.message || 'Login failed' };
-    }
+    };
+
+    inFlightGuestLoginPromise = runGuestLogin();
+    return inFlightGuestLoginPromise;
   };
 
   const loginWithEmail = async (email: string, pass: string) => {
@@ -644,10 +699,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loginWithAdminPin = async (pin: string) => {
     try {
+      const rc = await executeRecaptcha('ADMIN_PIN');
       const res = await customFetch('/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin })
+        body: JSON.stringify({ 
+          pin, 
+          recaptchaToken: rc.token, 
+          recaptchaAction: 'ADMIN_PIN' 
+        })
       });
       const data = await res.json();
       if (res.ok && (data.success || data.verified)) {
@@ -664,10 +724,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const verifyAdminPin = async (pin: string) => {
     try {
+      const rc = await executeRecaptcha('ADMIN_PIN');
       const res = await customFetch('/auth/verify-pin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin })
+        body: JSON.stringify({ 
+          pin, 
+          recaptchaToken: rc.token, 
+          recaptchaAction: 'ADMIN_PIN' 
+        })
       });
       const data = await res.json();
       if (res.ok && (data.success || data.verified)) {
@@ -899,58 +964,105 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const updateTelegramChatId = async (chatId: string, username?: string): Promise<boolean> => {
+  const updateTelegramPreferences = async (options: UpdateTelegramOptions): Promise<boolean> => {
     if (!profile) return false;
     reportSyncStatus('syncing');
-    const cleanChatId = chatId.trim();
-    const cleanUsername = username !== undefined ? (username.trim() || null) : profile.telegramUsername;
 
-    const updatedProfile = {
+    const unlink = options.unlink === true;
+    const cleanChatId = unlink ? null : (options.chatId !== undefined ? (options.chatId ? options.chatId.trim() : null) : profile.telegramChatId);
+    const cleanUsername = unlink ? null : (options.username !== undefined ? (options.username ? options.username.trim().replace(/^@/, '') : null) : profile.telegramUsername);
+
+    const currentPrefs = profile.notificationPreferences || defaultNotificationPreferences;
+    const updatedPrefs: UserNotificationPreferences = {
+      ...currentPrefs,
+      ...(options.alertsEnabled !== undefined ? { telegramAlertsEnabled: options.alertsEnabled } : {}),
+      ...(options.aiSummaryEnabled !== undefined ? { telegramAiSummaryEnabled: options.aiSummaryEnabled } : {}),
+      ...(options.alertScope !== undefined ? { telegramAlertScope: options.alertScope } : {}),
+    };
+
+    if (unlink) {
+      updatedPrefs.telegramAlertsEnabled = false;
+    }
+
+    const updatedProfile: UserProfile = {
       ...profile,
       telegramChatId: cleanChatId,
-      telegramUsername: cleanUsername
+      telegramUsername: cleanUsername,
+      notificationPreferences: updatedPrefs
     };
+
     setProfile(updatedProfile);
     saveLocalSession(user, updatedProfile);
 
     try {
       if (profile.uid) {
-        localStorage.setItem(`bse_user_tg_chat_id_${profile.uid}`, cleanChatId);
-        if (cleanUsername) localStorage.setItem(`bse_user_tg_username_${profile.uid}`, cleanUsername);
+        if (cleanChatId) {
+          localStorage.setItem(`bse_user_tg_chat_id_${profile.uid}`, cleanChatId);
+        } else {
+          localStorage.removeItem(`bse_user_tg_chat_id_${profile.uid}`);
+        }
+        if (cleanUsername) {
+          localStorage.setItem(`bse_user_tg_username_${profile.uid}`, cleanUsername);
+        } else {
+          localStorage.removeItem(`bse_user_tg_username_${profile.uid}`);
+        }
       }
-      localStorage.removeItem('bse_user_tg_chat_id_global');
-      localStorage.removeItem('bse_user_tg_username_global');
     } catch {}
 
     try {
-      const res = await customFetch('/api/users/profile', {
+      const res = await customFetch('/api/users/telegram/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           telegramChatId: cleanChatId,
-          telegramUsername: cleanUsername
+          telegramUsername: cleanUsername,
+          telegramAlertsEnabled: updatedPrefs.telegramAlertsEnabled,
+          telegramAiSummaryEnabled: updatedPrefs.telegramAiSummaryEnabled,
+          telegramAlertScope: updatedPrefs.telegramAlertScope,
+          unlink
         })
       });
+
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData?.error || `Server responded with status ${res.status}`);
+        // Transparent fallback to general profile endpoint
+        const fallbackRes = await customFetch('/api/users/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            telegramChatId: cleanChatId,
+            telegramUsername: cleanUsername,
+            notificationPreferences: updatedPrefs
+          })
+        });
+        if (!fallbackRes.ok) {
+          throw new Error(`Profile sync returned status ${fallbackRes.status}`);
+        }
       }
+
       reportSyncStatus('synced');
       return true;
     } catch (e: any) {
-      console.warn('Telegram chat ID update notice:', e);
-      reportSyncStatus('failed', `Telegram chat ID update failed: ${e?.message || e}`);
+      console.warn('Telegram preferences update notice:', e);
+      reportSyncStatus('failed', `Telegram settings update failed: ${e?.message || e}`);
       return false;
     }
   };
 
-  const upgradeToPro = async (plan: string = '₹0 Early Access Promo') => {
+  const updateTelegramChatId = async (chatId: string, username?: string): Promise<boolean> => {
+    return updateTelegramPreferences({
+      chatId,
+      username,
+      alertsEnabled: Boolean(chatId && chatId.trim())
+    });
+  };
+
+  const upgradeToPro = async (plan: string = '1-Week Free Pro Trial') => {
     if (!profile) {
       setIsAuthModalOpen(true);
       return false;
     }
 
-    const expiry = Date.now() + 365 * 24 * 60 * 60 * 1000; // 1 year free early access
+    const expiry = Date.now() + 7 * 24 * 60 * 60 * 1000; // 1-Week (7 days) free trial
     const updatedProfile: UserProfile = {
       ...profile,
       tier: 'pro',
@@ -989,7 +1101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Strict Pro gating:
   // - Guest/Anonymous users: strictly view-only, NEVER Pro
   // - Admin/Owner: Always Pro
-  // - Google/Authenticated users: Pro ONLY while 30-day trial is active (profile.proExpiresAt > now)
+  // - Google/Authenticated users: Pro ONLY while 1-week (7-day) trial is active (profile.proExpiresAt > now)
   const isPro = Boolean(
     user &&
     !user.isAnonymous &&
@@ -1024,6 +1136,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         checkUsernameAvailability,
         updateNotificationPreferences,
         updateTelegramChatId,
+        updateTelegramPreferences,
         upgradeToPro,
         isAuthModalOpen,
         setIsAuthModalOpen,

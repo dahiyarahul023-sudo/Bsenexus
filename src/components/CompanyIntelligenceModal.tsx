@@ -7,7 +7,9 @@ import {
   Coins, Gift, Briefcase, Zap, Share2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { springSnappy, buttonTap, itemFadeUpVariants } from '../utils/motionTokens';
+import { springSnappy, springBouncy, springSmoothPill, buttonTap, itemFadeUpVariants } from '../utils/motionTokens';
+import { ShareActionMenu } from './ui/motion/ShareActionMenu';
+import { RollingNumber } from './ui/motion/RollingNumber';
 import { customFetch } from '../api';
 import { getSafePdfUrl } from '../utils/pdfHelper';
 import { formatFullDateTime, formatShortDateTime, formatTimeOnly, formatDateOnly } from '../utils/timeFormat';
@@ -17,6 +19,10 @@ import { useAuth } from '../context/AuthContext';
 import { useAiQuota, syncQuotaFromResponse } from '../utils/aiQuota';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { ComponentSkeleton } from './ui/ComponentSkeleton';
+import { CompanyHubSkeleton } from './ui/DesignedSkeletons';
+import { HonestProgressBar } from './ui/HonestProgressBar';
+import { TimeoutRetryState } from './ui/TimeoutRetryState';
+import { ActionButton } from './ui/ActionButton';
 
 import { QuarterlyResultsLedger } from './QuarterlyResultsLedger';
 import { AiSummaryViewer } from './AiSummaryViewer';
@@ -51,6 +57,7 @@ export function CompanyIntelligenceModal({
   const [selectedYears, setSelectedYears] = useState<number>(3);
   const [isFetchingHistory, setIsFetchingHistory] = useState<boolean>(false);
   const [historySuccessMsg, setHistorySuccessMsg] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Non-intrusive Toast Notifications
   const [toastMsg, setToastMsg] = useState<{ text: string; type: 'info' | 'error' | 'success' } | null>(null);
@@ -79,20 +86,34 @@ export function CompanyIntelligenceModal({
 
   const loadIntelligence = async () => {
     setLoading(true);
+    setLoadError(null);
     setHistorySuccessMsg(null);
+
+    // Signal 06: Fail out loud - give every load a deadline (12s timeout)
+    const timeoutId = setTimeout(() => {
+      setLoadError("We couldn't reach the BSE data feed within 12 seconds. Your session is safe.");
+      setLoading(false);
+    }, 12000);
+
     try {
       const identifier = effectiveScrip || effectiveSymbol;
       const res = await customFetch(`/api/company-intel/${identifier}?scripCode=${effectiveScrip}&symbol=${effectiveSymbol}`);
+      clearTimeout(timeoutId);
       if (res.ok) {
         const data = await res.json();
         setIntelData(data);
         if (data.aiSnapshot) {
           setAiOverview(data.aiSnapshot);
         }
+      } else {
+        setLoadError(`BSE service returned status ${res.status}. Please try again.`);
       }
-    } catch (err) {
+    } catch (err: any) {
+      clearTimeout(timeoutId);
       console.error("Failed to load company intelligence", err);
+      setLoadError("Connection error: Unable to load company intelligence from server.");
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   };
@@ -101,13 +122,13 @@ export function CompanyIntelligenceModal({
     const isGuestUser = !user || user.isAnonymous;
     if (isGuestUser) {
       setIsAuthModalOpen(true);
-      showToast('🔒 Google Sign-In Required: Sign in with Google to get 30 days of Free Pro AI analysis!', 'info');
+      showToast('🔒 Google Sign-In Required: Sign in with Google to get 1 week (7 days) of Free Pro AI analysis!', 'info');
       return;
     }
 
     if (!isProOrAdmin) {
       setIsProModalOpen(true);
-      showToast('🔒 30-Day Free Pro trial has ended. Upgrade to Pro for unlimited Gemini AI 360° Analysis!', 'info');
+      showToast('🔒 1-Week Free Pro trial has ended. Upgrade to Pro (₹499/mo) for unlimited Gemini AI 360° Analysis!', 'info');
       return;
     }
 
@@ -126,13 +147,13 @@ export function CompanyIntelligenceModal({
 
       if (res.status === 401 || data?.authRequired) {
         setIsAuthModalOpen(true);
-        showToast(data?.error || '🔒 Google Sign-In Required: Sign in to enjoy 30 days of Free Pro AI features.', 'info');
+        showToast(data?.error || '🔒 Google Sign-In Required: Sign in to enjoy 1 week of Free Pro AI features.', 'info');
         return;
       }
 
       if (res.status === 403 || data?.proRequired) {
         setIsProModalOpen(true);
-        showToast(data?.error || '🔒 30-Day Free Pro trial has ended. Upgrade to continue using Gemini AI.', 'info');
+        showToast(data?.error || '🔒 1-Week Free Pro trial has ended. Upgrade to Pro (₹499/mo) to continue using Gemini AI.', 'info');
         return;
       }
 
@@ -271,8 +292,8 @@ export function CompanyIntelligenceModal({
               )}
               {price !== undefined && (
                 <div className="flex items-center gap-1.5 ml-1">
-                  <span className="font-bold text-slate-900 dark:text-white">
-                    ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  <span className="font-bold text-slate-900 dark:text-white inline-flex items-center">
+                    <RollingNumber value={price.toFixed(2)} prefix="₹" />
                   </span>
                   <span className={cn(
                     "flex items-center gap-0.5 font-bold px-1.5 py-0.2 rounded text-[11px]",
@@ -286,6 +307,14 @@ export function CompanyIntelligenceModal({
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
+            <ShareActionMenu
+              title={`${effectiveName} (${effectiveScrip ? `BSE: ${effectiveScrip}` : 'BSE'})`}
+              headline={`Latest corporate intelligence, financials and disclosures for ${effectiveName}`}
+              companyName={effectiveName}
+              scripCode={effectiveScrip}
+              url={`https://bsenexus.in/?scrip=${effectiveScrip}`}
+              size="sm"
+            />
             <motion.button
               whileTap={buttonTap}
               type="button"
@@ -310,96 +339,76 @@ export function CompanyIntelligenceModal({
           </div>
         </div>
 
-        {/* Navigation Tabs - Fixed (shrink-0) with no ml-auto and consistent bottom alignment */}
-        <div className="px-3 sm:px-5 border-b border-slate-200 dark:border-slate-800 flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar shrink-0 bg-white dark:bg-[#0F172A]">
-          <button
-            type="button"
-            onClick={() => setActiveTab('hub')}
-            className={cn(
-              "shrink-0 inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2.5 sm:py-3 text-xs font-bold border-b-2 -mb-px transition-colors whitespace-nowrap cursor-pointer",
-              activeTab === 'hub'
-                ? "border-emerald-600 text-emerald-600 dark:text-emerald-400"
-                : "border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-            )}
-          >
-            <Building2 size={14} />
-            <span>Company Hub</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('timeline')}
-            className={cn(
-              "shrink-0 inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2.5 sm:py-3 text-xs font-bold border-b-2 -mb-px transition-colors whitespace-nowrap cursor-pointer",
-              activeTab === 'timeline'
-                ? "border-emerald-600 text-emerald-600 dark:text-emerald-400"
-                : "border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-            )}
-          >
-            <Zap size={14} className="text-amber-500" />
-            <span>Material Actions</span>
-            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-slate-200 dark:bg-slate-800">
-              {timelineEvents.length}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('results')}
-            className={cn(
-              "shrink-0 inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2.5 sm:py-3 text-xs font-bold border-b-2 -mb-px transition-colors whitespace-nowrap cursor-pointer",
-              activeTab === 'results'
-                ? "border-emerald-600 text-emerald-600 dark:text-emerald-400"
-                : "border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-            )}
-          >
-            <BarChart3 size={14} className="text-emerald-500" />
-            <span>Quarterly Results</span>
-            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-slate-200 dark:bg-slate-800">
-              {quarterlyResults.length}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('filings')}
-            className={cn(
-              "shrink-0 inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2.5 sm:py-3 text-xs font-bold border-b-2 -mb-px transition-colors whitespace-nowrap cursor-pointer",
-              activeTab === 'filings'
-                ? "border-emerald-600 text-emerald-600 dark:text-emerald-400"
-                : "border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-            )}
-          >
-            <FileText size={14} />
-            <span>Filings</span>
-            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-slate-200 dark:bg-slate-800">
-              {recentFilings.length}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('research')}
-            className={cn(
-              "shrink-0 inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2.5 sm:py-3 text-xs font-bold border-b-2 -mb-px transition-colors whitespace-nowrap cursor-pointer",
-              activeTab === 'research'
-                ? "border-emerald-600 text-emerald-600 dark:text-emerald-400"
-                : "border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-            )}
-          >
-            <Layers size={14} />
-            <span>Research Tools</span>
-          </button>
+        {/* Navigation Tabs - Fluid spring animated active indicator */}
+        <div className="relative px-3 sm:px-5 border-b border-slate-200 dark:border-slate-800 flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar shrink-0 bg-white dark:bg-[#0F172A]">
+          {[
+            { id: 'hub' as const, label: 'Company Hub', icon: <Building2 size={14} /> },
+            { id: 'timeline' as const, label: 'Material Actions', icon: <Zap size={14} className="text-amber-500" />, count: timelineEvents.length },
+            { id: 'results' as const, label: 'Quarterly Results', icon: <BarChart3 size={14} className="text-emerald-500" />, count: quarterlyResults.length },
+            { id: 'filings' as const, label: 'Filings', icon: <FileText size={14} />, count: recentFilings.length },
+            { id: 'research' as const, label: 'Research Tools', icon: <Layers size={14} /> },
+          ].map(tab => {
+            const isTabActive = activeTab === tab.id;
+            return (
+              <motion.button
+                key={tab.id}
+                type="button"
+                whileTap={{ scale: 0.95 }}
+                transition={springBouncy}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  "relative shrink-0 inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2.5 sm:py-3 text-xs font-bold transition-colors whitespace-nowrap cursor-pointer z-10",
+                  isTabActive
+                    ? "text-emerald-600 dark:text-emerald-400 font-black"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                )}
+              >
+                {tab.icon}
+                <span>{tab.label}</span>
+                {tab.count !== undefined && (
+                  <span className={cn(
+                    "text-[10px] font-mono px-1.5 py-0.2 rounded-full transition-colors",
+                    isTabActive 
+                      ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-bold"
+                      : "bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+                  )}>
+                    {tab.count}
+                  </span>
+                )}
+                {/* Active animated bottom bar */}
+                {isTabActive && (
+                  <motion.div
+                    layoutId="companyIntelActiveTabIndicator"
+                    transition={springSmoothPill}
+                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-600 dark:bg-emerald-400 rounded-full"
+                  />
+                )}
+              </motion.button>
+            );
+          })}
         </div>
 
         {/* Modal Body Container - Scrollable area (flex-1 min-h-0 overflow-y-auto) */}
         <div className="p-4 sm:p-6 flex-1 min-h-0 overflow-y-auto space-y-4 overscroll-contain">
-          {loading ? (
-            <div className="py-16 text-center space-y-3">
-              <RefreshCw size={28} className="animate-spin text-emerald-500 mx-auto" />
-              <p className="text-xs text-slate-500">
-                Loading company details for {effectiveName}...
-              </p>
+          {loadError ? (
+            <div className="py-8">
+              <TimeoutRetryState
+                title="Couldn't load company intelligence"
+                message={loadError}
+                onRetry={loadIntelligence}
+                onBack={onClose}
+              />
+            </div>
+          ) : loading ? (
+            <div className="space-y-4 min-h-[360px]">
+              <div className="flex items-center justify-between px-1 text-xs text-slate-500 font-mono">
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                  <span>Loading financial metrics for {effectiveName}...</span>
+                </span>
+                <span className="text-[11px] text-slate-400">Rendering layout...</span>
+              </div>
+              <CompanyHubSkeleton />
             </div>
           ) : (
             <>
@@ -407,26 +416,47 @@ export function CompanyIntelligenceModal({
               {activeTab === 'hub' && (
                 <div className="space-y-4 animate-in fade-in duration-150">
                   {!hasAnyHistory ? (
-                    /* Clean Empty State */
-                    <div className="p-10 text-center space-y-3.5 bg-slate-50 dark:bg-slate-900/40 border border-slate-200/90 dark:border-slate-800 rounded-xl">
-                      <Building2 className="w-10 h-10 mx-auto text-slate-400 dark:text-slate-500" />
+                    /* Clean Empty State - Left-anchored */
+                    <div className="p-6 sm:p-8 text-left space-y-4 bg-slate-50 dark:bg-slate-900/40 border border-slate-200/90 dark:border-slate-800 rounded-2xl max-w-lg">
+                      <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800/80 flex items-center justify-center text-slate-500 dark:text-slate-400">
+                        <Building2 size={20} />
+                      </div>
                       <div className="space-y-1">
                         <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                           No company history loaded yet
                         </h3>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                           Fetch official BSE announcements and financial results to initialize intelligence for {effectiveName}.
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={handleFetchDeepHistory}
-                        disabled={isFetchingHistory}
-                        className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-700 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 disabled:opacity-50"
-                      >
-                        <Download size={14} className={cn(isFetchingHistory && "animate-bounce")} />
-                        <span>{isFetchingHistory ? "Loading history..." : "Load history"}</span>
-                      </button>
+
+                      {isFetchingHistory && (
+                        <div className="max-w-md pt-1 text-left">
+                          <HonestProgressBar
+                            color="emerald"
+                            isRunning={true}
+                            simulatedSteps={[
+                              { label: `Connecting to BSE archival registry for ${selectedYears}Y data...`, durationMs: 1400 },
+                              { label: 'Fetching corporate filings & board outcomes...', durationMs: 2500 },
+                              { label: 'Indexing quarterly financial disclosures...', durationMs: 2500 },
+                              { label: 'Synchronizing timeline & valuation records...', durationMs: 1200 }
+                            ]}
+                          />
+                        </div>
+                      )}
+
+                      <div className="pt-1">
+                        <ActionButton
+                          onClick={handleFetchDeepHistory}
+                          isLoading={isFetchingHistory}
+                          loadingText="Loading history..."
+                          variant="primary"
+                          size="md"
+                          icon={<Download size={14} />}
+                        >
+                          Load history
+                        </ActionButton>
+                      </div>
                     </div>
                   ) : (
                     <>
@@ -518,26 +548,36 @@ export function CompanyIntelligenceModal({
 
                             <div className="flex items-center gap-2">
                               {!isGeneratingAi && (
-                                <motion.button
-                                  type="button"
-                                  whileTap={buttonTap}
+                                <ActionButton
                                   onClick={handleGenerateAiOverview}
-                                  disabled={isGeneratingAi}
-                                  className="text-xs text-slate-800 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white font-bold cursor-pointer flex items-center gap-1.5 bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-2xs min-h-[36px] transition-all whitespace-nowrap"
+                                  isLoading={isGeneratingAi}
+                                  loadingText="Synthesizing..."
+                                  variant="secondary"
+                                  size="sm"
+                                  icon={<Bot size={13} className="text-amber-500" />}
+                                  className="min-h-[36px]"
                                 >
-                                  <Bot size={13} className="text-amber-500" />
-                                  <span>Generate deeper analysis</span>
-                                </motion.button>
+                                  Generate deeper analysis
+                                </ActionButton>
                               )}
                             </div>
                           </div>
 
                           {isGeneratingAi ? (
-                            <div className="py-4 text-center space-y-1.5">
-                              <RefreshCw size={18} className="animate-spin text-emerald-500 mx-auto" />
-                              <p className="text-xs font-bold text-slate-600 dark:text-slate-300">
-                                Synthesizing latest financial metrics with Gemini AI...
-                              </p>
+                            <div className="py-2 min-h-[120px] space-y-3">
+                              <HonestProgressBar
+                                color="emerald"
+                                isRunning={true}
+                                simulatedSteps={[
+                                  { label: 'Fetching corporate disclosures & ratios...', durationMs: 1200 },
+                                  { label: 'Evaluating operating margins & profitability trends...', durationMs: 1800 },
+                                  { label: 'Synthesizing concise investment takeaways...', durationMs: 1500 }
+                                ]}
+                              />
+                              <div className="space-y-1.5 pt-1 animate-pulse">
+                                <div className="h-3 w-4/5 bg-emerald-100 dark:bg-emerald-950/40 rounded" />
+                                <div className="h-3 w-2/3 bg-emerald-100 dark:bg-emerald-950/40 rounded" />
+                              </div>
                             </div>
                           ) : (
                             <p className="text-xs text-slate-500 dark:text-slate-400 italic">

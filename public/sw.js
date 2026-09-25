@@ -1,11 +1,12 @@
 // BSE Nexus - Progressive Web App Service Worker
-// Version: 4.0.0
+// Version: 4.1.0
 
-const CACHE_NAME = 'bse-nexus-v4';
+const CACHE_NAME = 'bse-nexus-v4.1';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
+  '/opensearch.xml',
   '/favicon.ico',
   '/icon.svg',
   '/favicon-32x32.png',
@@ -59,14 +60,18 @@ self.addEventListener('activate', (event) => {
 
 // Helper: Check if an API endpoint is strictly public and safe for offline caching
 function isPublicCacheableApi(pathname) {
-  // Only public, anonymous data like market announcements, results, or market pulse
+  // Only public, anonymous data like market announcements, results, market status or stock master
   const publicEndpoints = [
     '/api/announcements',
     '/api/results',
     '/api/market-status',
+    '/api/market/status',
+    '/api/market/indices',
+    '/api/stock-master',
+    '/api/news/sources',
     '/api/stats'
   ];
-  return publicEndpoints.some(endpoint => pathname === endpoint || pathname.startsWith(endpoint + '?'));
+  return publicEndpoints.some(endpoint => pathname === endpoint || pathname.startsWith(endpoint + '?') || pathname.startsWith(endpoint + '/'));
 }
 
 // Fetch Event: Intelligent multi-strategy caching

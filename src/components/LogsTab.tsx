@@ -4,6 +4,7 @@ import {
   Filter, Search, XCircle, CheckCircle2, Info, Send, Radio, Check, Copy
 } from 'lucide-react';
 import { customFetch } from '../api';
+import { ActionButton } from './ui/ActionButton';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -99,34 +100,40 @@ export function LogsTab({ logs, onRefreshLogs }: { logs: any[]; onRefreshLogs?: 
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <button
+          <ActionButton
             onClick={handleTestAi}
-            disabled={isTestingAi}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-[#2A263D] dark:hover:bg-[#342F4C] text-white text-xs font-bold rounded-lg transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
-            title="Test AI Summary generation on sample earnings data"
+            isLoading={isTestingAi}
+            loadingText="Testing AI..."
+            variant="primary"
+            size="sm"
+            className="text-xs font-bold"
+            icon={<Sparkles className="w-3.5 h-3.5 text-amber-400" />}
           >
-            <Sparkles className={`w-3.5 h-3.5 text-amber-400 ${isTestingAi ? 'animate-spin' : ''}`} />
-            <span>{isTestingAi ? 'Testing AI...' : 'Test Gemini AI'}</span>
-          </button>
+            Test Gemini AI
+          </ActionButton>
 
           {onRefreshLogs && (
-            <button
+            <ActionButton
               onClick={onRefreshLogs}
-              className="flex items-center gap-1 px-3 py-1.5 bg-white dark:bg-[#1A1926] border border-slate-200 dark:border-[#2D283E] hover:bg-slate-50 dark:hover:bg-[#222030] text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-lg transition-colors shadow-2xs cursor-pointer"
+              variant="secondary"
+              size="sm"
+              icon={<RefreshCw className="w-3.5 h-3.5 text-slate-400" />}
             >
-              <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
-              <span>Refresh</span>
-            </button>
+              Refresh
+            </ActionButton>
           )}
 
-          <button
+          <ActionButton
             onClick={handleClearLogs}
-            disabled={isClearing || logs.length === 0}
-            className="flex items-center gap-1 px-3 py-1.5 bg-white dark:bg-[#1A1926] border border-slate-200 dark:border-[#2D283E] hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 text-xs font-semibold rounded-lg transition-colors shadow-2xs disabled:opacity-40 cursor-pointer"
+            isLoading={isClearing}
+            loadingText="Clearing..."
+            disabled={logs.length === 0}
+            variant="danger"
+            size="sm"
+            icon={<Trash2 className="w-3.5 h-3.5" />}
           >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span>Clear Logs</span>
-          </button>
+            Clear Logs
+          </ActionButton>
         </div>
       </div>
 

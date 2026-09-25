@@ -1,5 +1,5 @@
 import YahooFinance from 'yahoo-finance2';
-import { getStockResultsHistory, getResultsCalendarData } from './resultsCalendarService.js';
+import { getStockResultsHistory, getResultsCalendarData, fetchDeepHistoricalResultsForStock } from './resultsCalendarService.js';
 import { classifyMaterialEvent, MaterialEvent } from './timelineClassifier.js';
 import { getRecentAnnouncements } from '../database/announcementDao.js';
 import { generateDirectSummary } from './gemini.js';
@@ -8,7 +8,19 @@ import { parseBseDate } from '../utils/helpers.js';
 let yfClient: any = null;
 function getYF() {
   if (!yfClient) {
-    yfClient = new (YahooFinance as any)({ suppressNotices: ['yahooSurvey'] });
+    const rawModule = YahooFinance as any;
+    const YFClass = rawModule?.default?.default || rawModule?.default || rawModule;
+    if (typeof YFClass === 'function') {
+      try {
+        yfClient = new YFClass({ suppressNotices: ['yahooSurvey'] });
+      } catch {
+        yfClient = YFClass;
+      }
+    } else if (typeof rawModule?.quote === 'function') {
+      yfClient = rawModule;
+    } else {
+      yfClient = YFClass;
+    }
   }
   return yfClient;
 }
@@ -113,7 +125,11 @@ export async function getCompanyIntelligence(scripCode: string, symbol: string):
   // 1. Fetch Quote & Valuation Context
   let quote: CompanyQuoteContext | null = null;
   if (targetSym) {
-    quote = await fetchStockQuote(targetSym);
+    try {
+      quote = await fetchStockQuote(targetSym);
+    } catch (err: any) {
+      console.warn(`[CompanyIntel] Quote fetch failed for ${targetSym}:`, err?.message);
+    }
   }
 
   // 2. Fetch Historical Results & Calendar Data
@@ -231,6 +247,31 @@ export async function getCompanyIntelligence(scripCode: string, symbol: string):
         scripCode: targetScrip,
         symbol: targetSym
       });
+    }
+  }
+
+  // If this stock has 0 local filings, automatically trigger a fast 1-year archive sync from BSE API
+  if (filingMap.size === 0 && targetScrip) {
+    try {
+      await fetchDeepHistoricalResultsForStock(targetScrip, targetSym, 1);
+      const syncedHistory = await getStockResultsHistory(targetScrip, targetSym);
+      for (const h of syncedHistory || []) {
+        const hId = h.id || `hist_${h.meetingDate}`;
+        if (!filingMap.has(hId)) {
+          filingMap.set(hId, {
+            id: hId,
+            subject: h.subject || h.periodOrMeeting,
+            details: h.details,
+            bseTime: h.declarationDate ? `${h.declarationDate} ${h.declarationTime || ''}` : h.meetingDate,
+            pdfLink: h.pdfLink,
+            timestamp: h.submissionTimestamp || Date.now(),
+            scripCode: targetScrip,
+            symbol: targetSym
+          });
+        }
+      }
+    } catch (syncErr: any) {
+      console.warn(`[CompanyIntel] Auto-sync notice for ${targetScrip}:`, syncErr?.message);
     }
   }
 

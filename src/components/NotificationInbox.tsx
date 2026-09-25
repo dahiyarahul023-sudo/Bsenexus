@@ -17,6 +17,7 @@ import { customFetch } from '../api';
 import { getSafePdfUrl } from '../utils/pdfHelper';
 import { formatTimeOnly, formatDateOnly } from '../utils/timeFormat';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+import { useAuth } from '../context/AuthContext';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -57,6 +58,7 @@ export function NotificationInbox({
   onRefreshCount
 }: NotificationInboxProps) {
   useBodyScrollLock(isOpen);
+  const { user, profile } = useAuth();
   const [notifications, setNotifications] = useState<InAppNotificationItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [activeFilter, setActiveFilter] = useState<'WATCHLIST' | 'RESULTS' | 'ACTIONS' | 'UNREAD' | 'ALL'>('WATCHLIST');
@@ -68,9 +70,10 @@ export function NotificationInbox({
       loadNotifications();
       fetchMuteStatus();
     }
-  }, [isOpen, activeFilter]);
+  }, [isOpen, activeFilter, user?.uid, profile?.uid]);
 
   const fetchMuteStatus = async () => {
+    if (!user && !profile) return;
     try {
       const res = await customFetch('/api/settings');
       if (res.ok) {
@@ -83,9 +86,12 @@ export function NotificationInbox({
   };
 
   const handleToggleMute = async () => {
+    const prevState = isMuted;
+    const nextState = !prevState;
+    // Optimistic UI update: toggle mute switch immediately
+    setIsMuted(nextState);
     try {
       setIsTogglingMute(true);
-      const nextState = !isMuted;
       const res = await customFetch('/api/notifications/toggle-mute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -93,9 +99,14 @@ export function NotificationInbox({
       });
       if (res.ok) {
         const data = await res.json().catch(() => null);
-        setIsMuted(typeof data?.muteInAppNotifications === 'boolean' ? data.muteInAppNotifications : nextState);
+        if (typeof data?.muteInAppNotifications === 'boolean') {
+          setIsMuted(data.muteInAppNotifications);
+        }
+      } else {
+        setIsMuted(prevState); // Rollback on error
       }
     } catch (err) {
+      setIsMuted(prevState); // Rollback on error
       alert("Failed to toggle notification mute state");
     } finally {
       setIsTogglingMute(false);
@@ -103,6 +114,11 @@ export function NotificationInbox({
   };
 
   const loadNotifications = async () => {
+    if (!user && !profile) {
+      setNotifications([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       let url = '/api/notifications?limit=100';
@@ -136,33 +152,60 @@ export function NotificationInbox({
 
   const handleMarkAsRead = async (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    const prevNotifications = notifications;
+    // Optimistic UI update: mark read immediately
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+    onRefreshCount();
+
     try {
-      await customFetch(`/api/notifications/${id}/read`, { method: 'POST' });
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
-      onRefreshCount();
+      const res = await customFetch(`/api/notifications/${id}/read`, { method: 'POST' });
+      if (!res.ok) {
+        setNotifications(prevNotifications); // Rollback on error
+        onRefreshCount();
+      }
     } catch (err) {
       console.error(err);
+      setNotifications(prevNotifications); // Rollback on network failure
+      onRefreshCount();
     }
   };
 
   const handleMarkAllRead = async () => {
+    const prevNotifications = notifications;
+    // Optimistic UI update: mark all read immediately
+    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    onRefreshCount();
+
     try {
-      await customFetch('/api/notifications/read-all', { method: 'POST' });
-      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-      onRefreshCount();
+      const res = await customFetch('/api/notifications/read-all', { method: 'POST' });
+      if (!res.ok) {
+        setNotifications(prevNotifications); // Rollback on error
+        onRefreshCount();
+      }
     } catch (err) {
       console.error(err);
+      setNotifications(prevNotifications); // Rollback on network failure
+      onRefreshCount();
     }
   };
 
   const handleClearAll = async () => {
     if (!confirm('Are you sure you want to clear in-app notifications?')) return;
+    const prevNotifications = notifications;
+    // Optimistic UI update: clear notifications immediately
+    setNotifications([]);
+    onRefreshCount();
+
     try {
-      await customFetch('/api/notifications', { method: 'DELETE' });
-      setNotifications([]);
-      onRefreshCount();
+      const res = await customFetch('/api/notifications', { method: 'DELETE' });
+      if (!res.ok) {
+        setNotifications(prevNotifications); // Rollback on error
+        onRefreshCount();
+      }
     } catch (err) {
       console.error(err);
+      setNotifications(prevNotifications); // Rollback on network failure
+      onRefreshCount();
     }
   };
 

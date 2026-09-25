@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, KeyRound, ShieldCheck, AlertCircle, Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+import { ActionButton } from './ui/ActionButton';
 
 export function AdminPinModal() {
   const { 
@@ -18,7 +19,13 @@ export function AdminPinModal() {
   const [error, setError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
 
-  if (!isAdminPinModalOpen) return null;
+  const ADMIN_EMAIL = 'dahiyarahul023@gmail.com';
+  const isAdminUser = !user?.isAnonymous && (
+    user?.email?.toLowerCase() === ADMIN_EMAIL ||
+    profile?.email?.toLowerCase() === ADMIN_EMAIL
+  );
+
+  if (!isAdminPinModalOpen || !isAdminUser) return null;
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,7 +95,7 @@ export function AdminPinModal() {
           )}
 
           <div>
-            <label htmlFor="admin-security-pin" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-center">
+            <label htmlFor="admin-security-pin" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 text-left">
               Master Security PIN
             </label>
             <input
@@ -104,14 +111,17 @@ export function AdminPinModal() {
             />
           </div>
 
-          <button
+          <ActionButton
             type="submit"
-            disabled={isVerifying}
-            className="w-full py-2.5 px-4 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-xs shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+            isLoading={isVerifying}
+            loadingText="Verifying PIN..."
+            variant="primary"
+            size="md"
+            icon={<ShieldCheck size={14} />}
+            className="w-full bg-purple-600 hover:bg-purple-700 text-white"
           >
-            <ShieldCheck size={14} />
-            <span>{isVerifying ? 'Verifying PIN...' : 'Confirm Access'}</span>
-          </button>
+            Confirm Access
+          </ActionButton>
         </form>
       </div>
     </div>

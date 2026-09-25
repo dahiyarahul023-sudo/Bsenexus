@@ -20,6 +20,43 @@ import { AdminDiagnostics } from './components/AdminDiagnostics';
 import { LogsTab } from './components/LogsTab';
 import { SettingsTab } from './components/SettingsTab';
 import { SeoStudio } from './components/seo/SeoStudio';
+import { useScrollRestoration } from './hooks/useScrollRestoration';
+import { ScrollRestoredPill } from './components/ui/ScrollRestoredPill';
+import { saveScrollPosition } from './utils/scrollState';
+import { PricingPage } from './components/PricingPage';
+import { GuidesPage } from './components/GuidesPage';
+import { CompaniesPage } from './components/CompaniesPage';
+import { TrustPage } from './components/TrustPages';
+import { NotFoundPage } from './components/NotFoundPage';
+
+function getAppPathRoute(): 'home' | 'pricing' | 'guides' | 'companies' | 'about' | 'contact' | 'privacy' | 'terms' | 'disclaimer' | '404' {
+  if (typeof window === 'undefined') return 'home';
+  const path = window.location.pathname.toLowerCase().replace(/\/+$/, '') || '/';
+  if (path === '/' || path === '') return 'home';
+  if (path === '/pricing' || path === '/plans') return 'pricing';
+  if (path === '/guides' || path === '/market-guides') return 'guides';
+  if (path === '/companies' || path === '/company-directory') return 'companies';
+  if (path === '/about') return 'about';
+  if (path === '/contact') return 'contact';
+  if (path === '/disclaimer') return 'disclaimer';
+  if (path === '/privacy' || path === '/privacy-policy') return 'privacy';
+  if (path === '/terms' || path === '/terms-of-service') return 'terms';
+  if (
+    path.startsWith('/faq') ||
+    path.startsWith('/company/') ||
+    path.startsWith('/stock/') ||
+    path.startsWith('/guides/') ||
+    path.startsWith('/announcement/') ||
+    path.startsWith('/announcements') ||
+    path.startsWith('/results-calendar') ||
+    path.startsWith('/watchlist') ||
+    path.startsWith('/watchlists') ||
+    path.startsWith('/embed/')
+  ) {
+    return 'home';
+  }
+  return '404';
+}
 
 function Dashboard({ bseHealth, telegramHealth, isRunning, handleToggle }: any) {
   return (
@@ -36,9 +73,15 @@ function Dashboard({ bseHealth, telegramHealth, isRunning, handleToggle }: any) 
 }
 
 function AppContent() {
+  const [currentRoute, setCurrentRoute] = useState<'home' | 'pricing' | 'guides' | 'companies' | 'about' | 'contact' | 'privacy' | 'terms' | 'disclaimer' | '404'>(() => getAppPathRoute());
   const [activeTab, setActiveTab] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       try {
+        const pathname = window.location.pathname.toLowerCase().replace(/\/+$/, '');
+        if (pathname === '/announcements') return 'dashboard';
+        if (pathname === '/results-calendar') return 'results-calendar';
+        if (pathname === '/watchlist' || pathname === '/watchlists') return 'watchlists';
+
         const params = new URLSearchParams(window.location.search);
         const tab = params.get('tab');
         const hasShared = params.get('text') || params.get('title') || params.get('url') || params.get('q');
@@ -51,6 +94,35 @@ function AppContent() {
     }
     return 'home';
   });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      if (window.location.hostname && window.location.hostname.indexOf('ai.studio') !== -1) {
+        let robotsMeta = document.querySelector('meta[name="robots"]');
+        if (robotsMeta) {
+          robotsMeta.setAttribute('content', 'noindex, nofollow');
+        } else {
+          robotsMeta = document.createElement('meta');
+          robotsMeta.setAttribute('name', 'robots');
+          robotsMeta.setAttribute('content', 'noindex, nofollow');
+          document.head.appendChild(robotsMeta);
+        }
+        window.location.replace('https://bsenexus.in' + window.location.pathname + window.location.search);
+        return;
+      }
+    } catch {}
+    const path = window.location.pathname.toLowerCase();
+    if (path.includes('/announcement/') && path.includes('batch_test_')) {
+      let metaRobots = document.querySelector('meta[name="robots"]');
+      if (!metaRobots) {
+        metaRobots = document.createElement('meta');
+        metaRobots.setAttribute('name', 'robots');
+        document.head.appendChild(metaRobots);
+      }
+      metaRobots.setAttribute('content', 'noindex, nofollow');
+    }
+  }, []);
 
   const [visitedTabs, setVisitedTabs] = useState<Set<string>>(() => new Set(['home', activeTab]));
   const [theme, setTheme] = useState(() => {
@@ -66,23 +138,91 @@ function AppContent() {
   const [watchlists, setWatchlists] = useState<any[]>([]);
   const [health, setHealth] = useState({ bse: { status: 'stable', latency: 85 }, telegram: { status: 'connected', latency: 120 } });
   
-  const { 
-    user, profile, authLoading, isAdmin, adminUnlocked, logout, 
-    setIsAuthModalOpen, 
+  const { user, profile, authLoading, isAdmin, adminUnlocked, logout, 
+    setIsAuthModalOpen, setIsProModalOpen,
     isAuthModalOpen, isProModalOpen, isAdminPinModalOpen 
   } = useAuth();
   const [serverAuth, setServerAuth] = useState<{ isAuthenticated: boolean; hasPin: boolean } | null>(null);
+
+  // Apple-Grade Scroll State & Restoration System ("Scroll is state")
+  const { restoredInfo, scrollToTop } = useScrollRestoration({
+    activeKey: activeTab,
+    enabled: true
+  });
+
+  const handleTabChange = (newTab: string) => {
+    if (newTab === activeTab) {
+      // Tap active tab to scroll to top (like iOS / Twitter)
+      scrollToTop();
+      return;
+    }
+    if (newTab === 'companies') {
+      window.location.href = '/companies';
+      return;
+    }
+    // Save previous tab scroll position immediately before switching
+    saveScrollPosition(activeTab);
+    setActiveTab(newTab);
+
+    if (typeof window !== 'undefined') {
+      let targetPath = '/';
+      switch (newTab) {
+        case 'dashboard':
+          targetPath = '/announcements';
+          break;
+        case 'watchlists':
+          targetPath = '/watchlist';
+          break;
+        case 'results-calendar':
+          targetPath = '/results-calendar';
+          break;
+        case 'news':
+          targetPath = '/?tab=news';
+          break;
+        case 'seo-suite':
+          targetPath = '/?tab=seo-suite';
+          break;
+        case 'settings':
+          targetPath = '/settings';
+          break;
+        case 'home':
+        default:
+          targetPath = '/';
+          break;
+      }
+      const currentUrl = window.location.pathname + window.location.search;
+      if (currentUrl !== targetPath) {
+        window.history.pushState(null, '', targetPath);
+      }
+    }
+  };
 
   // Check URL query parameters on mount (Share Target API, shortcuts, and deep links)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
+      const pathname = window.location.pathname.toLowerCase().replace(/\/+$/, '');
+      if (pathname === '/announcements') {
+        setActiveTab('dashboard');
+      } else if (pathname === '/results-calendar') {
+        setActiveTab('results-calendar');
+      } else if (pathname === '/watchlist' || pathname === '/watchlists') {
+        setActiveTab('watchlists');
+      } else if (pathname === '/settings') {
+        setActiveTab('settings');
+      }
+
       const searchParams = new URLSearchParams(window.location.search);
       const tabParam = searchParams.get('tab');
+      const actionParam = searchParams.get('action');
       const sharedTitle = searchParams.get('title') || '';
       const sharedText = searchParams.get('text') || '';
       const sharedUrl = searchParams.get('url') || '';
       const queryParam = searchParams.get('q') || searchParams.get('stock') || searchParams.get('scrip') || '';
+
+      if (actionParam === 'upgrade' || actionParam === 'trial' || actionParam === 'pro') {
+        setIsProModalOpen(true);
+      }
 
       if (tabParam) {
         if (tabParam === 'announcements' || tabParam === 'dashboard') {
@@ -111,7 +251,107 @@ function AppContent() {
         }));
       }
     } catch {}
+
+    const handlePopState = () => {
+      setCurrentRoute(getAppPathRoute());
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  // Synchronize browser address bar with activeTab navigation without reloading
+  const isFirstTabSyncRender = useRef(true);
+  useEffect(() => {
+    if (isFirstTabSyncRender.current) {
+      isFirstTabSyncRender.current = false;
+      return;
+    }
+    if (typeof window === 'undefined') return;
+
+    let targetPath = '/';
+    switch (activeTab) {
+      case 'dashboard':
+        targetPath = '/announcements';
+        break;
+      case 'watchlists':
+        targetPath = '/watchlist';
+        break;
+      case 'results-calendar':
+        targetPath = '/results-calendar';
+        break;
+      case 'news':
+        targetPath = '/?tab=news';
+        break;
+      case 'seo-suite':
+        targetPath = '/?tab=seo-suite';
+        break;
+      case 'settings':
+        targetPath = '/?tab=settings';
+        break;
+      case 'home':
+      default:
+        targetPath = '/';
+        break;
+    }
+
+    const currentUrl = window.location.pathname + window.location.search;
+    if (currentUrl !== targetPath) {
+      window.history.pushState(null, '', targetPath);
+    }
+  }, [activeTab]);
+
+  // Synchronize activeTab when navigating via browser Back / Forward buttons
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handlePopState = () => {
+      try {
+        const pathname = window.location.pathname.toLowerCase().replace(/\/+$/, '');
+        if (pathname === '/announcements') {
+          setActiveTab('dashboard');
+          return;
+        }
+        if (pathname === '/results-calendar') {
+          setActiveTab('results-calendar');
+          return;
+        }
+        if (pathname === '/watchlist' || pathname === '/watchlists') {
+          setActiveTab('watchlists');
+          return;
+        }
+
+        const searchParams = new URLSearchParams(window.location.search);
+        const tabParam = searchParams.get('tab');
+
+        if (tabParam) {
+          if (tabParam === 'announcements' || tabParam === 'dashboard') {
+            setActiveTab('dashboard');
+          } else if (tabParam === 'watchlist' || tabParam === 'watchlists') {
+            setActiveTab('watchlists');
+          } else if (tabParam === 'results' || tabParam === 'results-calendar') {
+            setActiveTab('results-calendar');
+          } else if (tabParam === 'news') {
+            setActiveTab('news');
+          } else if (tabParam === 'seo' || tabParam === 'seo-suite' || tabParam === 'superseo') {
+            if (isAdmin) {
+              setActiveTab('seo-suite');
+            }
+          } else if (tabParam === 'settings') {
+            setActiveTab('settings');
+          } else {
+            setActiveTab('home');
+          }
+        } else {
+          setActiveTab('home');
+        }
+      } catch {}
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [isAdmin]);
 
   useEffect(() => {
     setVisitedTabs(prev => prev.has(activeTab) ? prev : new Set(prev).add(activeTab));
@@ -219,17 +459,116 @@ function AppContent() {
     fetchSettings();
   };
 
-  // If user is not authenticated, strictly show Home Overview landing page IMMEDIATELY
-  // with zero delay for instant First Contentful Paint & Core Web Vitals optimization
-  if (!user) {
+  // Render dedicated standalone routes with direct navigation, refresh, and SEO support
+  if (currentRoute === 'pricing') {
+    return (
+      <>
+        <PricingPage
+          onEnterTerminal={(tab) => {
+            window.history.pushState({}, '', tab ? `/?tab=${tab}` : '/');
+            setCurrentRoute('home');
+            if (tab) setActiveTab(tab);
+            if (!user) setIsAuthModalOpen(true);
+          }}
+          onOpenProModal={() => {
+            if (!user) {
+              setIsAuthModalOpen(true);
+            } else {
+              setIsProModalOpen(true);
+            }
+          }}
+        />
+        {isAuthModalOpen && <AuthModal />}
+        {isProModalOpen && <ProUpgradeModal />}
+      </>
+    );
+  }
+
+  if (currentRoute === 'guides') {
+    return (
+      <>
+        <GuidesPage
+          onEnterTerminal={(tab) => {
+            setCurrentRoute('home');
+            if (tab) handleTabChange(tab);
+            else setIsAuthModalOpen(true);
+          }}
+        />
+        {isAuthModalOpen && <AuthModal />}
+        {isProModalOpen && <ProUpgradeModal />}
+      </>
+    );
+  }
+
+  if (currentRoute === 'companies') {
+    return (
+      <>
+        <CompaniesPage
+          onEnterTerminal={(tab) => {
+            setCurrentRoute('home');
+            if (tab) handleTabChange(tab);
+            else setIsAuthModalOpen(true);
+          }}
+        />
+        {isAuthModalOpen && <AuthModal />}
+        {isProModalOpen && <ProUpgradeModal />}
+      </>
+    );
+  }
+
+  if (
+    currentRoute === 'about' ||
+    currentRoute === 'contact' ||
+    currentRoute === 'privacy' ||
+    currentRoute === 'terms' ||
+    currentRoute === 'disclaimer'
+  ) {
+    return (
+      <>
+        <TrustPage
+          type={currentRoute}
+          onEnterTerminal={(tab) => {
+            setCurrentRoute('home');
+            if (tab) handleTabChange(tab);
+            else setIsAuthModalOpen(true);
+          }}
+        />
+        {isAuthModalOpen && <AuthModal />}
+        {isProModalOpen && <ProUpgradeModal />}
+      </>
+    );
+  }
+
+  if (currentRoute === '404') {
+    return (
+      <>
+        <NotFoundPage
+          onEnterTerminal={(tab) => {
+            setCurrentRoute('home');
+            if (tab) handleTabChange(tab);
+            else setIsAuthModalOpen(true);
+          }}
+        />
+        {isAuthModalOpen && <AuthModal />}
+        {isProModalOpen && <ProUpgradeModal />}
+      </>
+    );
+  }
+
+  // If user is not authenticated and on home route ('/'), show LandingPage
+  if (!user && activeTab === 'home' && !authLoading) {
     return (
       <>
         <LandingPage
           onEnterTerminal={(tab) => {
             if (tab) {
-              setActiveTab(tab);
+              const safeTab = (tab === 'diagnostics' || tab === 'logs' || tab === 'storage' || tab === 'seo-suite') && !isAdmin
+                ? 'dashboard'
+                : tab;
+              handleTabChange(safeTab);
+            } else {
+              setIsAuthModalOpen(true);
             }
-            setIsAuthModalOpen(true);
           }}
           theme={theme}
           setTheme={setTheme}
@@ -243,121 +582,121 @@ function AppContent() {
     );
   }
 
-  // Only show the terminal loader if user has entered the terminal and auth is actively syncing
-  if (authLoading) {
+  // If user is on home route during initial auth evaluation, show LandingPage immediately without blank spinner
+  if (!user && activeTab === 'home') {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-[#0D0C15] flex flex-col items-center justify-center p-6 select-none transition-colors">
-        <div className="w-full max-w-xs flex flex-col items-center space-y-5 text-center">
-          {/* Logo badge with spinning emerald ring */}
-          <div className="relative flex items-center justify-center">
-            <div className="w-14 h-14 rounded-2xl bg-white dark:bg-[#1A1926] border border-slate-200 dark:border-[#2D283E] shadow-sm flex items-center justify-center">
-              <span className="font-black text-xl tracking-tight bg-gradient-to-r from-emerald-500 to-teal-500 bg-clip-text text-transparent">
-                BSE
-              </span>
-            </div>
-            <div className="absolute -inset-2 border-2 border-emerald-500/20 border-t-emerald-500 rounded-2xl animate-spin" />
-          </div>
-
-          {/* App title and pulsating status */}
-          <div className="space-y-1">
-            <h1 className="text-sm font-bold text-slate-900 dark:text-white tracking-tight">
-              BSE Nexus Terminal
-            </h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium animate-pulse">
-              Authenticating secure session...
-            </p>
-          </div>
-
-          {/* Clean loading skeleton placeholders */}
-          <div className="w-full space-y-2 pt-2">
-            <div className="h-2.5 w-3/4 mx-auto bg-slate-200/80 dark:bg-[#201E2E] rounded-full animate-pulse" />
-            <div className="h-2 w-1/2 mx-auto bg-slate-200/60 dark:bg-[#201E2E]/60 rounded-full animate-pulse" />
-          </div>
-        </div>
-      </div>
+      <>
+        <LandingPage
+          onEnterTerminal={(tab) => {
+            if (tab) {
+              const safeTab = (tab === 'diagnostics' || tab === 'logs' || tab === 'storage' || tab === 'seo-suite') && !isAdmin
+                ? 'dashboard'
+                : tab;
+              handleTabChange(safeTab);
+            } else {
+              setIsAuthModalOpen(true);
+            }
+          }}
+          theme={theme}
+          setTheme={setTheme}
+          bseHealth={health.bse}
+          telegramHealth={health.telegram}
+        />
+        {isAuthModalOpen && <AuthModal />}
+        {isProModalOpen && <ProUpgradeModal />}
+        {isAdminPinModalOpen && <AdminPinModal />}
+      </>
     );
   }
 
   return (
-    <Layout 
-      activeTab={activeTab} 
-      onTabChange={setActiveTab} 
-      theme={theme} 
-      setTheme={setTheme} 
-      onLogout={handleLogout}
-      bseHealth={health.bse}
-      telegramHealth={health.telegram}
-      isRunning={settings.isRunning}
-      onToggleEngine={handleToggle}
-    >
-      {visitedTabs.has('home') && (
-        <div className={activeTab === 'home' ? '' : 'hidden'}>
-          <HomeForYou onNavigate={(tab) => setActiveTab(tab)} />
-        </div>
-      )}
-          {visitedTabs.has('dashboard') && (
-            <div className={activeTab === 'dashboard' ? '' : 'hidden'}>
-              <Dashboard 
-                bseHealth={health.bse} 
-                telegramHealth={health.telegram} 
-                isRunning={settings.isRunning} 
-                handleToggle={handleToggle} 
-              />
-            </div>
-          )}
-          {visitedTabs.has('watchlists') && (
-            <div className={activeTab === 'watchlists' ? '' : 'hidden'}>
-              <WatchlistManager />
-            </div>
-          )}
-          {visitedTabs.has('results-calendar') && (
-            <div className={activeTab === 'results-calendar' ? '' : 'hidden'}>
-              <ResultsCalendar />
-            </div>
-          )}
-          {visitedTabs.has('news') && (
-            <div className={activeTab === 'news' ? '' : 'hidden'}>
-              <NewsPortal 
-                watchlists={watchlists} 
-                user={user} 
-                onOpenWatchlists={() => setActiveTab('watchlists')}
-                onOpenSettings={() => setActiveTab('settings')}
-              />
-            </div>
-          )}
-          {isAdmin && visitedTabs.has('seo-suite') && (
-            <div className={activeTab === 'seo-suite' ? '' : 'hidden'}>
-              <SeoStudio />
-            </div>
-          )}
-          {isAdmin && visitedTabs.has('storage') && (
-            <div className={activeTab === 'storage' ? '' : 'hidden'}>
-              <StorageManager />
-            </div>
-          )}
-          {isAdmin && visitedTabs.has('diagnostics') && (
-            <div className={activeTab === 'diagnostics' ? '' : 'hidden'}>
-              <AdminDiagnostics />
-            </div>
-          )}
-          {isAdmin && visitedTabs.has('logs') && (
-            <div className={activeTab === 'logs' ? '' : 'hidden'}>
-              <LogsTab logs={logs} onRefreshLogs={fetchLogs} />
-            </div>
-          )}
-          {visitedTabs.has('settings') && (
-            <div className={activeTab === 'settings' ? '' : 'hidden'}>
-              <SettingsTab 
-                settings={settings} 
-                setSettings={setSettings} 
-                fetchSettings={fetchSettings} 
-                theme={theme} 
-                setTheme={setTheme} 
-                onNavigate={(tab: string) => setActiveTab(tab)}
-              />
-            </div>
-          )}
+    <>
+      <Layout 
+        activeTab={activeTab} 
+        onTabChange={handleTabChange} 
+        theme={theme} 
+        setTheme={setTheme} 
+        onLogout={handleLogout}
+        bseHealth={health.bse}
+        telegramHealth={health.telegram}
+        isRunning={settings.isRunning}
+        onToggleEngine={handleToggle}
+      >
+        {visitedTabs.has('home') && (
+          <div className={activeTab === 'home' ? '' : 'hidden'}>
+            <HomeForYou onNavigate={(tab) => handleTabChange(tab)} />
+          </div>
+        )}
+        {visitedTabs.has('dashboard') && (
+          <div className={activeTab === 'dashboard' ? '' : 'hidden'}>
+            <Dashboard 
+              bseHealth={health.bse} 
+              telegramHealth={health.telegram} 
+              isRunning={settings.isRunning} 
+              handleToggle={handleToggle} 
+            />
+          </div>
+        )}
+        {visitedTabs.has('watchlists') && (
+          <div className={activeTab === 'watchlists' ? '' : 'hidden'}>
+            <WatchlistManager />
+          </div>
+        )}
+        {visitedTabs.has('results-calendar') && (
+          <div className={activeTab === 'results-calendar' ? '' : 'hidden'}>
+            <ResultsCalendar />
+          </div>
+        )}
+        {visitedTabs.has('news') && (
+          <div className={activeTab === 'news' ? '' : 'hidden'}>
+            <NewsPortal 
+              watchlists={watchlists} 
+              user={user} 
+              onOpenWatchlists={() => handleTabChange('watchlists')}
+              onOpenSettings={() => handleTabChange('settings')}
+            />
+          </div>
+        )}
+        {isAdmin && visitedTabs.has('seo-suite') && (
+          <div className={activeTab === 'seo-suite' ? '' : 'hidden'}>
+            <SeoStudio />
+          </div>
+        )}
+        {isAdmin && visitedTabs.has('storage') && (
+          <div className={activeTab === 'storage' ? '' : 'hidden'}>
+            <StorageManager />
+          </div>
+        )}
+        {isAdmin && visitedTabs.has('diagnostics') && (
+          <div className={activeTab === 'diagnostics' ? '' : 'hidden'}>
+            <AdminDiagnostics />
+          </div>
+        )}
+        {isAdmin && visitedTabs.has('logs') && (
+          <div className={activeTab === 'logs' ? '' : 'hidden'}>
+            <LogsTab logs={logs} onRefreshLogs={fetchLogs} />
+          </div>
+        )}
+        {visitedTabs.has('settings') && (
+          <div className={activeTab === 'settings' ? '' : 'hidden'}>
+            <SettingsTab 
+              settings={settings} 
+              setSettings={setSettings} 
+              fetchSettings={fetchSettings} 
+              theme={theme} 
+              setTheme={setTheme} 
+              onNavigate={(tab: string) => handleTabChange(tab)}
+            />
+          </div>
+        )}
       </Layout>
+
+      {/* Floating Reassurance Indicator when restoring scroll position */}
+      <ScrollRestoredPill 
+        restoredY={restoredInfo?.y ?? null} 
+        onScrollToTop={scrollToTop} 
+      />
+    </>
   );
 }
 

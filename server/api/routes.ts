@@ -2,12 +2,12 @@ import express from "express";
 import bcrypt from "bcryptjs";
 import { getSettings, saveSettings } from "../database/settingsDao.js";
 import { getLogs, addLog, clearLogs } from "../database/logDao.js";
-import { getRecentAnnouncements, markAnnouncementSent, getAnnouncementById } from "../database/announcementDao.js";
+import { getRecentAnnouncements, markAnnouncementSent, getAnnouncementById, processedBloomFilter, sentBloomFilter, isAnnouncementProcessed, isAnnouncementSent, getBloomFilterDiagnostics } from "../database/announcementDao.js";
 import { generateDirectSummary, generateAndSendSummary, askAppHelpAI } from "../services/gemini.js";
 import { escapeHTML } from "../utils/helpers.js";
-import { db, resumeFirestoreNetwork, pauseFirestoreNetwork } from "../database/firebase.js";
-import { doc, getDoc } from "firebase/firestore";
+import { resumeFirestoreNetwork, pauseFirestoreNetwork } from "../database/firebase.js";
 import { requireAuth, requireAdmin, requireProOrAdmin, aiRateLimiter, telegramRateLimiter } from "../security/auth.js";
+import { runSecurityAudit, executeSimulatedPenTest } from "../security/hardening.js";
 import {
   getAllWatchlists,
   renameWatchlist,
@@ -19,15 +19,17 @@ import {
   updateSymbolPriorityInWatchlist,
   updateSymbolPriorityAcrossAllWatchlists,
   removeSymbolFromWatchlist,
+  removeSymbolsFromWatchlistBatch,
+  updateSymbolsPriorityBatch,
   clearWatchlistSymbols,
   clearAllWatchlistsSymbols,
   resetUserWatchlistsToDefault,
   sanitizeUserId
 } from "../database/watchlistDao.js";
-import { getBseHealth, testBSEConnection, fetchBSEAnnouncements, syncWatchlistHistoricalData, syncSingleStockHistoricalData, backfillRecentAnnouncements } from "../services/bse.js";
+import { getBseHealth, testBSEConnection, syncWatchlistHistoricalData, syncSingleStockHistoricalData, backfillRecentAnnouncements, getBackupStalenessMetrics } from "../services/bse.js";
 import { getAllStockEntries } from "../utils/stockResolver.js";
 import { invalidateMonitorConfigCache } from "../services/monitor.js";
-import { getTelegramHealth, sendToTelegram } from "../services/telegram.js";
+import { getTelegramHealth, sendToTelegram, getBotUsername } from "../services/telegram.js";
 import { 
   getResultsCalendarData, 
   fetchAndSyncResultsCalendar, 
@@ -42,7 +44,8 @@ import {
 import { getStorageStatusReport, runAutoStorageCleanup, triggerManualTestStorageAlert, pruneAnnouncementsByPercentage } from "../services/storageMonitor.js";
 import { getManualStorageMode, setManualStorageMode, resetQuotaExceededFlag, isFirestoreQuotaExceeded, resetAdminPermissionDenied, isAdminPermissionDenied } from "../database/localStore.js";
 import { getCompanyIntelligence, generateCompanyAiOverview, fetchStockQuote } from "../services/companyIntelService.js";
-import { getAllNotifications, getUnreadNotificationCount, markNotificationRead, markAllNotificationsRead, clearAllNotifications } from "../database/notificationDao.js";
+import { getAllNotifications, getUnreadNotificationCount, markNotificationRead, markNotificationsReadBatch, markAllNotificationsRead, clearAllNotifications } from "../database/notificationDao.js";
+import { circuitRegistry } from "../utils/circuitBreaker.js";
 import { 
   fetchGeneralMarketNews, 
   fetchStockSpecificNews, 
@@ -56,14 +59,14 @@ import {
   getUserProfile, 
   saveUserProfile, 
   isUsernameAvailable, 
-  generateUniqueUsername, 
-  sanitizeUsername 
+  generateUniqueUsername
 } from "../database/usersDao.js";
 import { getAllAlertRules, saveAlertRule, toggleAlertRule, deleteAlertRule } from "../database/alertRulesDao.js";
-import { checkServerAiQuota, consumeServerAiQuota, checkAndConsumeServerAiQuota, getServerAiQuotaStatus, resetServerAiQuota } from "../services/aiQuotaService.js";
+import { checkServerAiQuota, consumeServerAiQuota, getServerAiQuotaStatus, resetServerAiQuota } from "../services/aiQuotaService.js";
 import { classifyMaterialEvent } from "../services/timelineClassifier.js";
 import { searchCompany } from "./search.js";
 import { fetchLiveMarketIndices, getMarketSessionStatus } from "../services/marketIndicesService.js";
+import { getLiveStoryFeed } from "../services/storyFeedService.js";
 import { 
   recordTelemetry, 
   getDiagnosticsSummary, 
@@ -74,15 +77,113 @@ import {
   deleteApprovedBugRule
 } from "../database/diagnosticsDao.js";
 import { seoRouter } from "./seoRoutes.js";
+import { pageRenderCache, staticGuideCache, apiResponseCache } from "../utils/renderCache.js";
+import { getMarketGuides, getMarketGuideBySlug } from "../services/marketGuidesService.js";
 
 export const apiRouter = express.Router();
 
 // Mount Super SEO Suite (11 Verified Skills Engine)
 apiRouter.use("/seo", seoRouter);
 
-// Health Check Endpoint
+// Educational Market Guides API (Fail-safe, cached)
+apiRouter.get("/market-guides", (_req, res) => {
+  const guides = getMarketGuides();
+  res.json({
+    success: true,
+    total: guides.length,
+    guides
+  });
+});
+
+apiRouter.get("/market-guides/:slug", (req, res) => {
+  const guide = getMarketGuideBySlug(req.params.slug);
+  if (!guide) {
+    return res.status(404).json({ success: false, error: "Market guide not found" });
+  }
+  res.json({
+    success: true,
+    guide
+  });
+});
+
+// Health Check Endpoint with Circuit Breakers & Cache Telemetry
 apiRouter.get("/health", (_req, res) => {
-  res.json({ status: "ok", uptime: process.uptime(), timestamp: Date.now() });
+  res.json({ 
+    status: "ok", 
+    uptime: process.uptime(), 
+    timestamp: Date.now(),
+    circuitBreakers: circuitRegistry.getAllStatuses(),
+    caches: {
+      pages: pageRenderCache.getStats(),
+      api: apiResponseCache.getStats(),
+      guides: staticGuideCache.getStats()
+    }
+  });
+});
+
+// Cache Telemetry & Diagnostics API
+apiRouter.get("/cache/stats", (_req, res) => {
+  res.json({
+    success: true,
+    pages: pageRenderCache.getStats(),
+    api: apiResponseCache.getStats(),
+    guides: staticGuideCache.getStats()
+  });
+});
+
+// Admin Cache Invalidation API
+apiRouter.post("/cache/clear", requireAdmin, (req, res) => {
+  const namespace = req.body?.namespace as string | undefined;
+  if (namespace === 'pages') {
+    pageRenderCache.clear();
+  } else if (namespace === 'api') {
+    apiResponseCache.clear();
+  } else if (namespace === 'guides') {
+    staticGuideCache.clear();
+  } else {
+    pageRenderCache.clear();
+    apiResponseCache.clear();
+    staticGuideCache.clear();
+  }
+  addLog('INFO', 'CACHE', `Render and API cache flushed (namespace: ${namespace || 'all'}) by admin`).catch(() => {});
+  res.json({
+    success: true,
+    message: `Cache cleared successfully (${namespace || 'all'})`
+  });
+});
+
+// Circuit Breaker Telemetry & Status API
+apiRouter.get("/circuit-breakers", (_req, res) => {
+  res.json({
+    success: true,
+    circuitBreakers: circuitRegistry.getAllStatuses()
+  });
+});
+
+// Reset a specific circuit breaker manually (Admin only)
+apiRouter.post("/circuit-breakers/:name/reset", requireAdmin, (req, res) => {
+  const breaker = circuitRegistry.get(req.params.name);
+  if (!breaker) {
+    return res.status(404).json({ success: false, error: `Circuit breaker '${req.params.name}' not found` });
+  }
+  breaker.reset();
+  addLog('INFO', 'CIRCUIT_BREAKER', `Circuit breaker '${req.params.name}' was manually reset by admin`).catch(() => {});
+  res.json({
+    success: true,
+    message: `Circuit breaker '${req.params.name}' reset successfully`,
+    status: breaker.getStatus()
+  });
+});
+
+// Reset all circuit breakers manually (Admin only)
+apiRouter.post("/circuit-breakers/reset-all", requireAdmin, (_req, res) => {
+  circuitRegistry.resetAll();
+  addLog('INFO', 'CIRCUIT_BREAKER', 'All circuit breakers were manually reset by admin').catch(() => {});
+  res.json({
+    success: true,
+    message: "All circuit breakers reset successfully",
+    circuitBreakers: circuitRegistry.getAllStatuses()
+  });
 });
 
 // Helper to safely extract verified user ID from authenticated JWT
@@ -140,12 +241,16 @@ apiRouter.get("/settings", async (req, res) => {
   res.json({
     botToken: isAdmin ? (settings.botToken ? "•••••••••••••••••••••••••••••" : "") : "",
     chatId: isAdmin ? settings.chatId : "",
+    botUsername: getBotUsername(),
+    telegramBotConfigured: Boolean(settings.botToken || process.env.TELEGRAM_BOT_TOKEN),
     isRunning: settings.isRunning,
     isFilterEnabled: settings.isFilterEnabled,
     excludeKeywords: settings.excludeKeywords || "",
     telegramAlertPriority: settings.telegramAlertPriority || 'HIGH_ONLY',
     telegramAlertCategory: settings.telegramAlertCategory || 'RESULTS_ONLY',
     telegramWatchlistOnly: settings.telegramWatchlistOnly !== undefined ? settings.telegramWatchlistOnly : true,
+    telegramAlertsEnabled: settings.telegramAlertsEnabled !== false,
+    telegramAiSummaryEnabled: settings.telegramAiSummaryEnabled !== false,
     muteCrashAlerts: !!settings.muteCrashAlerts,
     muteInAppNotifications: !!userMuted,
     hasAppPin: !!settings.appPinHash,
@@ -162,8 +267,11 @@ apiRouter.get("/settings", async (req, res) => {
 // Settings Modification (Strictly Admin Only)
 apiRouter.post("/settings", requireAdmin, async (req, res) => {
   const updated = { ...req.body };
-  if (updated.botToken === "•••••••••••••••••••••••••••••") {
+  if (updated.botToken === "•••••••••••••••••••••••••••••" || (typeof updated.botToken === 'string' && !updated.botToken.trim())) {
     delete updated.botToken;
+  }
+  if (typeof updated.chatId === 'string' && !updated.chatId.trim()) {
+    delete updated.chatId;
   }
 
   if (updated.clearPin) {
@@ -185,6 +293,7 @@ apiRouter.get("/logs", requireAdmin, async (req, res) => {
   res.json({
     logs: await getLogs(limitParam),
     bseHealth: getBseHealth(),
+    backupMetrics: getBackupStalenessMetrics(),
     telegramHealth: getTelegramHealth(),
   });
 });
@@ -243,16 +352,34 @@ apiRouter.post("/test-gemini", requireAdmin, aiRateLimiter, async (req, res) => 
   }
 });
 
-apiRouter.get("/announcements", async (req, res) => {
-  res.setHeader('Cache-Control', 'private, max-age=5, stale-while-revalidate=15');
-  const limitParam = parseInt(req.query.limit as string) || 1000;
-  let symbols: string[] | undefined;
-  if (req.query.symbols && typeof req.query.symbols === 'string') {
-    symbols = req.query.symbols.split(',').map(s => s.trim()).filter(Boolean);
-  } else if (Array.isArray(req.query.symbols)) {
-    symbols = (req.query.symbols as string[]).map(s => String(s).trim()).filter(Boolean);
+apiRouter.get("/announcements", 
+  apiResponseCache.middleware({ ttlMs: 15 * 1000, publicCache: false }),
+  async (req, res) => {
+    res.setHeader('Cache-Control', 'private, max-age=10, stale-while-revalidate=20');
+    // Cap limit at 100 to protect Firestore read quota and memory
+    const limitParam = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
+    let symbols: string[] | undefined;
+    if (req.query.symbols && typeof req.query.symbols === 'string') {
+      symbols = req.query.symbols.split(',').map(s => s.trim()).filter(Boolean);
+    } else if (Array.isArray(req.query.symbols)) {
+      symbols = (req.query.symbols as string[]).map(s => String(s).trim()).filter(Boolean);
+    }
+    res.json(await getRecentAnnouncements(limitParam, symbols));
   }
-  res.json(await getRecentAnnouncements(limitParam, symbols));
+);
+
+apiRouter.get("/announcements/:id", async (req, res) => {
+  try {
+    const newsId = req.params.id;
+    const item = await getAnnouncementById(newsId);
+    if (!item) {
+      return res.status(404).json({ success: false, error: "Announcement not found" });
+    }
+    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+    res.json(item);
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || "Failed to fetch announcement" });
+  }
 });
 
 apiRouter.post("/announcements/refresh", async (_req, res) => {
@@ -272,7 +399,7 @@ apiRouter.get("/billing/quota", async (req, res) => {
   res.json(status);
 });
 
-apiRouter.post("/billing/reset-quota", async (req, res) => {
+apiRouter.post("/billing/reset-quota", requireAdmin, async (req, res) => {
   const uid = getReqUserId(req);
   await resetServerAiQuota(uid);
   const status = await getServerAiQuotaStatus(uid, true);
@@ -290,7 +417,7 @@ apiRouter.post("/announcements/:id/generate-summary", aiRateLimiter, async (req,
       return res.status(401).json({
         success: false,
         authRequired: true,
-        error: "Google Sign-In Required: Sign in with Google to get 30 days of Free Pro Gemini AI summaries."
+        error: "Google Sign-In Required: Sign in with Google to get 1 week (7 days) of Free Pro Gemini AI summaries."
       });
     }
 
@@ -408,9 +535,13 @@ apiRouter.post(["/watchlists/sync-stock", "/results-calendar/sync-stock"], requi
   });
 });
 
-apiRouter.get("/stock-master", async (req, res) => {
-  res.json(getAllStockEntries());
-});
+apiRouter.get(
+  "/stock-master",
+  apiResponseCache.middleware({ ttlMs: 60 * 60 * 1000, publicCache: true }),
+  async (_req, res) => {
+    res.json(getAllStockEntries());
+  }
+);
 
 apiRouter.patch("/watchlists/:id/toggle", requireAuth, async (req, res) => {
   const uid = getReqUserId(req);
@@ -504,6 +635,34 @@ apiRouter.delete("/watchlists/:id/symbols/:symbol", requireAuth, async (req, res
   res.json({ success: true });
 });
 
+apiRouter.post("/watchlists/:id/symbols/remove-batch", requireAuth, async (req, res) => {
+  try {
+    const uid = getReqUserId(req);
+    const symbols = Array.isArray(req.body.symbols) ? req.body.symbols : [];
+    if (symbols.length > 0) {
+      await removeSymbolsFromWatchlistBatch(req.params.id, symbols, uid);
+      invalidateMonitorConfigCache();
+    }
+    res.json({ success: true, removedCount: symbols.length });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+apiRouter.post("/watchlists/:id/symbols/priority-batch", requireAuth, async (req, res) => {
+  try {
+    const uid = getReqUserId(req);
+    const updates = Array.isArray(req.body.updates) ? req.body.updates : [];
+    if (updates.length > 0) {
+      await updateSymbolsPriorityBatch(req.params.id, updates, uid);
+      invalidateMonitorConfigCache();
+    }
+    res.json({ success: true, updatedCount: updates.length });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 const handleToggleRoute = async (req: any, res: any) => {
   const isRunningVal = typeof req.body.isRunning === 'boolean'
     ? req.body.isRunning
@@ -552,22 +711,29 @@ apiRouter.post("/test-telegram", requireAdmin, telegramRateLimiter, async (req, 
 apiRouter.post("/users/test-telegram", requireAuth, telegramRateLimiter, async (req, res) => {
   try {
     const uid = getReqUserId(req);
-    const { chatId } = req.body;
-    if (!chatId || typeof chatId !== 'string' || !chatId.trim()) {
+    const { chatId } = req.body || {};
+    const userProf = await getUserProfile(uid);
+    const rawTargetChatId = (chatId && typeof chatId === 'string' && chatId.trim()) ? chatId.trim() : (userProf?.telegramChatId || '');
+
+    if (!rawTargetChatId) {
       return res.status(400).json({ success: false, error: "Please enter your numerical Telegram Chat ID" });
     }
 
     const settings = await getSettings();
-    if (!settings.botToken) {
+    const botToken = settings.botToken || process.env.TELEGRAM_BOT_TOKEN;
+    if (!botToken) {
       return res.status(400).json({ 
         success: false, 
         error: "Global Telegram Bot is not configured by Admin yet. Please check back shortly." 
       });
     }
 
-    const cleanChatId = chatId.trim();
-    const userName = (req as any).user?.displayName || (req as any).user?.email?.split('@')[0] || 'Trader';
-    const testMsg = `👋 <b>BSE Nexus Personal Alert Test</b>\n\nHello <b>${escapeHTML(userName)}</b>!\n\nYour personal Telegram instant alert connection is <b>ACTIVE & VERIFIED</b>.\n\nYou will receive real-time corporate filings for your Watchlist stocks directly to this chat.\n\n🕒 <i>${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</i>`;
+    const cleanChatId = rawTargetChatId;
+    const userName = (req as any).user?.displayName || (req as any).user?.email?.split('@')[0] || userProf?.displayName || 'Trader';
+    const isAiSummaryOn = userProf?.notificationPreferences?.telegramAiSummaryEnabled !== false;
+    const isAlertsOn = userProf?.notificationPreferences?.telegramAlertsEnabled !== false;
+
+    const testMsg = `👋 <b>BSE Nexus Personal Alert Test</b>\n\nHello <b>${escapeHTML(userName)}</b>!\n\nYour personal Telegram instant alert connection is <b>ACTIVE & VERIFIED</b>.\n\n⚙️ <b>Current Configuration:</b>\n• Alert Status: ${isAlertsOn ? '🔔 <b>Active (ON)</b>' : '🔕 <b>Muted/Paused (OFF)</b>'}\n• Gemini AI Summary: ${isAiSummaryOn ? '✨ <b>Enabled (ON)</b>' : '⚡ <b>Disabled (Raw Filings Only)</b>'}\n\nYou will receive real-time corporate filings for your Watchlist stocks directly to this chat.\n\n🕒 <i>${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</i>`;
 
     const result = await sendToTelegram(testMsg, cleanChatId);
     if (result.success) {
@@ -575,9 +741,17 @@ apiRouter.post("/users/test-telegram", requireAuth, telegramRateLimiter, async (
       res.json({ success: true, messageId: result.messageId });
     } else {
       await addLog('ERROR', 'TELEGRAM', `Personal test alert failed for user ${uid} (${cleanChatId}): ${result.error}`);
-      res.status(500).json({ 
+      
+      const botUser = getBotUsername();
+      let friendlyError = result.error || "Could not deliver message to Telegram.";
+      const errStr = (result.error || '').toLowerCase();
+      if (errStr.includes('chat not found') || errStr.includes('bot was blocked') || errStr.includes('user is deactivated') || errStr.includes('chat_id is empty')) {
+        friendlyError = `Telegram bot cannot reach your Chat ID yet. Telegram requires you to start the bot first: Please open @${botUser} on Telegram (or tap https://t.me/${botUser}), press "Start" (/start), then click "Send test alert" again!`;
+      }
+
+      res.status(400).json({ 
         success: false, 
-        error: result.error || "Could not deliver message to Telegram. Make sure you started @BseNexusBot first." 
+        error: friendlyError 
       });
     }
   } catch (err: any) {
@@ -660,6 +834,7 @@ apiRouter.post("/users/profile", requireAuth, async (req, res) => {
     }
 
     const updatedProfile = await saveUserProfile(uid, { ...sanitizedPatch, uid });
+    invalidateMonitorConfigCache(uid);
     res.json({ success: true, profile: updatedProfile });
   } catch (err: any) {
     if (err.code === 'USERNAME_UNAVAILABLE') {
@@ -670,6 +845,63 @@ apiRouter.post("/users/profile", requireAuth, async (req, res) => {
         suggestion: err.suggestion 
       });
     }
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Dedicated User Telegram Settings Management (Toggle, AI Summary, Disconnect/Unlink, Scope)
+apiRouter.post("/users/telegram/settings", requireAuth, async (req, res) => {
+  try {
+    const uid = getReqUserId(req);
+    const { 
+      telegramChatId, 
+      telegramUsername, 
+      telegramAlertsEnabled, 
+      telegramAiSummaryEnabled, 
+      telegramAlertScope,
+      unlink 
+    } = req.body || {};
+
+    const existingProfile = await getUserProfile(uid);
+    const currentPrefs = existingProfile?.notificationPreferences || ({} as any);
+
+    const updatedPrefs = {
+      ...currentPrefs,
+      ...(telegramAlertsEnabled !== undefined ? { telegramAlertsEnabled: Boolean(telegramAlertsEnabled) } : {}),
+      ...(telegramAiSummaryEnabled !== undefined ? { telegramAiSummaryEnabled: Boolean(telegramAiSummaryEnabled) } : {}),
+      ...(telegramAlertScope !== undefined ? { telegramAlertScope: telegramAlertScope } : {}),
+    };
+
+    const patch: Record<string, any> = {
+      notificationPreferences: updatedPrefs,
+      uid
+    };
+
+    if (unlink) {
+      patch.telegramChatId = null;
+      patch.telegramUsername = null;
+      updatedPrefs.telegramAlertsEnabled = false;
+    } else {
+      if (telegramChatId !== undefined) {
+        patch.telegramChatId = typeof telegramChatId === 'string' ? telegramChatId.trim() : (telegramChatId === null ? null : undefined);
+      }
+      if (telegramUsername !== undefined) {
+        patch.telegramUsername = typeof telegramUsername === 'string' ? telegramUsername.trim().replace(/^@/, '') : (telegramUsername === null ? null : undefined);
+      }
+    }
+
+    const updatedProfile = await saveUserProfile(uid, patch);
+    invalidateMonitorConfigCache(uid);
+
+    res.json({
+      success: true,
+      profile: updatedProfile,
+      telegramChatId: updatedProfile.telegramChatId,
+      telegramAlertsEnabled: updatedProfile.notificationPreferences?.telegramAlertsEnabled !== false,
+      telegramAiSummaryEnabled: updatedProfile.notificationPreferences?.telegramAiSummaryEnabled !== false,
+      telegramAlertScope: updatedProfile.notificationPreferences?.telegramAlertScope || 'WATCHLIST_ONLY'
+    });
+  } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -745,9 +977,12 @@ apiRouter.post("/send-to-telegram-manual", requireProOrAdmin, telegramRateLimite
     }
     await addLog('SUCCESS', 'TELEGRAM', `Manual alert sent to Telegram for ${companyName}`);
 
-    // Trigger AI summary generation & send as reply automatically
-    generateAndSendSummary(messageId, companyName, subject, details || '', category || 'OTHER', effectivePdf || '', newsId)
-      .catch(err => addLog('ERROR', 'GEMINI', `Manual AI summary send error: ${err.message}`));
+    // Trigger AI summary generation & send as reply automatically if requested
+    const shouldSendAi = req.body.includeAiSummary !== undefined ? Boolean(req.body.includeAiSummary) : true;
+    if (shouldSendAi) {
+      generateAndSendSummary(messageId, companyName, subject, details || '', category || 'OTHER', effectivePdf || '', newsId)
+        .catch(err => addLog('ERROR', 'GEMINI', `Manual AI summary send error: ${err.message}`));
+    }
 
     res.json({ success: true, messageId });
   } catch (err: any) {
@@ -848,6 +1083,19 @@ apiRouter.post("/results-calendar/telegram-broadcast", requireProOrAdmin, telegr
 });
 
 // ==========================================
+// Dynamic Live Market Story Feed Route
+// ==========================================
+apiRouter.get("/story/feed", async (_req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
+    const feed = await getLiveStoryFeed();
+    res.json({ success: true, ...feed });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==========================================
 // Multi-Source Stock News & 24/7 Telegram Alert Routes
 // ==========================================
 apiRouter.get(["/news", "/news/general"], async (req, res) => {
@@ -873,20 +1121,23 @@ apiRouter.get("/news/watchlist", async (req, res) => {
   }
 });
 
-apiRouter.get("/news/sources", async (_req, res) => {
-  try {
-    res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=7200');
-    const uniqueSources = [
-      { name: 'Economic Times', slug: 'et', logo: 'ET', feedsCount: 5, color: '#C026D3' },
-      { name: 'LiveMint', slug: 'mint', logo: 'Mint', feedsCount: 4, color: '#EA580C' },
-      { name: 'Moneycontrol', slug: 'moneycontrol', logo: 'MC', feedsCount: 4, color: '#0284C7' },
-      { name: 'Business Standard', slug: 'bs', logo: 'BS', feedsCount: 3, color: '#DC2626' }
-    ];
-    res.json({ success: true, sources: uniqueSources, totalFeeds: NEWS_FEEDS.length });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+apiRouter.get(
+  "/news/sources",
+  apiResponseCache.middleware({ ttlMs: 60 * 60 * 1000, publicCache: true }),
+  async (_req, res) => {
+    try {
+      const uniqueSources = [
+        { name: 'Economic Times', slug: 'et', logo: 'ET', feedsCount: 5, color: '#C026D3' },
+        { name: 'LiveMint', slug: 'mint', logo: 'Mint', feedsCount: 4, color: '#EA580C' },
+        { name: 'Moneycontrol', slug: 'moneycontrol', logo: 'MC', feedsCount: 4, color: '#0284C7' },
+        { name: 'Business Standard', slug: 'bs', logo: 'BS', feedsCount: 3, color: '#DC2626' }
+      ];
+      res.json({ success: true, sources: uniqueSources, totalFeeds: NEWS_FEEDS.length });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
   }
-});
+);
 
 apiRouter.get("/news/stock/:symbol", async (req, res) => {
   try {
@@ -913,7 +1164,7 @@ apiRouter.post("/news/summarize", aiRateLimiter, async (req, res) => {
       return res.status(401).json({
         success: false,
         authRequired: true,
-        error: "Google Sign-In Required: Sign in with Google to get 30 days of Free Pro Gemini AI summaries."
+        error: "Google Sign-In Required: Sign in with Google to get 1 week (7 days) of Free Pro Gemini AI summaries."
       });
     }
 
@@ -1199,7 +1450,7 @@ apiRouter.get("/stock-results-history", async (req, res) => {
 });
 
 // Deep Historical Sync for a single stock (1 to 5 years)
-apiRouter.post("/stocks/:scripCode/fetch-deep-history", requireAuth, async (req, res) => {
+apiRouter.post("/stocks/:scripCode/fetch-deep-history", async (req, res) => {
   try {
     const scripCode = req.params.scripCode;
     const { symbol, years } = req.body;
@@ -1333,6 +1584,7 @@ apiRouter.get("/pdf-open", async (req, res) => {
           const contentType = response.headers.get('content-type') || '';
           if (contentType.includes('application/pdf') || testUrl.toLowerCase().endsWith('.pdf')) {
             const cleanSafeName = (filename || 'bse_filing.pdf').replace(/[^a-zA-Z0-9_\-\.]/g, '');
+            res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400');
             res.setHeader('Content-Type', 'application/pdf');
             res.setHeader('Content-Disposition', `inline; filename="${cleanSafeName}"`);
             const arrayBuffer = await response.arrayBuffer();
@@ -1515,6 +1767,17 @@ apiRouter.post("/notifications/:id/read", requireAuth, async (req, res) => {
   }
 });
 
+apiRouter.post("/notifications/read-batch", requireAuth, async (req, res) => {
+  try {
+    const uid = getReqUserId(req);
+    const ids = Array.isArray(req.body.ids) ? req.body.ids : [];
+    const count = markNotificationsReadBatch(ids, uid);
+    res.json({ success: true, updatedCount: count });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 apiRouter.post("/notifications/read-all", requireAuth, async (req, res) => {
   try {
     const uid = getReqUserId(req);
@@ -1615,23 +1878,31 @@ apiRouter.delete("/alert-rules/:id", requireAuth, async (req, res) => {
 // FEATURE: REAL-TIME MARKET INDICES & OVERVIEW
 // ==========================================
 
-apiRouter.get("/market/indices", async (req, res) => {
-  try {
-    const data = await fetchLiveMarketIndices();
-    res.json(data);
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+apiRouter.get(
+  "/market/indices",
+  apiResponseCache.middleware({ ttlMs: 15 * 1000, publicCache: true }),
+  async (_req, res) => {
+    try {
+      const data = await fetchLiveMarketIndices();
+      res.json(data);
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
   }
-});
+);
 
-apiRouter.get("/market/status", (req, res) => {
-  try {
-    const status = getMarketSessionStatus();
-    res.json(status);
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+apiRouter.get(
+  "/market/status",
+  apiResponseCache.middleware({ ttlMs: 30 * 1000, publicCache: true }),
+  (_req, res) => {
+    try {
+      const status = getMarketSessionStatus();
+      res.json(status);
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
   }
-});
+);
 
 // ==========================================
 // FEATURE: IN-HOUSE SYSTEM HEALTH & CRASH DIAGNOSTICS (ADMIN ONLY)
@@ -1766,6 +2037,78 @@ apiRouter.post("/admin/diagnostics/toggle-mute-alerts", requireAdmin, async (req
     await saveSettings({ muteCrashAlerts: shouldMute });
     addLog('INFO', 'TELEMETRY', `Global crash alert muting set to ${shouldMute}`);
     res.json({ success: true, muteCrashAlerts: shouldMute });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==========================================
+// 20-POINT SECURITY AUDIT & PENETRATION TESTING
+// ==========================================
+
+// Audit status of all 20 launch security items
+apiRouter.get("/security/audit", async (req, res) => {
+  try {
+    const user = (req as any).user;
+    const auditReport = await runSecurityAudit(user);
+    res.json({ success: true, ...auditReport });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Execute simulated live penetration test against endpoints
+apiRouter.post("/security/pen-test", requireAdmin, async (req, res) => {
+  try {
+    const penTestReport = await executeSimulatedPenTest('http://localhost:3000');
+    await addLog('INFO', 'SECURITY', `Simulated Penetration Test executed: ${penTestReport.blockedAttacks}/${penTestReport.totalAttacks} attack vectors blocked successfully`);
+    res.json({ success: true, ...penTestReport });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Admin-only: Real-time Bloom Filter Telemetry
+apiRouter.get("/admin/bloom-stats", requireAdmin, async (_req, res) => {
+  try {
+    const stats = getBloomFilterDiagnostics();
+    res.json({ success: true, ...stats });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Admin-only: Test an ID / Scrip live against the Bloom Filter
+apiRouter.get("/admin/bloom-test", requireAdmin, async (req, res) => {
+  try {
+    const testId = String(req.query.id || '').trim();
+    if (!testId) {
+      return res.status(400).json({ success: false, error: "Missing 'id' query parameter" });
+    }
+
+    const processedIndices = processedBloomFilter.getBitIndices(testId);
+    const sentIndices = sentBloomFilter.getBitIndices(testId);
+    const mightBeProcessed = processedBloomFilter.has(testId);
+    const mightBeSent = sentBloomFilter.has(testId);
+    const actuallyProcessed = await isAnnouncementProcessed(testId);
+    const actuallySent = await isAnnouncementSent(testId);
+
+    res.json({
+      success: true,
+      id: testId,
+      processed: {
+        mightBeInSet: mightBeProcessed,
+        actuallyInSet: actuallyProcessed,
+        bitIndices: processedIndices,
+        bypassedDbScan: !mightBeProcessed
+      },
+      sent: {
+        mightBeInSet: mightBeSent,
+        actuallyInSet: actuallySent,
+        bitIndices: sentIndices,
+        bypassedDbScan: !mightBeSent
+      }
+    });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }

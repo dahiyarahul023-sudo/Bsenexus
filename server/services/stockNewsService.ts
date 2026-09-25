@@ -1,11 +1,12 @@
 import { createHash } from 'crypto';
-import { getActiveWatchlistSymbols, getAllWatchlists, extractSymbol } from '../database/watchlistDao.js';
+import { getAllWatchlists, extractSymbol } from '../database/watchlistDao.js';
 import { sendToTelegram } from './telegram.js';
 import { addLog } from '../database/logDao.js';
 import { getSettings } from '../database/settingsDao.js';
-import { getAllUserProfiles, getUserProfile } from '../database/usersDao.js';
+import { getAllUserProfiles } from '../database/usersDao.js';
 import { readLocalJson, writeLocalJson, isFirestoreQuotaExceeded, isAdminPermissionDenied } from '../database/localStore.js';
 import { adminDb } from '../database/firebase.js';
+import { externalFeedsCircuitBreaker } from '../utils/circuitBreaker.js';
 
 export interface StockNewsItem {
   id: string;
@@ -287,6 +288,13 @@ export async function fetchAllMultiSourceNewsFeeds(forceRefresh = false): Promis
     return newsCache.allNews;
   }
 
+  // Fast-fail if external feeds circuit breaker is OPEN, returning cached news
+  if (externalFeedsCircuitBreaker.getState() === 'OPEN') {
+    if (newsCache.allNews.length > 0) {
+      return newsCache.allNews;
+    }
+  }
+
   const resultsMap = new Map<string, StockNewsItem>();
   const normalizedTitleMap = new Map<string, string>(); // Cross-publisher deduplication
   const sourceCountMap: Record<string, number> = {
@@ -298,15 +306,21 @@ export async function fetchAllMultiSourceNewsFeeds(forceRefresh = false): Promis
 
   const feedPromises = NEWS_FEEDS.map(async (feed) => {
     try {
-      const res = await fetch(feed.url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-          'Accept': 'application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8'
+      const res = await externalFeedsCircuitBreaker.execute(
+        async (signal) => {
+          return await fetch(feed.url, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+              'Accept': 'application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8'
+            },
+            signal: signal || AbortSignal.timeout(6500)
+          });
         },
-        signal: AbortSignal.timeout(6500)
-      });
+        undefined,
+        6500
+      );
 
-      if (res.ok) {
+      if (res && res.ok) {
         const xml = await res.text();
         const parsed = parseRssFeedXml(xml, feed);
 
@@ -585,8 +599,8 @@ export async function processAutomatedNewsAlerts(): Promise<{ checked: number; d
       allowedCategories?: string[];
     }[] = [];
 
-    // Global recipient
-    if (settings.chatId && settings.autoTelegramNews !== false) {
+    // Global recipient (Strict opt-in: only if explicitly set to true)
+    if (settings.chatId && settings.autoTelegramNews === true) {
       recipients.push({
         targetId: `global_${settings.chatId}`,
         chatId: settings.chatId,
@@ -596,9 +610,9 @@ export async function processAutomatedNewsAlerts(): Promise<{ checked: number; d
       });
     }
 
-    // User-specific recipients
+    // User-specific recipients (Strict opt-in: only if explicitly enabled by user)
     for (const u of allUsers) {
-      if (u.telegramChatId && u.notificationPreferences?.telegramNewsAlerts !== false) {
+      if (u.telegramChatId && u.notificationPreferences?.telegramNewsAlerts === true) {
         // Avoid duplicate if same as global
         if (u.telegramChatId !== settings.chatId) {
           recipients.push({

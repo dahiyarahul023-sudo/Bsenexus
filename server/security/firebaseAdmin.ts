@@ -1,5 +1,6 @@
 import { initializeApp, cert, getApps, App } from 'firebase-admin/app';
 import { getAuth, Auth } from 'firebase-admin/auth';
+import { getAppCheck, AppCheck } from 'firebase-admin/app-check';
 import fs from 'fs';
 import path from 'path';
 
@@ -179,6 +180,11 @@ export function getFirebaseAdmin(): App {
 export function getFirebaseAuth(): Auth {
   return getAuth(getFirebaseAdmin());
 }
+
+export function getFirebaseAppCheck(): AppCheck {
+  return getAppCheck(getFirebaseAdmin());
+}
+
 
 
 

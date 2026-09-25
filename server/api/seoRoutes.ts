@@ -14,6 +14,7 @@ import {
   fetchPageContent
 } from "../services/seoService.js";
 import { addLog } from "../database/logDao.js";
+import { indexNowQueue, notifySearchEnginesOfNewPages, INDEXNOW_KEY, INDEXNOW_HOST } from "../services/indexNow.js";
 
 export const seoRouter = express.Router();
 
@@ -204,5 +205,35 @@ seoRouter.post("/expert-interview", async (req, res) => {
   } catch (err: any) {
     addLog('ERROR', 'SEO', `Expert interview extraction failed: ${err.message}`);
     res.status(500).json({ success: false, error: err.message || "Questionnaire generation failed." });
+  }
+});
+
+// 12. IndexNow Real-Time Search Engine Submission & Diagnostics (Bing, Yandex, Seznam)
+seoRouter.get("/indexnow/stats", (_req, res) => {
+  res.json({
+    success: true,
+    host: INDEXNOW_HOST,
+    key: INDEXNOW_KEY,
+    keyLocation: `https://${INDEXNOW_HOST}/${INDEXNOW_KEY}.txt`,
+    stats: indexNowQueue.getStats()
+  });
+});
+
+seoRouter.post("/indexnow/ping", async (req, res) => {
+  try {
+    const urls = req.body?.urls;
+    if (urls && Array.isArray(urls) && urls.length > 0) {
+      notifySearchEnginesOfNewPages(urls);
+    }
+    const result = await indexNowQueue.flush();
+    res.json({
+      success: result.success,
+      submittedCount: result.submittedCount,
+      message: result.success
+        ? `Successfully submitted ${result.submittedCount} URL(s) to IndexNow (Bing/Yandex)`
+        : `Submission pending/deferred: ${result.error || 'Check queue'}`
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'IndexNow ping failed' });
   }
 });

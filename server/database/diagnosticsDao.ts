@@ -1,6 +1,7 @@
 import { readLocalJson, writeLocalJson } from './localStore.js';
 import { getSettings } from './settingsDao.js';
 import { sendToTelegram } from '../services/telegram.js';
+import { getBloomFilterDiagnostics } from './announcementDao.js';
 
 export interface DeviceInfo {
   type: 'MOBILE' | 'TABLET' | 'DESKTOP' | 'UNKNOWN';
@@ -353,6 +354,7 @@ export interface DiagnosticsSummary {
   slowestPages: Array<{ path: string; avgLoadMs: number; samples: number }>;
   recentErrors: TelemetryEvent[];
   recentEvents: TelemetryEvent[];
+  bloomFilter?: any;
 }
 
 export async function getDiagnosticsSummary(): Promise<DiagnosticsSummary> {
@@ -497,7 +499,8 @@ export async function getDiagnosticsSummary(): Promise<DiagnosticsSummary> {
     },
     slowestPages,
     recentErrors,
-    recentEvents: events.slice(0, 30)
+    recentEvents: events.slice(0, 30),
+    bloomFilter: getBloomFilterDiagnostics()
   };
 }
 

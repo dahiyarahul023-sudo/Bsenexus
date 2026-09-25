@@ -165,7 +165,7 @@ export function MarketTickerTape({
                     idx.tick === 'UP' && "tick-flash-up",
                     idx.tick === 'DOWN' && "tick-flash-down"
                   )}
-                  title={`${idx.description || idx.name} | High: ${idx.dayHigh ? formatPrice(idx) : '--'} | Low: ${idx.dayLow ? formatPrice(idx) : '--'}`}
+                  title={`${idx.description || idx.name} | High: ${idx.dayHigh !== undefined ? formatPrice({ ...idx, price: idx.dayHigh }) : '--'} | Low: ${idx.dayLow !== undefined ? formatPrice({ ...idx, price: idx.dayLow }) : '--'}`}
                 >
                   <span className="text-slate-700 dark:text-slate-300 font-bold text-[10px] sm:text-[10.5px]">
                     {idx.name}

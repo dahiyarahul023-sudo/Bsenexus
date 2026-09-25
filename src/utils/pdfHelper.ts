@@ -31,6 +31,45 @@ export function getSafePdfUrl(
   return `/api/pdf-open?${params.toString()}`;
 }
 
+/**
+ * Resolves the direct, official BSE public PDF link (e.g. https://www.bseindia.com/xml-data/corpfiling/AttachLive/...)
+ * Unwraps /api/pdf-open proxy URLs if passed, returning a clean, shareable PDF link without server proxy parameters.
+ */
+export function getDirectBsePdfUrl(
+  pdfLink?: string | null,
+  attachmentName?: string | null
+): string | null {
+  if (pdfLink && typeof pdfLink === 'string') {
+    const trimmed = pdfLink.trim();
+    if (trimmed.includes('/api/pdf-open')) {
+      try {
+        const dummyBase = 'https://bsenexus.in';
+        const parsed = new URL(trimmed, dummyBase);
+        const underlying = parsed.searchParams.get('url');
+        if (underlying && underlying.startsWith('http')) {
+          return underlying;
+        }
+        const fileParam = parsed.searchParams.get('file');
+        if (fileParam) {
+          return `https://www.bseindia.com/xml-data/corpfiling/AttachLive/${fileParam}`;
+        }
+      } catch {}
+    } else if (trimmed.startsWith('http')) {
+      return trimmed;
+    }
+  }
+
+  if (attachmentName && typeof attachmentName === 'string') {
+    const clean = attachmentName.trim();
+    if (clean.startsWith('http')) return clean;
+    if (clean.length > 0) {
+      return `https://www.bseindia.com/xml-data/corpfiling/AttachLive/${clean}`;
+    }
+  }
+
+  return null;
+}
+
 export function openSafePdfInNewTab(
   pdfLink?: string | null,
   attachmentName?: string | null,

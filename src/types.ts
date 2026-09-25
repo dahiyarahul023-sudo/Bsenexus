@@ -39,6 +39,9 @@ export interface UserNotificationPreferences {
   telegramNewsAlerts?: boolean;
   telegramNewsSources?: string[];
   telegramNewsCategories?: string[];
+  telegramAlertsEnabled?: boolean;
+  telegramAiSummaryEnabled?: boolean;
+  telegramAlertScope?: AlertScopeFilter;
   alertPriority: AlertPriorityFilter;
   alertScope: AlertScopeFilter;
   alertCategory: AlertCategoryFilter;

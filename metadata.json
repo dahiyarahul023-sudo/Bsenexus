@@ -1,6 +1,6 @@
 {
   "name": "BSE Nexus",
-  "description": "Real-time BSE corporate disclosures tracker with AI financial YoY/QoQ breakdown, custom watchlists, and Telegram alert integration.",
+  "description": "Track latest BSE corporate announcements, board meeting outcomes, financial results, and regulatory filings in real time on BSE Nexus.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

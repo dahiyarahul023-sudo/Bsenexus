@@ -23,11 +23,27 @@ import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { useVisibilityInterval } from '../hooks/useVisibilityInterval';
 import { PullToRefreshIndicator } from './ui/PullToRefreshIndicator';
+import { ActionButton } from './ui/ActionButton';
 import { clusterAnnouncements, AnnouncementCluster } from '../utils/clusterAnnouncements';
 import { detectFilingType, getMutedTypes, saveMutedTypes, getMutedCompanies, saveMutedCompanies } from '../utils/noiseFilter';
 import { getCacheItem, setCacheItem } from '../utils/cache';
-import { springStandard, springSnappy, springMorph, containerStaggerVariants, itemFadeUpVariants, buttonTap, subtleHover, accordionTransition, modalBackdropVariants } from '../utils/motionTokens';
+import { 
+  springStandard, 
+  springSnappy, 
+  springMorph, 
+  springBouncy,
+  springSmoothPill,
+  containerStaggerVariants, 
+  itemFadeUpVariants, 
+  buttonTap, 
+  subtleHover, 
+  accordionTransition, 
+  modalBackdropVariants 
+} from '../utils/motionTokens';
 import { AiSummaryViewer } from './AiSummaryViewer';
+import { WatchlistStarButton } from './ui/motion/WatchlistStarButton';
+import { ShareActionMenu } from './ui/motion/ShareActionMenu';
+import { RollingNumber } from './ui/motion/RollingNumber';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -68,14 +84,13 @@ export function Announcements({
   const { isDeveloperMode } = useDeveloperMode();
   const { openIntelModal } = useIntelModal();
 
-  // SWR: Initialize announcements immediately from client cache to eliminate CLS and achieve 0ms load
+  // SWR: Initialize announcements immediately from client cache to achieve 0ms initial paint
   const [announcements, setAnnouncements] = useState<any[]>(() => {
-    return getCacheItem<any[]>('announcements_feed', 5 * 60 * 1000) || [];
-  });
-  const [isLoading, setIsLoading] = useState<boolean>(() => {
     const cached = getCacheItem<any[]>('announcements_feed', 5 * 60 * 1000);
-    return !cached || cached.length === 0;
+    if (cached && cached.length > 0) return cached;
+    return [];
   });
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [search, setSearch] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -102,6 +117,34 @@ export function Announcements({
     window.addEventListener('bse-share-target', handleShareTarget);
     return () => window.removeEventListener('bse-share-target', handleShareTarget);
   }, []);
+
+  // Deep Link listener: Auto-select and display announcement if shared link (?announcement=:id or ?id=:id) is opened
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const annId = urlParams.get('announcement') || urlParams.get('id');
+      if (annId) {
+        const found = announcements.find(a => (a.id || a.newsId) === annId);
+        if (found) {
+          setSelectedItem(found);
+          if (window.innerWidth < 1024) setIsMobileDetailOpen(true);
+        } else if (announcements.length > 0) {
+          customFetch(`/api/announcements/${encodeURIComponent(annId)}`)
+            .then(res => res.ok ? res.json() : null)
+            .then(data => {
+              if (data && (data.id || data.newsId)) {
+                setAnnouncements(prev => [data, ...prev.filter(p => (p.id || p.newsId) !== (data.id || data.newsId))]);
+                setSelectedItem(data);
+                if (window.innerWidth < 1024) setIsMobileDetailOpen(true);
+              }
+            })
+            .catch(() => {});
+        }
+      }
+    } catch {}
+  }, [announcements.length]);
+
   const [filterType, setFilterType] = useState('ALL');
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
   const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(false);
@@ -110,6 +153,7 @@ export function Announcements({
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const [isStatusExpanded, setIsStatusExpanded] = useState<boolean>(false);
+  const [isSyncingNow, setIsSyncingNow] = useState<boolean>(false);
 
   // Responsive View Mode (Grid on PC / Large screen, List on Mobile by default, user-customizable)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
@@ -283,6 +327,11 @@ export function Announcements({
   useBodyScrollLock(Boolean(isMobileDetailOpen || isFilterSheetOpen));
 
   const fetchUserWatchlists = async () => {
+    if (!user && !profile) {
+      setUserWatchlists([]);
+      setUserWatchlistSymbols(new Set());
+      return;
+    }
     try {
       const res = await customFetch('/api/watchlists');
       if (res.ok) {
@@ -318,9 +367,36 @@ export function Announcements({
     const symbolOrScrip = String(scripCode || '').trim().toUpperCase() || (companyName || '').trim().toUpperCase();
     if (!symbolOrScrip) return;
 
-    if (userWatchlistSymbols.has(symbolOrScrip) || (scripCode && userWatchlistSymbols.has(String(scripCode).trim().toUpperCase())) || (companyName && userWatchlistSymbols.has(companyName.trim().toUpperCase()))) {
-      setWatchlistToast(`"${companyName || symbolOrScrip}" is already in your Watchlist`);
-      setTimeout(() => setWatchlistToast(null), 3000);
+    const isAlreadyInWatchlist = userWatchlistSymbols.has(symbolOrScrip) || 
+      (scripCode && userWatchlistSymbols.has(String(scripCode).trim().toUpperCase())) || 
+      (companyName && userWatchlistSymbols.has(companyName.trim().toUpperCase()));
+
+    if (isAlreadyInWatchlist) {
+      setIsSavingWatchlist(true);
+      try {
+        let targetList = userWatchlists.find(w => w.is_active === 1) || userWatchlists[0];
+        if (targetList) {
+          const deleteRes = await customFetch(`/api/watchlists/${targetList.id}/symbols/${encodeURIComponent(symbolOrScrip)}`, {
+            method: 'DELETE'
+          });
+          if (deleteRes.ok) {
+            setUserWatchlistSymbols(prev => {
+              const next = new Set(prev);
+              next.delete(symbolOrScrip);
+              if (scripCode) next.delete(String(scripCode).trim().toUpperCase());
+              if (companyName) next.delete(companyName.trim().toUpperCase());
+              return next;
+            });
+            setWatchlistToast(`Removed "${companyName || symbolOrScrip}" from Watchlist`);
+            setTimeout(() => setWatchlistToast(null), 3000);
+            fetchUserWatchlists();
+          }
+        }
+      } catch (e: any) {
+        console.error("Failed to remove from watchlist:", e);
+      } finally {
+        setIsSavingWatchlist(false);
+      }
       return;
     }
 
@@ -447,10 +523,10 @@ export function Announcements({
     if (!isProOrAdmin) {
       if (!user || user.isAnonymous) {
         setIsAuthModalOpen(true);
-        showToast('🔒 Google Sign-In Required: Sign in with Google to activate your 30-Day Free Pro trial to broadcast to Telegram!', 'info');
+        showToast('🔒 Google Sign-In Required: Sign in with Google to activate your 1-Week Free Pro trial to broadcast to Telegram!', 'info');
       } else {
         setIsProModalOpen(true);
-        showToast('🔒 Direct Telegram Broadcasting is a Pro feature (30-day trial ended).', 'info');
+        showToast('🔒 Direct Telegram Broadcasting is a Pro feature (1-week trial ended. Upgrade to Pro for ₹499/mo).', 'info');
       }
       return;
     }
@@ -494,18 +570,18 @@ export function Announcements({
   };
 
   const handleGenerateSummary = async (id: string) => {
-    // 1. Guests are strictly view-only: prompt Google sign-in for 30-day Free Pro
+    // 1. Guests are strictly view-only: prompt Google sign-in for 1-week Free Pro
     const isGuestUser = !user || user.isAnonymous;
     if (isGuestUser) {
       setIsAuthModalOpen(true);
-      showToast('🔒 Google Sign-In Required: Sign in with Google to activate your 30-Day Free Pro trial with Gemini AI summaries!', 'info');
+      showToast('🔒 Google Sign-In Required: Sign in with Google to activate your 1-Week Free Pro trial with Gemini AI summaries!', 'info');
       return;
     }
 
     // 2. Authenticated user without active Pro trial / admin
     if (!isProOrAdmin) {
       setIsProModalOpen(true);
-      showToast('🔒 30-Day Free Pro trial has ended. Upgrade to Pro to continue generating Gemini AI summaries!', 'info');
+      showToast('🔒 1-Week Free Pro trial has ended. Upgrade to Pro (₹499/mo) to continue generating Gemini AI summaries!', 'info');
       return;
     }
 
@@ -527,7 +603,7 @@ export function Announcements({
 
       if (res.status === 401 || data?.authRequired) {
         setIsAuthModalOpen(true);
-        showToast(data?.error || '🔒 Google Sign-In Required: Sign in to enjoy 30 days of Free Pro AI features.', 'info');
+        showToast(data?.error || '🔒 Google Sign-In Required: Sign in to enjoy 1 week of Free Pro AI features.', 'info');
         return;
       }
 
@@ -688,11 +764,18 @@ export function Announcements({
     return true;
   });
 
-  const searched = filteredByType.filter(a => 
-    (a.companyName || '').toLowerCase().includes(search.toLowerCase()) || 
-    (a.subject || '').toLowerCase().includes(search.toLowerCase()) ||
-    (a.scrip_cd || '').toString().includes(search)
-  );
+  const searched = filteredByType.filter(a => {
+    const q = (search || '').toLowerCase().trim();
+    if (!q) return true;
+    return (
+      (a.companyName || '').toLowerCase().includes(q) || 
+      (a.subject || '').toLowerCase().includes(q) ||
+      (a.headline || '').toLowerCase().includes(q) ||
+      (a.details || '').toLowerCase().includes(q) ||
+      (a.category || '').toLowerCase().includes(q) ||
+      (a.scrip_cd || '').toString().includes(q)
+    );
+  });
 
   const filtered = React.useMemo(() => {
     if (sortOrder === 'oldest') {
@@ -790,14 +873,14 @@ export function Announcements({
         <div className="border-b border-slate-200/90 dark:border-[#2D283E] pb-4 space-y-2 relative">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-black text-slate-700 dark:text-slate-300 font-mono flex items-center gap-1">
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 font-mono flex items-center gap-1">
                 <span>{item.scrip_cd ? `BSE: ${item.scrip_cd}` : 'BSE Listed'}</span>
               </span>
-              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-[#252233] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#352F48] select-none">
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-[#252233] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#352F48] select-none whitespace-nowrap">
                 {cleanSub.regulation || 'Reg 30 (LODR)'}
               </span>
             </div>
-            <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 font-medium">
+            <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">
               {formatDateOnly(item.bseTime || item.fetched_at)}
             </span>
           </div>
@@ -811,22 +894,23 @@ export function Announcements({
               {item.companyName}
             </motion.h3>
             <div className="flex items-center gap-1.5 shrink-0">
-              <motion.button
-                whileTap={buttonTap}
-                type="button"
-                disabled={isSavingWatchlist}
-                onClick={() => handleToggleWatchlist(item.scrip_cd, item.companyName)}
-                className={cn(
-                  "min-h-[38px] px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs select-none",
-                  isSavedInWatchlist
-                    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30"
-                    : "bg-slate-100 hover:bg-slate-200 dark:bg-[#252233] dark:hover:bg-[#2F2B40] text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-[#352F48]"
-                )}
-                title={isSavedInWatchlist ? "Already in Watchlist" : "Save to Watchlist"}
-              >
-                <Bookmark size={13} className={isSavedInWatchlist ? "fill-amber-500 text-amber-500" : "text-slate-500 dark:text-slate-400"} />
-                <span>{isSavedInWatchlist ? "Watching" : "Watch"}</span>
-              </motion.button>
+              <WatchlistStarButton
+                isSaved={isSavedInWatchlist}
+                isLoading={isSavingWatchlist}
+                onToggle={() => handleToggleWatchlist(item.scrip_cd, item.companyName)}
+                showLabel={true}
+                size="sm"
+              />
+              <ShareActionMenu
+                title={`${item.companyName} (${item.scrip_cd ? `BSE: ${item.scrip_cd}` : 'BSE'})`}
+                headline={cleanSub.headline || item.subject}
+                companyName={item.companyName}
+                scripCode={item.scrip_cd}
+                newsId={item.id || item.newsId}
+                category={item.category}
+                pdfUrl={item.pdfLink || item.ATTACHMENTNAME || item.attachmentName}
+                size="sm"
+              />
             </div>
           </div>
         </div>
@@ -839,7 +923,7 @@ export function Announcements({
               href={getSafePdfUrl(item.pdfLink, item.ATTACHMENTNAME || item.attachmentName, item.id, item.scrip_cd)} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="w-full min-h-[44px] flex items-center justify-center gap-2.5 px-4 py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs sm:text-sm font-bold transition-all shadow-xs cursor-pointer select-none"
+              className="w-full min-h-[44px] flex items-center justify-center gap-2.5 px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs sm:text-sm font-bold transition-all shadow-xs cursor-pointer select-none whitespace-nowrap"
             >
               <FileText size={16} className="text-white" />
               <span>Open Official BSE Document (PDF)</span>
@@ -866,7 +950,7 @@ export function Announcements({
           <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1.5">
             Announcement
           </span>
-          <div className="bg-slate-50 dark:bg-[#15141E] p-3.5 rounded-xl border border-slate-200/90 dark:border-[#2D283E] space-y-1">
+          <div className="bg-slate-50 dark:bg-[#15141E] p-3.5 rounded-xl border border-slate-200/90 dark:border-[#2D283E] space-y-1.5">
             <div className="text-xs font-bold text-slate-900 dark:text-white">
               {cleanSub.humanTitle || 'Corporate announcement'}
             </div>
@@ -887,16 +971,17 @@ export function Announcements({
             </div>
 
             {!item.aiSummary && !isGeneratingAi && (
-              <motion.button
-                whileTap={buttonTap}
-                type="button"
-                disabled={isGeneratingAi}
+              <ActionButton
                 onClick={() => handleGenerateSummary(item.id)}
-                className="text-xs text-purple-700 dark:text-purple-300 hover:text-purple-900 dark:hover:text-white font-bold cursor-pointer disabled:opacity-50 flex items-center gap-1.5 bg-purple-50 dark:bg-purple-950/40 px-2.5 py-1.5 rounded-lg border border-purple-200 dark:border-purple-800 shadow-2xs select-none"
+                isLoading={isGeneratingAi}
+                loadingText="Analyzing..."
+                variant="secondary"
+                size="sm"
+                icon={<Bot className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />}
+                className="text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 border-purple-200 dark:border-purple-800"
               >
-                <Bot className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                <span>Generate deeper analysis</span>
-              </motion.button>
+                Generate deeper analysis
+              </ActionButton>
             )}
           </div>
 
@@ -953,7 +1038,7 @@ export function Announcements({
               <button
                 type="button"
                 onClick={(e) => handleMuteFilingType(detectedNoiseType.id, e)}
-                className="px-2 py-1 rounded-lg text-[11px] font-medium bg-slate-100 hover:bg-rose-50 dark:bg-[#252233] text-slate-700 dark:text-slate-300 hover:text-rose-600 border border-slate-200 dark:border-[#38324E] cursor-pointer"
+                className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-100 hover:bg-rose-50 dark:bg-[#252233] text-slate-700 dark:text-slate-300 hover:text-rose-600 border border-slate-200 dark:border-[#38324E] cursor-pointer whitespace-nowrap"
               >
                 Mute "{detectedNoiseType.label}"
               </button>
@@ -961,7 +1046,7 @@ export function Announcements({
             <button
               type="button"
               onClick={(e) => handleMuteCompany(item.companyName, e)}
-              className="px-2 py-1 rounded-lg text-[11px] font-medium bg-slate-100 hover:bg-rose-50 dark:bg-[#252233] text-slate-700 dark:text-slate-300 hover:text-rose-600 border border-slate-200 dark:border-[#38324E] cursor-pointer"
+              className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-100 hover:bg-rose-50 dark:bg-[#252233] text-slate-700 dark:text-slate-300 hover:text-rose-600 border border-slate-200 dark:border-[#38324E] cursor-pointer whitespace-nowrap"
             >
               Mute Company
             </button>
@@ -970,26 +1055,25 @@ export function Announcements({
 
         {/* Telegram Dispatch Action */}
         <div className="pt-1 space-y-2">
-          <motion.button
-            whileTap={buttonTap}
-            type="button"
-            disabled={isSendingTelegram}
+          <ActionButton
             onClick={() => handleManualSendTelegram(item)}
-            className="w-full min-h-[44px] relative overflow-hidden flex items-center justify-center gap-2.5 px-4 py-2.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/50 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/80 rounded-xl text-xs font-bold transition-all shadow-xs disabled:opacity-50 cursor-pointer select-none"
+            isLoading={isSendingTelegram}
+            loadingText="Launching Broadcast to Telegram..."
+            variant="secondary"
+            size="md"
+            icon={
+              <Send 
+                size={14} 
+                className={cn(
+                  "text-blue-500 transition-transform",
+                  isPlaneFlying ? "animate-plane-fly" : ""
+                )} 
+              />
+            }
+            className="w-full min-h-[44px] bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/50 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/80 rounded-xl whitespace-nowrap"
           >
-            <Send 
-              size={14} 
-              className={cn(
-                "transition-transform",
-                isPlaneFlying ? "animate-plane-fly" : ""
-              )} 
-            />
-            <span>
-              {isSendingTelegram 
-                ? "Launching Broadcast to Telegram..." 
-                : "Forward to Telegram Channel"}
-            </span>
-          </motion.button>
+            Forward to Telegram Channel
+          </ActionButton>
 
           {/* Telegram Dispatch Message Alert */}
           {telegramStatus && (
@@ -1041,12 +1125,12 @@ export function Announcements({
           {/* Left: Brand Title & Clean Live Indicator */}
           <div className="flex items-center gap-2 shrink-0">
             <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white font-display whitespace-nowrap tracking-tight">
-              Filings
+              Live BSE Announcements
             </h1>
             {effectiveIsRunning && (
               <span 
                 className="relative flex h-2.5 w-2.5 items-center justify-center shrink-0" 
-                title="BSE Live Realtime Poller Active (15s updates)"
+                title="BSE Live Realtime Poller Active (30s market hours / 5m off-hours)"
               >
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
@@ -1104,33 +1188,51 @@ export function Announcements({
           </div>
         </div>
 
-        {/* Row 2: Clean Category Tabs without redundant counts */}
-        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 no-scrollbar pt-2.5 sm:pt-2 border-t border-slate-100 dark:border-[#2D283E]">
+        {/* Row 2: Clean Category Tabs with Smooth Sliding Pill */}
+        <div className="relative flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 no-scrollbar pt-2.5 sm:pt-2 border-t border-slate-100 dark:border-[#2D283E]">
           {[
             { id: 'ALL', label: 'All' },
             { id: 'RESULTS', label: 'Results' },
             { id: 'CONFERENCE CALL', label: 'Concalls' },
             { id: 'HIGH PRIORITY', label: 'Priority' },
             { id: 'AI_SYNTHESIZED', label: '✨ AI Ready' }
-          ].map(chip => (
-            <button
-              key={chip.id}
-              type="button"
-              onClick={() => setFilterType(chip.id as any)}
-              className={cn(
-                "min-h-[28px] px-2.5 sm:px-3 rounded-lg text-xs font-semibold shrink-0 transition-all border flex items-center gap-1.5 cursor-pointer select-none",
-                filterType === chip.id
-                  ? chip.id === 'AI_SYNTHESIZED'
-                    ? "bg-purple-600 text-white border-purple-600 shadow-xs"
-                    : "bg-slate-900 text-white dark:bg-white dark:text-slate-900 border-slate-900 shadow-xs"
-                  : chip.id === 'AI_SYNTHESIZED'
-                  ? "bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800/80 hover:bg-purple-100 dark:hover:bg-purple-900/40"
-                  : "bg-slate-50 dark:bg-[#15141E] text-slate-700 dark:text-slate-300 border-slate-200/80 dark:border-[#2D283E] hover:bg-slate-100 dark:hover:bg-[#201E2E]"
-              )}
-            >
-              <span>{chip.label}</span>
-            </button>
-          ))}
+          ].map(chip => {
+            const isChipActive = filterType === chip.id;
+            return (
+              <motion.button
+                key={chip.id}
+                type="button"
+                whileTap={{ scale: 0.94 }}
+                transition={springBouncy}
+                onClick={() => setFilterType(chip.id as any)}
+                className={cn(
+                  "relative min-h-[28px] px-2.5 sm:px-3 rounded-lg text-xs font-semibold shrink-0 transition-colors flex items-center gap-1.5 cursor-pointer select-none z-10",
+                  isChipActive
+                    ? chip.id === 'AI_SYNTHESIZED'
+                      ? "text-white font-bold"
+                      : "text-white dark:text-slate-900 font-bold"
+                    : chip.id === 'AI_SYNTHESIZED'
+                    ? "text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/40"
+                    : "text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
+                )}
+              >
+                {/* Smooth Animated Active Pill */}
+                {isChipActive && (
+                  <motion.div
+                    layoutId="announcementsCategoryPill"
+                    transition={springSmoothPill}
+                    className={cn(
+                      "absolute inset-0 rounded-lg -z-10 shadow-xs",
+                      chip.id === 'AI_SYNTHESIZED'
+                        ? "bg-purple-600 border border-purple-500 shadow-purple-500/20"
+                        : "bg-slate-900 dark:bg-white border border-slate-900 dark:border-white"
+                    )}
+                  />
+                )}
+                <span>{chip.label}</span>
+              </motion.button>
+            );
+          })}
         </div>
       </div>
 
@@ -1328,13 +1430,23 @@ export function Announcements({
                     <RefreshCw size={13} className={effectiveIsRunning ? "text-emerald-500 animate-spin" : "text-slate-400"} />
                     <span>BSE Live Engine & Pro Sync</span>
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => fetchData(true)}
-                    className="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 hover:bg-slate-200 dark:bg-[#252233] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#38324E] cursor-pointer"
+                  <ActionButton
+                    onClick={async () => {
+                      setIsSyncingNow(true);
+                      try {
+                        await fetchData(true);
+                      } finally {
+                        setIsSyncingNow(false);
+                      }
+                    }}
+                    isLoading={isSyncingNow}
+                    loadingText="Syncing..."
+                    variant="secondary"
+                    size="sm"
+                    className="text-xs font-bold"
                   >
                     Sync Now
-                  </button>
+                  </ActionButton>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
                   <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-[#14131E] border border-slate-200/60 dark:border-[#2D283E]">
@@ -1402,6 +1514,7 @@ export function Announcements({
               isPulling={isPulling}
               isRefreshing={isPullRefreshing}
               progress={pullProgress}
+              label="BSE Filings"
             />
 
             {/* Creative Feature 1: "Since you last checked" Divider Header (if new items present) */}
@@ -1409,7 +1522,7 @@ export function Announcements({
               <div className="p-2 bg-amber-500/10 dark:bg-amber-950/40 border-b border-amber-300 dark:border-amber-800/80 px-3.5 flex items-center justify-between text-[11px] font-bold text-amber-800 dark:text-amber-200 animate-in fade-in duration-200">
                 <div className="flex items-center gap-1.5">
                   <Sparkles size={12} className="text-amber-500 fill-amber-500" />
-                  <span>{newSinceLastCheckedCount} new filing{newSinceLastCheckedCount > 1 ? 's' : ''} since your last session</span>
+                  <span><RollingNumber value={newSinceLastCheckedCount} /> new filing{newSinceLastCheckedCount > 1 ? 's' : ''} since your last session</span>
                 </div>
                 <button
                   type="button"
@@ -1422,27 +1535,30 @@ export function Announcements({
             )}
 
             {isLoading && announcements.length === 0 ? (
-              /* Shimmer Zero-Layout-Shift Skeleton Placeholder */
+              /* Semantic Zero-Layout-Shift Skeleton with Real Text & Structure */
               <div className={viewMode === 'grid' ? "grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-2.5" : "divide-y divide-slate-100 dark:divide-[#242033]"}>
-                {[1, 2, 3, 4, 5, 6].map(sk => (
+                {[
+                  { name: "RELIANCE INDUSTRIES LTD.", scrip: "500325", sub: "Financial Results For The Quarter And Year Ended March 31 - SEBI LODR Reg 33" },
+                  { name: "TATA CONSULTANCY SERVICES LTD.", scrip: "532540", sub: "Outcome of Board Meeting - Audited Results & Final Dividend Declaration" },
+                  { name: "LARSEN & TOUBRO LTD.", scrip: "500510", sub: "Heavy Civil Infrastructure Secures Major Order under Regulation 30" },
+                  { name: "INFOSYS LTD.", scrip: "500209", sub: "Schedule of Earnings Conference Call for Institutional Investors" },
+                  { name: "HDFC BANK LTD.", scrip: "500180", sub: "SEBI LODR Regulation 30 Corporate Intimation & Strategic Expansion" },
+                  { name: "BHARTI AIRTEL LTD.", scrip: "532454", sub: "Board Meeting Intimation to Consider Financial Results & Dividend" }
+                ].map((sk, idx) => (
                   <div 
-                    key={`feed-skeleton-${sk}`}
+                    key={`feed-skeleton-${idx}`}
                     className={cn(
-                      "p-3.5 space-y-2.5 animate-pulse",
+                      "p-3.5 space-y-2.5",
                       viewMode === 'grid' 
                         ? "rounded-xl border border-slate-200/80 dark:border-[#2D283E] bg-white dark:bg-[#181624]" 
                         : "bg-white dark:bg-[#181624] px-4 py-3.5"
                     )}
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <div className="h-4 bg-slate-200 dark:bg-[#2D283E] rounded w-36" />
-                      <div className="h-3 bg-slate-200 dark:bg-[#2D283E] rounded w-16" />
+                      <div className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white truncate">{sk.name}</div>
+                      <div className="text-[10px] font-mono text-slate-500 font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-[#201E2E]">BSE: {sk.scrip}</div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="h-3.5 bg-slate-200 dark:bg-[#2D283E] rounded w-24" />
-                      <div className="h-3.5 bg-slate-200 dark:bg-[#2D283E] rounded-full w-14" />
-                    </div>
-                    <div className="h-3 bg-slate-200 dark:bg-[#2D283E] rounded w-4/5" />
+                    <div className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2">{sk.sub}</div>
                   </div>
                 ))}
               </div>
@@ -1480,6 +1596,7 @@ export function Announcements({
 
                 return (
                   <motion.div
+                    id={`filing-${item.id || item.newsId}`}
                     key={item.id || item.newsId || `cluster-${cIdx}`}
                     variants={itemFadeUpVariants}
                     transition={springSnappy}
@@ -1527,31 +1644,31 @@ export function Announcements({
                           {cleanSub.humanTitle || 'Corporate announcement'}
                         </span>
                         {isHigh && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0 bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900/60 flex items-center gap-1 whitespace-nowrap select-none">
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0 bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900/60 flex items-center gap-1 whitespace-nowrap select-none">
                             <Zap size={10} className="fill-rose-500 text-rose-500" />
                             <span>High impact</span>
                           </span>
                         )}
                         {isResults && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/80 flex items-center gap-1 whitespace-nowrap select-none">
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/80 flex items-center gap-1 whitespace-nowrap select-none">
                             <TrendingUp size={10} className="text-emerald-500" />
                             <span>Results</span>
                           </span>
                         )}
                         {isConcall && !isResults && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/80 flex items-center gap-1 whitespace-nowrap select-none">
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/80 flex items-center gap-1 whitespace-nowrap select-none">
                             <Building2 size={10} className="text-sky-500" />
                             <span>Concall</span>
                           </span>
                         )}
                         {cluster.isCluster && (
-                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/80 flex items-center gap-1 whitespace-nowrap select-none">
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/80 flex items-center gap-1 whitespace-nowrap select-none">
                             <Layers size={10} className="text-amber-500" />
                             <span>{cluster.count} Batch</span>
                           </span>
                         )}
-                        {item.aiSummary && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 flex items-center gap-1 whitespace-nowrap select-none">
+                        {item.aiSummary && !isHigh && !isResults && (
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 flex items-center gap-1 whitespace-nowrap select-none">
                             <Sparkles size={10} className="text-purple-500 fill-purple-500" />
                             <span>AI Ready</span>
                           </span>
@@ -1573,8 +1690,20 @@ export function Announcements({
                       ) : (
                         <span>Tap for AI digest & PDF</span>
                       )}
-                      <div className="p-1 rounded bg-slate-100 dark:bg-[#201E2E] border border-slate-200/50 dark:border-[#2D283E]">
-                        <ChevronRight size={11} className="group-hover:translate-x-0.5 transition-transform text-slate-500 dark:text-slate-400" />
+                      <div className="flex items-center gap-1.5">
+                        <ShareActionMenu
+                          title={`${item.companyName} (${item.scrip_cd ? `BSE: ${item.scrip_cd}` : 'BSE'})`}
+                          headline={cleanSub.headline || item.subject}
+                          companyName={item.companyName}
+                          scripCode={item.scrip_cd}
+                          newsId={item.id || item.newsId}
+                          category={item.category}
+                          pdfUrl={item.pdfLink || item.ATTACHMENTNAME || item.attachmentName}
+                          size="xs"
+                        />
+                        <div className="p-1 rounded bg-slate-100 dark:bg-[#201E2E] border border-slate-200/50 dark:border-[#2D283E]">
+                          <ChevronRight size={11} className="group-hover:translate-x-0.5 transition-transform text-slate-500 dark:text-slate-400" />
+                        </div>
                       </div>
                     </div>
                   </motion.div>
@@ -1592,6 +1721,7 @@ export function Announcements({
 
                 return (
                   <motion.div
+                    id={`filing-${cluster.id || item.id || `cluster-${cIdx}`}`}
                     key={cluster.id || `cluster-${cIdx}`}
                     variants={itemFadeUpVariants}
                     transition={springSnappy}
@@ -1634,18 +1764,18 @@ export function Announcements({
                           <span className="text-xs sm:text-[13px] font-bold text-slate-900 dark:text-slate-100">
                             {cleanSub.humanTitle || 'Corporate announcement'}
                           </span>
-                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-[#252233] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#38324E] flex items-center gap-1">
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-[#252233] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#38324E] flex items-center gap-1 whitespace-nowrap select-none">
                             <Layers size={10} className="text-slate-400" />
                             <span>{cluster.count} Filings ({cluster.timeSpanLabel})</span>
                           </span>
                           {isHigh && (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0 bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900/60 flex items-center gap-1">
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0 bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900/60 flex items-center gap-1 whitespace-nowrap select-none">
                               <Zap size={10} className="fill-rose-500 text-rose-500" />
                               <span>High impact</span>
                             </span>
                           )}
                           {isResults && (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/80 flex items-center gap-1">
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/80 flex items-center gap-1 whitespace-nowrap select-none">
                               <TrendingUp size={10} className="text-emerald-500" />
                               <span>Results</span>
                             </span>
@@ -1678,6 +1808,7 @@ export function Announcements({
 
               return (
                 <motion.div 
+                  id={`filing-${item.id || item.newsId}`}
                   key={item.id || item.newsId}
                   variants={itemFadeUpVariants}
                   transition={springSnappy}
@@ -1720,25 +1851,25 @@ export function Announcements({
                           {cleanSub.humanTitle || 'Corporate announcement'}
                         </span>
                         {isHigh && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0 bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900/60 flex items-center gap-1">
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0 bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900/60 flex items-center gap-1 whitespace-nowrap select-none">
                             <Zap size={10} className="fill-rose-500 text-rose-500" />
                             <span>High impact</span>
                           </span>
                         )}
                         {isResults && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/80 flex items-center gap-1">
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/80 flex items-center gap-1 whitespace-nowrap select-none">
                             <TrendingUp size={10} className="text-emerald-500" />
                             <span>Results</span>
                           </span>
                         )}
                         {isConcall && !isResults && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/80 flex items-center gap-1">
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/80 flex items-center gap-1 whitespace-nowrap select-none">
                             <Building2 size={10} className="text-sky-500" />
                             <span>Concall</span>
                           </span>
                         )}
-                        {item.aiSummary && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 flex items-center gap-1 shrink-0">
+                        {item.aiSummary && !isHigh && !isResults && (
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 flex items-center gap-1 shrink-0 whitespace-nowrap select-none">
                             <Sparkles size={10} className="text-purple-500 fill-purple-500" />
                             <span>AI Ready</span>
                           </span>
@@ -1754,8 +1885,20 @@ export function Announcements({
                       </p>
                     </div>
 
-                    <div className="p-1 rounded bg-slate-100 dark:bg-[#201E2E] border border-slate-200/50 dark:border-[#2D283E] shrink-0 mt-0.5">
-                      <ChevronRight size={12} className={cn("transition-transform", isSelected ? "text-slate-900 dark:text-white translate-x-0.5" : "text-slate-400 group-hover:text-slate-600 group-hover:translate-x-0.5")} />
+                    <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+                      <ShareActionMenu
+                        title={`${item.companyName} (${item.scrip_cd ? `BSE: ${item.scrip_cd}` : 'BSE'})`}
+                        headline={cleanSub.headline || item.subject}
+                        companyName={item.companyName}
+                        scripCode={item.scrip_cd}
+                        newsId={item.id || item.newsId}
+                        category={item.category}
+                        pdfUrl={item.pdfLink || item.ATTACHMENTNAME || item.attachmentName}
+                        size="xs"
+                      />
+                      <div className="p-1 rounded bg-slate-100 dark:bg-[#201E2E] border border-slate-200/50 dark:border-[#2D283E]">
+                        <ChevronRight size={12} className={cn("transition-transform", isSelected ? "text-slate-900 dark:text-white translate-x-0.5" : "text-slate-400 group-hover:text-slate-600 group-hover:translate-x-0.5")} />
+                      </div>
                     </div>
                   </div>
                 </motion.div>
@@ -1764,33 +1907,35 @@ export function Announcements({
             </motion.div>
             )}
 
-            {/* Creative Feature 10: Rich Empty State with Actionable Guidance */}
+            {/* Creative Feature 10: Rich Empty State with Actionable Guidance (Left-Aligned Anchor) */}
             {paginatedItems.length === 0 && (
-              <div className="py-20 px-4 text-center space-y-3">
-                <div className="w-12 h-12 mx-auto rounded-2xl bg-slate-100 dark:bg-[#252233] flex items-center justify-center text-slate-400 border border-slate-200 dark:border-[#352F48]">
-                  <FileText className="w-6 h-6" />
+              <div className="my-8 p-6 sm:p-8 max-w-lg mx-auto bg-white dark:bg-[#161422] border border-slate-200/90 dark:border-[#2C2740] rounded-2xl shadow-xs space-y-4 text-left">
+                <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-[#252233] flex items-center justify-center text-slate-500 dark:text-slate-400 border border-slate-200/80 dark:border-[#352F48]">
+                  <FileText className="w-5 h-5" />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-sm font-bold text-slate-800 dark:text-slate-200">No corporate disclosures match criteria</p>
-                  <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  <p className="text-sm font-bold text-slate-900 dark:text-slate-100">No corporate disclosures match criteria</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                     {isResultDayMode 
                       ? "No earnings results in this batch. Toggle off Result Day mode or check back soon."
                       : "Try switching category filters or clearing the search query."}
                   </p>
                 </div>
                 {(isResultDayMode || mutedTypes.length > 0 || search) && (
-                  <div className="pt-2">
-                    <button
+                  <div className="pt-1">
+                    <motion.button
                       type="button"
+                      whileTap={buttonTap}
+                      transition={springSnappy}
                       onClick={() => {
                         setIsResultDayMode(false);
                         setFilterType('ALL');
                         setSearch('');
                       }}
-                      className="px-3 py-1.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg text-xs font-bold shadow-2xs hover:opacity-90 transition-all cursor-pointer"
+                      className="px-3.5 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl text-xs font-bold shadow-2xs hover:opacity-90 transition-all cursor-pointer select-none"
                     >
                       Reset All Filters
-                    </button>
+                    </motion.button>
                   </div>
                 )}
               </div>
@@ -1820,50 +1965,58 @@ export function Announcements({
                 align="left"
               />
 
-              <button 
+              <motion.button 
                 type="button"
+                whileTap={buttonTap}
+                transition={springSnappy}
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
-                className="px-2.5 py-1 bg-white dark:bg-[#252233] border border-slate-200 dark:border-[#352F48] hover:bg-slate-100 dark:hover:bg-[#2F2B40] disabled:opacity-40 rounded-md text-xs font-bold text-slate-700 dark:text-slate-300 transition-colors cursor-pointer shadow-2xs"
+                className="px-3 py-1.5 bg-white dark:bg-[#252233] border border-slate-200 dark:border-[#352F48] hover:bg-slate-100 dark:hover:bg-[#2F2B40] disabled:opacity-40 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-300 transition-colors cursor-pointer shadow-2xs whitespace-nowrap"
               >
                 Prev
-              </button>
+              </motion.button>
               
               <span className="text-slate-600 dark:text-slate-400 font-semibold font-mono text-center px-1">
                 {currentPage}/{totalPages}
               </span>
 
-              <button 
+              <motion.button 
                 type="button"
+                whileTap={buttonTap}
+                transition={springSnappy}
                 onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                 disabled={currentPage === totalPages}
-                className="px-2.5 py-1 bg-white dark:bg-[#252233] border border-slate-200 dark:border-[#352F48] hover:bg-slate-100 dark:hover:bg-[#2F2B40] disabled:opacity-40 rounded-md text-xs font-bold text-slate-700 dark:text-slate-300 transition-colors cursor-pointer shadow-2xs"
+                className="px-3 py-1.5 bg-white dark:bg-[#252233] border border-slate-200 dark:border-[#352F48] hover:bg-slate-100 dark:hover:bg-[#2F2B40] disabled:opacity-40 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-300 transition-colors cursor-pointer shadow-2xs whitespace-nowrap"
               >
                 Next
-              </button>
+              </motion.button>
             </div>
 
             {/* Mobile Stream Step Controls */}
             <div className="flex sm:hidden items-center gap-1.5">
-              <button 
+              <motion.button 
                 type="button"
+                whileTap={buttonTap}
+                transition={springSnappy}
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
-                className="px-2.5 py-1 bg-white dark:bg-[#252233] border border-slate-200 dark:border-[#352F48] hover:bg-slate-100 dark:hover:bg-[#2F2B40] disabled:opacity-40 rounded-md text-xs font-bold text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+                className="px-3 py-1.5 min-h-[38px] bg-white dark:bg-[#252233] border border-slate-200 dark:border-[#352F48] hover:bg-slate-100 dark:hover:bg-[#2F2B40] disabled:opacity-40 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-300 transition-colors cursor-pointer whitespace-nowrap"
               >
                 Prev
-              </button>
+              </motion.button>
               <span className="text-[11px] font-mono text-slate-600 dark:text-slate-400 font-bold px-1">
                 {currentPage}/{totalPages}
               </span>
-              <button 
+              <motion.button 
                 type="button"
+                whileTap={buttonTap}
+                transition={springSnappy}
                 onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                 disabled={currentPage === totalPages}
-                className="px-2.5 py-1 bg-white dark:bg-[#252233] border border-slate-200 dark:border-[#352F48] hover:bg-slate-100 dark:hover:bg-[#2F2B40] disabled:opacity-40 rounded-md text-xs font-bold text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+                className="px-3 py-1.5 min-h-[38px] bg-white dark:bg-[#252233] border border-slate-200 dark:border-[#352F48] hover:bg-slate-100 dark:hover:bg-[#2F2B40] disabled:opacity-40 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-300 transition-colors cursor-pointer whitespace-nowrap"
               >
                 Next
-              </button>
+              </motion.button>
             </div>
           </div>
         </div>

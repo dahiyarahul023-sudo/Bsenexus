@@ -21,9 +21,11 @@ import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { useVisibilityInterval } from '../hooks/useVisibilityInterval';
 import { PullToRefreshIndicator } from './ui/PullToRefreshIndicator';
+import { ActionButton } from './ui/ActionButton';
 import { clusterAnnouncements, AnnouncementCluster } from '../utils/clusterAnnouncements';
 import { motion, AnimatePresence } from 'framer-motion';
 import { springSnappy, springMorph, containerStaggerVariants, itemFadeUpVariants, buttonTap, cardHover } from '../utils/motionTokens';
+import { ShareActionMenu } from './ui/motion/ShareActionMenu';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -43,6 +45,7 @@ const stockMasterClient: Record<string, { scripCode: string; nameKeywords: strin
   "LT": { scripCode: "500510", nameKeywords: ["LARSEN & TOUBRO", "LARSEN AND TOUBRO", "L&T"] },
   "BAJFINANCE": { scripCode: "500034", nameKeywords: ["BAJAJ FINANCE"] },
   "HCLTECH": { scripCode: "532281", nameKeywords: ["HCL TECHNOLOGIES", "HCL TECH"] },
+  "WIPRO": { scripCode: "507685", nameKeywords: ["WIPRO LIMITED", "WIPRO"] },
   "MARUTI": { scripCode: "532500", nameKeywords: ["MARUTI SUZUKI"] },
   "SUNPHARMA": { scripCode: "524715", nameKeywords: ["SUN PHARMACEUTICAL", "SUN PHARMA"] },
   "ADANIENT": { scripCode: "512599", nameKeywords: ["ADANI ENTERPRISES"] },
@@ -660,10 +663,10 @@ export function WatchlistManager() {
     if (!isProOrAdmin) {
       if (!user || user.isAnonymous) {
         setIsAuthModalOpen(true);
-        alert('🔒 Google Sign-In Required: Sign in with Google to activate your 30-Day Free Pro trial to broadcast to Telegram!');
+        alert('🔒 Google Sign-In Required: Sign in with Google to activate your 1-Week Free Pro trial to broadcast to Telegram!');
       } else {
         setIsProModalOpen(true);
-        alert('🔒 Direct Telegram Broadcasting is a Pro feature.\n\nYour 30-Day Free Pro trial has ended. Upgrade to Pro to dispatch instant alerts to Telegram!');
+        alert('🔒 Direct Telegram Broadcasting is a Pro feature.\n\nYour 1-Week Free Pro trial has ended. Upgrade to Pro (₹499/mo) to dispatch instant alerts to Telegram!');
       }
       return;
     }
@@ -704,13 +707,13 @@ export function WatchlistManager() {
     const isGuestUser = !user || user.isAnonymous;
     if (isGuestUser) {
       setIsAuthModalOpen(true);
-      alert('🔒 Google Sign-In Required: Sign in with Google to get 30 days of Free Pro AI summaries!');
+      alert('🔒 Google Sign-In Required: Sign in with Google to get 1 week (7 days) of Free Pro AI summaries!');
       return;
     }
 
     if (!isProOrAdmin) {
       setIsProModalOpen(true);
-      alert('🔒 30-Day Free Pro trial has ended. Upgrade to Pro for unlimited Gemini AI summaries!');
+      alert('🔒 1-Week Free Pro trial has ended. Upgrade to Pro (₹499/mo) for unlimited Gemini AI summaries!');
       return;
     }
 
@@ -726,7 +729,7 @@ export function WatchlistManager() {
 
       if (response.status === 401 || data?.authRequired) {
         setIsAuthModalOpen(true);
-        alert(data?.error || '🔒 Google Sign-In Required: Sign in to enjoy 30 days of Free Pro AI features.');
+        alert(data?.error || '🔒 Google Sign-In Required: Sign in to enjoy 1 week of Free Pro AI features.');
         return;
       }
 
@@ -754,6 +757,10 @@ export function WatchlistManager() {
   };
 
   const fetchWatchlists = async () => {
+    if (!user && !profile) {
+      setWatchlists([]);
+      return;
+    }
     try {
       const res = await customFetch('/api/watchlists');
       if (res.ok) {
@@ -866,10 +873,10 @@ export function WatchlistManager() {
     if (!isProOrAdmin && watchlists.length >= 1) {
       if (!user && !profile) {
         setIsAuthModalOpen(true);
-        alert('🔒 Creating multiple watchlists is a Pro feature.\n\nPlease Sign In or Upgrade to Pro (₹10/mo)!');
+        alert('🔒 Creating multiple watchlists is a Pro feature.\n\nSign In to activate your 1-Week Free Pro Trial or Upgrade to Pro (₹499/mo)!');
       } else {
         setIsProModalOpen(true);
-        alert('🔒 Free accounts are limited to 1 Watchlist.\n\nUpgrade to Pro (₹10/mo) to create unlimited custom watchlists, priority buckets, and industry sectors!');
+        alert('🔒 Free accounts are limited to 1 Watchlist.\n\nUpgrade to Pro (₹499/mo) to create unlimited custom watchlists, priority buckets, and industry sectors!');
       }
       return;
     }
@@ -950,11 +957,25 @@ export function WatchlistManager() {
   };
 
   const handleToggleList = async (id: string, isActive: boolean) => {
-    await customFetch(`/api/watchlists/${id}/toggle`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ isActive: !isActive })
-    });
-    fetchWatchlists();
+    // Optimistic UI update: flip is_active state instantly
+    const prevWatchlists = watchlists;
+    setWatchlists(prev => prev.map(wl => 
+      String(wl.id) === String(id) 
+        ? { ...wl, is_active: isActive ? 0 : 1 } 
+        : wl
+    ));
+
+    try {
+      const res = await customFetch(`/api/watchlists/${id}/toggle`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: !isActive })
+      });
+      if (!res.ok) {
+        setWatchlists(prevWatchlists);
+      }
+    } catch {
+      setWatchlists(prevWatchlists);
+    }
   };
 
   const handleDirectAddSymbol = async (
@@ -997,6 +1018,43 @@ export function WatchlistManager() {
     setNewCategory('');
     setSearchResults([]);
 
+    // Optimistic UI update: immediately add the stock to local state
+    const prevWatchlists = watchlists;
+    const optimisticItem = {
+      symbol: sym,
+      priority: priorityToUse,
+      category: categoryToUse,
+      scripCode: symbolToScripCache[sym] || undefined
+    };
+
+    setWatchlists(prev => prev.map(wl => {
+      if (String(wl.id) === String(targetList.id)) {
+        const currentItems = wl.items || [];
+        const alreadyHas = currentItems.some((it: any) => parseSymbolItem(it).symbol === sym);
+        if (!alreadyHas) {
+          return {
+            ...wl,
+            items: [optimisticItem, ...currentItems]
+          };
+        }
+      }
+      return wl;
+    }));
+
+    setLastAddedInfo({
+      symbol: sym,
+      companyName: companyName || sym,
+      listName: targetList.name,
+      priority: priorityToUse,
+      timestamp: Date.now()
+    });
+    setHighlightedSymbol(sym);
+
+    // Clear pulse after 4s
+    setTimeout(() => setHighlightedSymbol(prev => prev === sym ? null : prev), 4000);
+    // Clear toast after 5s
+    setTimeout(() => setLastAddedInfo(prev => (prev && Date.now() - prev.timestamp >= 4900) ? null : prev), 5000);
+
     try {
       const res = await customFetch(`/api/watchlists/${targetList.id}/symbols`, {
         method: 'POST',
@@ -1009,6 +1067,7 @@ export function WatchlistManager() {
       });
 
       if (res.status === 402) {
+        setWatchlists(prevWatchlists); // Rollback on quota limit
         const data = await res.json().catch(() => ({}));
         if (data.upgradeRequired) {
           setIsProModalOpen(true);
@@ -1017,23 +1076,7 @@ export function WatchlistManager() {
       }
 
       if (res.ok) {
-        setLastAddedInfo({
-          symbol: sym,
-          companyName: companyName || sym,
-          listName: targetList.name,
-          priority: priorityToUse,
-          timestamp: Date.now()
-        });
-        setHighlightedSymbol(sym);
-
-        // Clear pulse after 4s
-        setTimeout(() => setHighlightedSymbol(prev => prev === sym ? null : prev), 4000);
-        // Clear toast after 5s
-        setTimeout(() => setLastAddedInfo(prev => (prev && Date.now() - prev.timestamp >= 4900) ? null : prev), 5000);
-
-        await fetchWatchlists();
-
-        // Immediately trigger single-stock historical fetch & update announcements in UI
+        // Background sync
         customFetch('/api/watchlists/sync-stock', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1049,9 +1092,12 @@ export function WatchlistManager() {
           }
           fetchAnnouncements();
         }).catch(() => {});
+      } else {
+        setWatchlists(prevWatchlists); // Rollback
       }
     } catch (err: any) {
       console.error("Error adding symbol directly:", err);
+      setWatchlists(prevWatchlists); // Rollback
     } finally {
       isAddingSymbolRef.current = false;
     }
@@ -1123,13 +1169,34 @@ export function WatchlistManager() {
       currentItem.priority === 'HIGH' ? 'MEDIUM' :
       currentItem.priority === 'MEDIUM' ? 'LOW' : 'HIGH';
 
-    // Synchronize across all user watchlists to prevent overlapping priority conflicts
-    await customFetch(`/api/watchlists/symbols/${encodeURIComponent(currentItem.symbol)}/priority-sync`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ priority: nextPriority })
-    });
-    fetchWatchlists();
+    // Optimistic UI Update: immediately update priority across all watchlists for instant feedback
+    const prevWatchlists = watchlists;
+    setWatchlists(prev => prev.map(wl => ({
+      ...wl,
+      items: (wl.items || []).map((it: any) => {
+        const parsed = parseSymbolItem(it);
+        if (parsed.symbol === currentItem.symbol) {
+          return typeof it === 'string' 
+            ? { symbol: parsed.symbol, priority: nextPriority, category: parsed.category }
+            : { ...it, priority: nextPriority };
+        }
+        return it;
+      })
+    })));
+
+    try {
+      // Synchronize across all user watchlists to prevent overlapping priority conflicts
+      const res = await customFetch(`/api/watchlists/symbols/${encodeURIComponent(currentItem.symbol)}/priority-sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priority: nextPriority })
+      });
+      if (!res.ok) {
+        setWatchlists(prevWatchlists); // Rollback on error
+      }
+    } catch {
+      setWatchlists(prevWatchlists); // Rollback on exception
+    }
   };
 
   const handleRemoveSymbol = async (listId: string, symbol: string) => {
@@ -1142,31 +1209,54 @@ export function WatchlistManager() {
     const prevPriority = parsedItem?.priority || 'LOW';
     const prevCategory = parsedItem?.category || '';
 
-    await customFetch(`/api/watchlists/${listId}/symbols/${encodeURIComponent(symbol)}`, { method: 'DELETE' });
-    fetchWatchlists();
+    // Optimistic UI update: immediately remove symbol from local list
+    const prevWatchlists = watchlists;
+    setWatchlists(prev => prev.map(wl => {
+      if (String(wl.id) === String(listId)) {
+        return {
+          ...wl,
+          items: (wl.items || []).filter((it: any) => {
+            const parsed = typeof it === 'string' ? { symbol: it } : it;
+            return parsed.symbol !== symbol;
+          })
+        };
+      }
+      return wl;
+    }));
 
     if (undoTimeoutRef.current) clearTimeout(undoTimeoutRef.current);
     setUndoToast({
       id: `${listId}-${symbol}-${Date.now()}`,
       message: `Removed ${symbol} from watchlist`,
       onUndo: async () => {
+        // Optimistically restore item
+        setWatchlists(prevWatchlists);
+        setUndoToast(null);
         await customFetch(`/api/watchlists/${listId}/symbols`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             symbol, 
-            priority: prevPriority,
+            priority: prevPriority, 
             category: prevCategory 
           })
         });
         fetchWatchlists();
-        setUndoToast(null);
       }
     });
 
     undoTimeoutRef.current = setTimeout(() => {
       setUndoToast(null);
     }, 4000);
+
+    try {
+      const res = await customFetch(`/api/watchlists/${listId}/symbols/${encodeURIComponent(symbol)}`, { method: 'DELETE' });
+      if (!res.ok) {
+        setWatchlists(prevWatchlists); // Rollback on error
+      }
+    } catch {
+      setWatchlists(prevWatchlists); // Rollback on network exception
+    }
   };
 
   // Map of all tracked symbols with their resolved priority & metadata (HIGH > MEDIUM > LOW)
@@ -1808,18 +1898,17 @@ export function WatchlistManager() {
                   ))}
                 </select>
 
-                <motion.button
-                  type="button"
-                  whileTap={buttonTap}
-                  transition={springSnappy}
+                <ActionButton
                   onClick={() => handleSyncWatchlists('quick')}
-                  disabled={isSyncingWatchlists}
-                  className="flex items-center gap-1 px-2.5 min-h-[36px] py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-[#2E2942] dark:hover:bg-[#383350] text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50 cursor-pointer shadow-2xs select-none"
+                  isLoading={isSyncingWatchlists}
+                  loadingText="Syncing..."
+                  variant="primary"
+                  size="sm"
+                  className="min-h-[36px]"
                   title="Instant Quick Refresh"
                 >
-                  <RefreshCw size={11} className={cn(isSyncingWatchlists && "animate-spin")} />
-                  <span>Sync</span>
-                </motion.button>
+                  Sync
+                </ActionButton>
               </div>
             )}
           </div>
@@ -2280,27 +2369,33 @@ export function WatchlistManager() {
 
           {/* Companies List / Grid */}
           {filteredMyCompanies.length === 0 ? (
-            <div className="p-12 text-center text-slate-400 space-y-3 bg-white dark:bg-[#1A1926] border border-slate-200/90 dark:border-[#2D283E] rounded-xl">
-              <Building2 className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600" />
-              <div className="text-base font-bold text-slate-800 dark:text-slate-200">
-                {myCompaniesList.length === 0
-                  ? "No companies in your watchlist yet"
-                  : `No companies match "${companySearch}"`}
+            <div className="my-4 p-6 sm:p-8 text-left text-slate-400 space-y-4 bg-white dark:bg-[#1A1926] border border-slate-200/90 dark:border-[#2D283E] rounded-2xl max-w-lg shadow-xs">
+              <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800/80 flex items-center justify-center text-slate-400 dark:text-slate-500">
+                <Building2 size={20} />
               </div>
-              <p className="text-xs max-w-sm mx-auto text-slate-500 dark:text-slate-400">
-                {myCompaniesList.length === 0
-                  ? "Start by adding companies to track their corporate filings, financial results, and announcements."
-                  : "Try searching with a different ticker symbol or company name."}
-              </p>
+              <div className="space-y-1">
+                <div className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100">
+                  {myCompaniesList.length === 0
+                    ? "No companies in your watchlist yet"
+                    : `No companies match "${companySearch}"`}
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                  {myCompaniesList.length === 0
+                    ? "Start by adding companies to track their corporate filings, financial results, and announcements."
+                    : "Try searching with a different ticker symbol or company name."}
+                </p>
+              </div>
               {myCompaniesList.length === 0 && (
-                <button
-                  type="button"
-                  onClick={() => setIsAddCompanyOpen(true)}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer shadow-sm min-h-[36px] active:scale-[0.96]"
-                >
-                  <Plus size={14} />
-                  <span>Add your first company</span>
-                </button>
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddCompanyOpen(true)}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer shadow-xs min-h-[36px] active:scale-[0.96]"
+                  >
+                    <Plus size={14} />
+                    <span>Add your first company</span>
+                  </button>
+                </div>
               )}
             </div>
           ) : (
@@ -2321,6 +2416,7 @@ export function WatchlistManager() {
 
                 return (
                   <div
+                    id={`stock-card-${c.symbol}`}
                     key={c.symbol}
                     onClick={() => handleOpenIntel(c.scripCode, c.symbol, c.name)}
                     className="group bg-white dark:bg-[#1A1926] border border-slate-200/90 dark:border-[#2D283E] hover:border-slate-400 dark:hover:border-[#3E3854] rounded-xl p-3.5 shadow-2xs hover:shadow-xs transition-all cursor-pointer flex flex-col justify-between gap-3 relative"
@@ -2624,9 +2720,16 @@ export function WatchlistManager() {
                             </div>
 
                             {isSearching ? (
-                              <div className="p-4 text-xs text-slate-400 text-center flex items-center justify-center gap-2">
-                                <RefreshCw size={14} className="animate-spin text-slate-500" />
-                                <span>Searching NSE/BSE database...</span>
+                              <div className="p-2 space-y-1.5 animate-pulse">
+                                {[1, 2, 3].map((sk) => (
+                                  <div key={sk} className="p-2.5 rounded-lg bg-slate-50/70 dark:bg-[#1f1d2b] flex items-center justify-between">
+                                    <div className="space-y-1">
+                                      <div className="h-3.5 w-24 bg-slate-200 dark:bg-slate-700 rounded" />
+                                      <div className="h-2.5 w-40 bg-slate-200/60 dark:bg-slate-800 rounded" />
+                                    </div>
+                                    <div className="h-5 w-12 bg-slate-200/50 dark:bg-slate-800 rounded" />
+                                  </div>
+                                ))}
                               </div>
                             ) : searchResults.length > 0 ? (
                               searchResults.map((res, i) => {
@@ -2805,38 +2908,45 @@ export function WatchlistManager() {
 
                     {/* List Actions Menu */}
                     <div className="relative">
-                      <button
+                      <motion.button
                         type="button"
+                        whileTap={buttonTap}
+                        transition={springSnappy}
                         onClick={() => setOpenMenuForList(openMenuForList === activeListId ? null : activeListId)}
-                        className="p-1.5 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#201E2E] rounded-md border border-slate-200 dark:border-[#2D283E] transition-colors cursor-pointer"
+                        className="p-2 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#201E2E] rounded-lg border border-slate-200 dark:border-[#2D283E] transition-colors cursor-pointer touch-manipulation min-h-[36px] min-w-[36px] flex items-center justify-center"
                         title="List options"
                       >
-                        <MoreVertical size={13} />
-                      </button>
+                        <MoreVertical size={14} />
+                      </motion.button>
 
                       {openMenuForList === activeListId && (
-                        <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-[#1E1C2B] border border-slate-200 dark:border-[#38324E] rounded-xl shadow-lg p-1 z-30 animate-in fade-in duration-100">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setOpenMenuForList(null);
-                              setConfirmModalState({
-                                isOpen: true,
-                                title: `Clear "${list.name}" Watchlist?`,
-                                description: `Are you sure you want to remove all ${currentListParsedItems.length} stocks from "${list.name}"? This action cannot be undone.`,
-                                actionType: 'clear_list',
-                                listId: activeListId,
-                                listName: list.name,
-                                stockCount: currentListParsedItems.length
-                              });
-                            }}
-                            disabled={currentListParsedItems.length === 0}
-                            className="w-full text-left px-2.5 py-1.5 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                          >
-                            <Trash2 size={13} />
-                            <span>Clear List ({currentListParsedItems.length})</span>
-                          </button>
-                        </div>
+                        <>
+                          <div className="fixed inset-0 z-20" onClick={() => setOpenMenuForList(null)} />
+                          <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-[#1E1C2B] border border-slate-200 dark:border-[#38324E] rounded-xl shadow-xl p-1 z-30 animate-in fade-in duration-100">
+                            <motion.button
+                              type="button"
+                              whileTap={{ scale: 0.96 }}
+                              transition={springSnappy}
+                              onClick={() => {
+                                setOpenMenuForList(null);
+                                setConfirmModalState({
+                                  isOpen: true,
+                                  title: `Clear "${list.name}" Watchlist?`,
+                                  description: `Are you sure you want to remove all ${currentListParsedItems.length} stocks from "${list.name}"? This action cannot be undone.`,
+                                  actionType: 'clear_list',
+                                  listId: activeListId,
+                                  listName: list.name,
+                                  stockCount: currentListParsedItems.length
+                                });
+                              }}
+                              disabled={currentListParsedItems.length === 0}
+                              className="w-full text-left px-3 py-2 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation min-h-[38px]"
+                            >
+                              <Trash2 size={13} />
+                              <span>Clear List ({currentListParsedItems.length})</span>
+                            </motion.button>
+                          </div>
+                        </>
                       )}
                     </div>
                   </div>
@@ -2852,6 +2962,7 @@ export function WatchlistManager() {
 
                       return (
                         <div 
+                          id={`watchlist-symbol-${item.symbol}`}
                           key={item.symbol} 
                           className={cn(
                             "flex items-center gap-2 px-2.5 py-1.5 bg-white dark:bg-[#201E2E] border rounded-lg shadow-2xs group transition-all",
@@ -2975,9 +3086,16 @@ export function WatchlistManager() {
                           </div>
 
                           {isSearching ? (
-                            <div className="p-4 text-xs text-slate-400 text-center flex items-center justify-center gap-2">
-                              <RefreshCw size={14} className="animate-spin text-slate-500" />
-                              <span>Searching stock database...</span>
+                            <div className="p-2 space-y-1.5 animate-pulse">
+                              {[1, 2, 3].map((sk) => (
+                                <div key={sk} className="p-2.5 rounded-lg bg-slate-50/70 dark:bg-[#1f1d2b] flex items-center justify-between">
+                                  <div className="space-y-1">
+                                    <div className="h-3.5 w-24 bg-slate-200 dark:bg-slate-700 rounded" />
+                                    <div className="h-2.5 w-40 bg-slate-200/60 dark:bg-slate-800 rounded" />
+                                  </div>
+                                  <div className="h-5 w-12 bg-slate-200/50 dark:bg-slate-800 rounded" />
+                                </div>
+                              ))}
                             </div>
                           ) : searchResults.length > 0 ? (
                             searchResults.map((res, i) => {
@@ -3137,54 +3255,63 @@ export function WatchlistManager() {
 
                   {/* Options Menu */}
                   <div className="relative">
-                    <button
+                    <motion.button
                       type="button"
+                      whileTap={buttonTap}
+                      transition={springSnappy}
                       onClick={() => setOpenMenuForList(openMenuForList === 'ALL' ? null : 'ALL')}
-                      className="px-2.5 py-1 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#201E2E] rounded-md border border-slate-200 dark:border-[#2D283E] transition-colors flex items-center gap-1.5 text-xs font-bold cursor-pointer"
+                      className="px-3 py-1.5 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#201E2E] rounded-lg border border-slate-200 dark:border-[#2D283E] transition-colors flex items-center gap-1.5 text-xs font-bold cursor-pointer touch-manipulation min-h-[36px]"
                       title="Watchlist management options"
                     >
-                      <SlidersHorizontal size={12} />
+                      <SlidersHorizontal size={13} />
                       <span>Options</span>
-                    </button>
+                    </motion.button>
 
                     {openMenuForList === 'ALL' && (
-                      <div className="absolute right-0 mt-1 w-56 bg-white dark:bg-[#1E1C2B] border border-slate-200 dark:border-[#38324E] rounded-xl shadow-lg p-1.5 z-30 animate-in fade-in duration-100 space-y-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setOpenMenuForList(null);
-                            setConfirmModalState({
-                              isOpen: true,
-                              title: "Restore Curated Default Watchlists?",
-                              description: "This will reset all your watchlists to the standard curated Indian equity baskets.",
-                              actionType: 'reset_defaults'
-                            });
-                          }}
-                          className="w-full text-left px-2.5 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#2A263D] rounded-lg transition-colors flex items-center gap-2 cursor-pointer"
-                        >
-                          <RotateCcw size={13} className="text-amber-500" />
-                          <span>Reset to Curated Defaults</span>
-                        </button>
+                      <>
+                        <div className="fixed inset-0 z-20" onClick={() => setOpenMenuForList(null)} />
+                        <div className="absolute right-0 mt-1 w-56 bg-white dark:bg-[#1E1C2B] border border-slate-200 dark:border-[#38324E] rounded-xl shadow-xl p-1.5 z-30 animate-in fade-in duration-100 space-y-1">
+                          <motion.button
+                            type="button"
+                            whileTap={{ scale: 0.96 }}
+                            transition={springSnappy}
+                            onClick={() => {
+                              setOpenMenuForList(null);
+                              setConfirmModalState({
+                                isOpen: true,
+                                title: "Restore Curated Default Watchlists?",
+                                description: "This will reset all your watchlists to the standard curated Indian equity baskets.",
+                                actionType: 'reset_defaults'
+                              });
+                            }}
+                            className="w-full text-left px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#2A263D] rounded-lg transition-colors flex items-center gap-2 cursor-pointer touch-manipulation min-h-[38px]"
+                          >
+                            <RotateCcw size={14} className="text-amber-500" />
+                            <span>Reset to Curated Defaults</span>
+                          </motion.button>
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setOpenMenuForList(null);
-                            setConfirmModalState({
-                              isOpen: true,
-                              title: "Clear ALL Watchlists?",
-                              description: `Are you sure you want to remove all ${allCombinedTrackedItems.length} stocks across all ${watchlists.length} watchlists? This action cannot be undone.`,
-                              actionType: 'clear_all',
-                              stockCount: allCombinedTrackedItems.length
-                            });
-                          }}
-                          disabled={allCombinedTrackedItems.length === 0}
-                          className="w-full text-left px-2.5 py-1.5 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed border-t border-slate-100 dark:border-[#2D283E] pt-1.5"
-                        >
-                          <Trash2 size={13} />
-                          <span>Clear All Watchlists ({allCombinedTrackedItems.length})</span>
-                        </button>
-                      </div>
+                          <motion.button
+                            type="button"
+                            whileTap={{ scale: 0.96 }}
+                            transition={springSnappy}
+                            onClick={() => {
+                              setOpenMenuForList(null);
+                              setConfirmModalState({
+                                isOpen: true,
+                                title: "Clear ALL Watchlists?",
+                                description: `Are you sure you want to remove all ${allCombinedTrackedItems.length} stocks across all ${watchlists.length} watchlists? This action cannot be undone.`,
+                                actionType: 'clear_all',
+                                stockCount: allCombinedTrackedItems.length
+                              });
+                            }}
+                            disabled={allCombinedTrackedItems.length === 0}
+                            className="w-full text-left px-3 py-2 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed border-t border-slate-100 dark:border-[#2D283E] pt-2 touch-manipulation min-h-[38px]"
+                          >
+                            <Trash2 size={14} />
+                            <span>Clear All Watchlists ({allCombinedTrackedItems.length})</span>
+                          </motion.button>
+                        </div>
+                      </>
                     )}
                   </div>
                 </div>
@@ -3280,16 +3407,20 @@ export function WatchlistManager() {
           viewMode === 'list' ? "bg-white dark:bg-[#1A1926] border border-slate-200/90 dark:border-[#2D283E] shadow-xs" : ""
         )}>
           {paginatedWatchlistAnnouncements.length === 0 ? (
-            <div className="p-12 text-center text-slate-400 space-y-2 bg-white dark:bg-[#1A1926] border border-slate-200/90 dark:border-[#2D283E] rounded-xl">
-              <FileText className="w-10 h-10 mx-auto text-slate-300 dark:text-slate-600" />
-              <div className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                {activeSymbols.length === 0 ? "Your Watchlist is Empty" : "No Watchlist Disclosures Found"}
+            <div className="p-6 sm:p-8 text-left text-slate-400 space-y-4 bg-white dark:bg-[#1A1926] border border-slate-200/90 dark:border-[#2D283E] rounded-2xl max-w-lg shadow-xs">
+              <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800/80 flex items-center justify-center text-slate-400 dark:text-slate-500">
+                <FileText size={20} />
               </div>
-              <p className="text-xs max-w-sm mx-auto text-slate-500 dark:text-slate-400">
-                {activeSymbols.length === 0 
-                  ? "You have no companies in your active watchlist. Add stocks above to track their live BSE corporate announcements and disclosures." 
-                  : "No matching filings found for the selected filter or symbols. Click \"Quick Sync\" above to pull historical disclosures from BSE."}
-              </p>
+              <div className="space-y-1">
+                <div className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100">
+                  {activeSymbols.length === 0 ? "Your Watchlist is Empty" : "No Watchlist Disclosures Found"}
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                  {activeSymbols.length === 0 
+                    ? "You have no companies in your active watchlist. Add stocks above to track their live BSE corporate announcements and disclosures." 
+                    : "No matching filings found for the selected filter or symbols. Click \"Quick Sync\" above to pull historical disclosures from BSE."}
+                </p>
+              </div>
             </div>
           ) : (
             <motion.div
@@ -3453,6 +3584,19 @@ export function WatchlistManager() {
                                   </a>
                                 )}
 
+                                <div onClick={e => e.stopPropagation()}>
+                                  <ShareActionMenu
+                                    title={`${item.companyName} (${item.scrip_cd ? `BSE: ${item.scrip_cd}` : 'BSE'})`}
+                                    headline={cleanSub.headline}
+                                    companyName={item.companyName}
+                                    scripCode={item.scrip_cd}
+                                    newsId={item.id || item.newsId}
+                                    category={item.category}
+                                    pdfUrl={item.pdfLink || item.ATTACHMENTNAME || item.attachmentName}
+                                    size="xs"
+                                  />
+                                </div>
+
                                 {item.aiSummary && (
                                   <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-sans font-semibold">
                                     <Sparkles size={11} className="text-amber-500" />
@@ -3549,6 +3693,16 @@ export function WatchlistManager() {
                                               <span>PDF</span>
                                             </a>
                                           )}
+                                          <ShareActionMenu
+                                            title={`${subItem.companyName} (${subItem.scrip_cd ? `BSE: ${subItem.scrip_cd}` : 'BSE'})`}
+                                            headline={subClean.headline}
+                                            companyName={subItem.companyName}
+                                            scripCode={subItem.scrip_cd}
+                                            newsId={subItem.id || subItem.newsId}
+                                            category={subItem.category}
+                                            pdfUrl={subItem.pdfLink || subItem.ATTACHMENTNAME || subItem.attachmentName}
+                                            size="xs"
+                                          />
                                         </div>
                                       </div>
                                     );
@@ -3672,6 +3826,19 @@ export function WatchlistManager() {
                               </a>
                             )}
 
+                            <div onClick={e => e.stopPropagation()}>
+                              <ShareActionMenu
+                                title={`${item.companyName} (${item.scrip_cd ? `BSE: ${item.scrip_cd}` : 'BSE'})`}
+                                headline={singleClean.headline}
+                                companyName={item.companyName}
+                                scripCode={item.scrip_cd}
+                                newsId={item.id || item.newsId}
+                                category={item.category}
+                                pdfUrl={item.pdfLink || item.ATTACHMENTNAME || item.attachmentName}
+                                size="xs"
+                              />
+                            </div>
+
                             {item.aiSummary && (
                               <span className="flex items-center gap-1 text-purple-600 dark:text-purple-400 font-sans font-semibold">
                                 <Sparkles size={11} className="text-amber-500" />
@@ -3792,13 +3959,16 @@ export function WatchlistManager() {
                   </div>
 
                   {!selectedAnnouncement.aiSummary && (
-                    <button
+                    <ActionButton
                       onClick={() => handleGenerateSummary(selectedAnnouncement.id)}
-                      disabled={isGeneratingSummary}
-                      className="px-2.5 py-1 bg-slate-900 dark:bg-[#2A263D] hover:bg-slate-800 dark:hover:bg-[#342F4C] text-white text-[11px] font-bold rounded-md disabled:opacity-50 transition-colors cursor-pointer"
+                      isLoading={isGeneratingSummary}
+                      loadingText="Extracting..."
+                      variant="primary"
+                      size="sm"
+                      icon={<Sparkles size={11} className="text-amber-400" />}
                     >
-                      {isGeneratingSummary ? "Extracting..." : "Generate AI Summary"}
-                    </button>
+                      Generate AI Summary
+                    </ActionButton>
                   )}
                 </div>
 
@@ -3839,16 +4009,26 @@ export function WatchlistManager() {
               ) : <div />}
 
               <div className="flex items-center gap-2">
-                <motion.button
-                  whileTap={buttonTap}
-                  transition={springSnappy}
+                <ShareActionMenu
+                  title={`${selectedAnnouncement.companyName} (${selectedAnnouncement.scrip_cd ? `BSE: ${selectedAnnouncement.scrip_cd}` : 'BSE'})`}
+                  headline={selectedAnnouncement.subject}
+                  companyName={selectedAnnouncement.companyName}
+                  scripCode={selectedAnnouncement.scrip_cd}
+                  newsId={selectedAnnouncement.id || selectedAnnouncement.newsId}
+                  category={selectedAnnouncement.category}
+                  pdfUrl={selectedAnnouncement.pdfLink || selectedAnnouncement.ATTACHMENTNAME || selectedAnnouncement.attachmentName}
+                  size="md"
+                />
+                <ActionButton
                   onClick={() => handleManualSendTelegram(selectedAnnouncement)}
-                  disabled={isSendingTelegram}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 dark:bg-[#2A263D] hover:bg-slate-800 dark:hover:bg-[#342F4C] text-white text-xs font-bold rounded-xl transition-colors disabled:opacity-50 cursor-pointer min-h-[44px]"
+                  isLoading={isSendingTelegram}
+                  loadingText="Sending..."
+                  variant="primary"
+                  size="md"
+                  icon={<Send size={14} className="text-sky-400" />}
                 >
-                  <Send size={15} />
-                  <span>{isSendingTelegram ? "Sending..." : "Dispatch to Telegram"}</span>
-                </motion.button>
+                  Dispatch to Telegram
+                </ActionButton>
               </div>
             </div>
           </div>

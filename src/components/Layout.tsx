@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Activity, Settings, List,
+  Activity, Settings, List, Star,
   CalendarDays, Zap, Sparkles, HelpCircle, Scale,
   User, Bell, ShieldAlert, Building2, BookOpen, ShieldCheck,
   AlertTriangle, X, WifiOff, Newspaper, Home, MoreHorizontal,
@@ -25,18 +25,30 @@ import { useVisibilityInterval } from '../hooks/useVisibilityInterval';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { springSnappy, springMorph, buttonTap, subtleHover } from '../utils/motionTokens';
+import { 
+  springSnappy, 
+  springMorph, 
+  springBouncy,
+  springSmoothPill,
+  tabIconBounceVariants,
+  buttonTap, 
+  subtleHover 
+} from '../utils/motionTokens';
 
 import { UserProfileModal } from './UserProfileModal';
 import { AuthModal } from './AuthModal';
 import { ProUpgradeModal } from './ProUpgradeModal';
+import { SocialIconsRow } from './ui/SocialLinks';
 import { AdminPinModal } from './AdminPinModal';
 import { HelpModal } from './HelpModal';
-import { TermsModal } from './TermsModal';
+import { TermsModal, LegalTabType } from './TermsModal';
+import { SecurityAuditModal } from './SecurityAuditModal';
+import { CookieConsentBanner } from './CookieConsentBanner';
 import { NotificationInbox } from './NotificationInbox';
 import { AlertRulesModal } from './AlertRulesModal';
 import { CompanyIntelligenceModal } from './CompanyIntelligenceModal';
 import { TodayMarketStoryModal } from './TodayMarketStoryModal';
+import { getStorySessionStorageKey, getISTMarketSession } from './story/storyData';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -70,19 +82,39 @@ export function Layout({
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [helpModalOpen, setHelpModalOpen] = useState(false);
   const [termsModalOpen, setTermsModalOpen] = useState(false);
+  const [termsModalTab, setTermsModalTab] = useState<LegalTabType>('terms');
+  const [securityAuditModalOpen, setSecurityAuditModalOpen] = useState(false);
+
+  const handleOpenTermsModal = (tab: LegalTabType = 'terms') => {
+    setTermsModalTab(tab);
+    setTermsModalOpen(true);
+  };
   const [supportModalOpen, setSupportModalOpen] = useState(false);
   const [storyModalOpen, setStoryModalOpen] = useState(false);
   const [hasSeenStory, setHasSeenStory] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
-    const todayKey = `bse_story_viewed_${new Date().toISOString().slice(0, 10)}`;
-    return localStorage.getItem(todayKey) === 'true';
+    const sessionKey = getStorySessionStorageKey();
+    return localStorage.getItem(sessionKey) === 'true';
   });
+
+  // Periodically check if a fresh market story edition has arrived (9:00 AM or 3:00 PM IST)
+  useEffect(() => {
+    const checkFreshStory = () => {
+      const sessionKey = getStorySessionStorageKey();
+      const viewed = localStorage.getItem(sessionKey) === 'true';
+      setHasSeenStory(viewed);
+    };
+
+    checkFreshStory();
+    const interval = setInterval(checkFreshStory, 60000); // check every minute
+    return () => clearInterval(interval);
+  }, []);
 
   const handleStoryViewed = () => {
     setHasSeenStory(true);
     try {
-      const todayKey = `bse_story_viewed_${new Date().toISOString().slice(0, 10)}`;
-      localStorage.setItem(todayKey, 'true');
+      const sessionKey = getStorySessionStorageKey();
+      localStorage.setItem(sessionKey, 'true');
     } catch {
       // Ignore local storage error
     }
@@ -178,6 +210,10 @@ export function Layout({
       setIsMoreSheetOpen(true);
       return;
     }
+    if (tabId === 'companies') {
+      window.location.href = '/companies';
+      return;
+    }
     onTabChange(tabId);
   };
 
@@ -185,8 +221,10 @@ export function Layout({
   useBodyScrollLock(isMoreSheetOpen);
 
   const renderNavIcon = (itemId: string, isActive: boolean) => {
+    let iconElement: React.ReactNode = null;
+
     if (itemId === 'home') {
-      return (
+      iconElement = (
         <Home 
           className={cn(
             "w-4 h-4 sm:w-4.5 sm:h-4.5 transition-colors",
@@ -194,10 +232,8 @@ export function Layout({
           )} 
         />
       );
-    }
-
-    if (itemId === 'dashboard') {
-      return (
+    } else if (itemId === 'dashboard') {
+      iconElement = (
         <Flame 
           className={cn(
             "w-4 h-4 sm:w-4.5 sm:h-4.5 transition-colors",
@@ -205,35 +241,17 @@ export function Layout({
           )} 
         />
       );
-    }
-
-    if (itemId === 'watchlists') {
-      return (
-        <div className="w-4 h-4 sm:w-4.5 sm:h-4.5 flex flex-col justify-center gap-[3px] py-0.5">
-          <span 
-            className={cn(
-              "h-[2px] rounded-full transition-all duration-300",
-              isActive ? "bg-white w-3.5" : "bg-slate-400 group-hover:bg-slate-600 dark:group-hover:bg-slate-300 w-3"
-            )} 
-          />
-          <span 
-            className={cn(
-              "h-[2px] rounded-full transition-all duration-300",
-              isActive ? "bg-white w-4" : "bg-slate-400 group-hover:bg-slate-600 dark:group-hover:bg-slate-300 w-4"
-            )} 
-          />
-          <span 
-            className={cn(
-              "h-[2px] rounded-full transition-all duration-300",
-              isActive ? "bg-white w-2.5" : "bg-slate-400 group-hover:bg-slate-600 dark:group-hover:bg-slate-300 w-2.5"
-            )} 
-          />
-        </div>
+    } else if (itemId === 'watchlists') {
+      iconElement = (
+        <Star 
+          className={cn(
+            "w-4 h-4 sm:w-4.5 sm:h-4.5 transition-colors",
+            isActive ? "fill-amber-400 text-amber-400 drop-shadow-[0_1px_3px_rgba(251,191,36,0.35)]" : "text-slate-400 group-hover:text-amber-400"
+          )} 
+        />
       );
-    }
-
-    if (itemId === 'results-calendar') {
-      return (
+    } else if (itemId === 'results-calendar') {
+      iconElement = (
         <div className="relative flex items-center justify-center">
           <div className={cn(
             "w-4 h-4 sm:w-4.5 sm:h-4.5 rounded-[4px] border flex flex-col overflow-hidden transition-all shadow-2xs",
@@ -254,10 +272,8 @@ export function Layout({
           </div>
         </div>
       );
-    }
-
-    if (itemId === 'news') {
-      return (
+    } else if (itemId === 'news') {
+      iconElement = (
         <Newspaper 
           className={cn(
             "w-4 h-4 sm:w-4.5 sm:h-4.5 transition-colors", 
@@ -265,10 +281,17 @@ export function Layout({
           )} 
         />
       );
-    }
-
-    if (itemId === 'more') {
-      return (
+    } else if (itemId === 'companies') {
+      iconElement = (
+        <Building2 
+          className={cn(
+            "w-4 h-4 sm:w-4.5 sm:h-4.5 transition-colors", 
+            isActive ? "text-emerald-400" : "text-slate-400 group-hover:text-emerald-400"
+          )} 
+        />
+      );
+    } else if (itemId === 'more') {
+      iconElement = (
         <MoreHorizontal 
           className={cn(
             "w-4 h-4 sm:w-4.5 sm:h-4.5 transition-colors", 
@@ -276,10 +299,8 @@ export function Layout({
           )} 
         />
       );
-    }
-
-    if (itemId === 'seo-suite') {
-      return (
+    } else if (itemId === 'seo-suite') {
+      iconElement = (
         <Sparkles 
           className={cn(
             "w-4 h-4 sm:w-4.5 sm:h-4.5 transition-colors", 
@@ -287,9 +308,19 @@ export function Layout({
           )} 
         />
       );
+    } else {
+      iconElement = <Activity className={cn("w-4 h-4 sm:w-4.5 sm:h-4.5", isActive ? "text-white" : "text-slate-400")} />;
     }
 
-    return <Activity className={cn("w-4 h-4 sm:w-4.5 sm:h-4.5", isActive ? "text-white" : "text-slate-400")} />;
+    return (
+      <motion.div
+        variants={tabIconBounceVariants}
+        animate={isActive ? "active" : "idle"}
+        className="flex items-center justify-center shrink-0"
+      >
+        {iconElement}
+      </motion.div>
+    );
   };
 
   interface NavItem {
@@ -303,7 +334,8 @@ export function Layout({
   const navItems: NavItem[] = [
     { id: 'home', label: 'For You', shortLabel: 'For You', icon: Home },
     { id: 'dashboard', label: 'Filings', shortLabel: 'Filings', icon: Flame },
-    { id: 'watchlists', label: 'My Watchlist', shortLabel: 'Watchlist', icon: List },
+    { id: 'companies', label: 'Companies', shortLabel: 'Companies', icon: Building2 },
+    { id: 'watchlists', label: 'My Watchlist', shortLabel: 'Watchlist', icon: Star },
     { id: 'results-calendar', label: 'Earnings Calendar', shortLabel: 'Earnings', icon: CalendarDays },
     { id: 'news', label: 'Market News', shortLabel: 'News', icon: Newspaper },
     { id: 'more', label: 'More', shortLabel: 'More', icon: MoreHorizontal },
@@ -313,7 +345,7 @@ export function Layout({
   const mobileNavItems: NavItem[] = [
     { id: 'home', label: 'For You', shortLabel: 'For You', icon: Home },
     { id: 'dashboard', label: 'Filings', shortLabel: 'Filings', icon: Flame },
-    { id: 'watchlists', label: 'Watchlist', shortLabel: 'Watchlist', icon: List },
+    { id: 'watchlists', label: 'Watchlist', shortLabel: 'Watchlist', icon: Star },
     { id: 'results-calendar', label: 'Earnings', shortLabel: 'Earnings', icon: CalendarDays },
     { id: 'more', label: 'More', shortLabel: 'More', icon: MoreHorizontal },
   ];
@@ -514,12 +546,12 @@ export function Layout({
                   whileTap={buttonTap}
                   transition={springSnappy}
                   onClick={() => (!user || user.isAnonymous) ? setIsAuthModalOpen(true) : setIsProModalOpen(true)}
-                  aria-label="30-Day Free Pro with Google Login"
+                  aria-label="1-Week Free Pro with Google Login"
                   className="hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-full bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-[11px] font-bold shadow-xs cursor-pointer shrink-0 min-h-[32px]"
-                  title="Sign in with Google to get 30 Days Free Pro Trial"
+                  title="Sign in with Google to get 1 Week (7 Days) Free Pro Trial"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>30D Free Pro</span>
+                  <span>7D Free Pro</span>
                 </motion.button>
               )}
 
@@ -586,7 +618,7 @@ export function Layout({
                   {isActive && (
                     <motion.div
                       layoutId="activeNavTabPill"
-                      transition={springSnappy}
+                      transition={springSmoothPill}
                       className="absolute inset-0 bg-slate-900 dark:bg-[#262335] rounded-lg shadow-xs border border-slate-900/10 dark:border-[#3C3652] -z-10"
                     />
                   )}
@@ -744,22 +776,26 @@ export function Layout({
             return (
               <motion.button
                 key={item.id}
-                whileTap={{ scale: 0.95 }}
-                transition={springSnappy}
+                whileTap={{ scale: 0.88 }}
+                transition={springBouncy}
                 onClick={() => handleTabClick(item.id)}
                 aria-label={item.label}
                 aria-current={isActive ? 'page' : undefined}
                 className={cn(
-                  "relative flex flex-col items-center justify-center flex-1 min-h-[48px] py-1.5 px-0.5 rounded-xl cursor-pointer select-none touch-manipulation",
+                  "relative flex flex-col items-center justify-center flex-1 min-h-[48px] py-1 px-0.5 rounded-xl cursor-pointer select-none touch-manipulation",
                   isActive
                     ? "text-slate-900 dark:text-white font-bold"
                     : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-medium"
                 )}
               >
-                <div className={cn(
-                  "p-1.5 rounded-lg transition-all relative flex items-center justify-center min-w-[32px] min-h-[32px]",
-                  isActive && "bg-slate-100 dark:bg-[#282438] text-slate-900 dark:text-white ring-1 ring-slate-200 dark:ring-[#3D3754]"
-                )}>
+                <motion.div 
+                  animate={isActive ? { scale: 1.05 } : { scale: 1 }}
+                  transition={springSmoothPill}
+                  className={cn(
+                    "p-1.5 rounded-xl transition-all relative flex items-center justify-center min-w-[34px] min-h-[34px]",
+                    isActive && "bg-slate-100 dark:bg-[#282438] text-slate-900 dark:text-white ring-1 ring-slate-200 dark:ring-[#3D3754]"
+                  )}
+                >
                   {renderNavIcon(item.id, isActive)}
                   {item.id === 'dashboard' && isRunning && (
                     <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
@@ -769,15 +805,15 @@ export function Layout({
                       {item.badge}
                     </span>
                   )}
-                </div>
+                </motion.div>
                 <span className="text-[11px] font-medium tracking-tight mt-0.5 whitespace-nowrap">
                   {item.shortLabel || item.label}
                 </span>
                 {isActive && (
                   <motion.span 
                     layoutId="mobileNavActivePill"
-                    transition={springSnappy}
-                    className="w-4 h-0.5 rounded-full mt-0.5 bg-slate-900 dark:bg-slate-200" 
+                    transition={springSmoothPill}
+                    className="w-5 h-1 rounded-full mt-0.5 bg-slate-900 dark:bg-amber-400 shadow-[0_1px_4px_rgba(251,191,36,0.3)]" 
                   />
                 )}
               </motion.button>
@@ -892,6 +928,31 @@ export function Layout({
                     <div>
                       <div className="text-xs font-bold text-slate-900 dark:text-white">Settings & Preferences</div>
                       <div className="text-[10px] text-slate-400">Telegram, audio & theme</div>
+                    </div>
+                  </div>
+                  <ChevronRight size={14} className="text-slate-400" />
+                </motion.button>
+
+                {/* BSE Listed Companies Directory */}
+                <motion.button
+                  type="button"
+                  whileTap={buttonTap}
+                  transition={springSnappy}
+                  onClick={() => {
+                    setIsMoreSheetOpen(false);
+                    if (typeof window !== 'undefined') {
+                      window.location.href = '/companies';
+                    }
+                  }}
+                  className="min-h-[48px] p-3 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-[#201E2E] dark:hover:bg-[#2A263D] border border-slate-200/80 dark:border-[#352F48] flex items-center justify-between text-left cursor-pointer transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                      <Building2 size={16} />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-900 dark:text-white">BSE Listed Companies</div>
+                      <div className="text-[10px] text-slate-400">All 26 top companies, profiles &amp; filings</div>
                     </div>
                   </div>
                   <ChevronRight size={14} className="text-slate-400" />
@@ -1045,7 +1106,7 @@ export function Layout({
                 <button
                   type="button"
                   onClick={() => {
-                    setTermsModalOpen(true);
+                    handleOpenTermsModal('sebi');
                     setIsMoreSheetOpen(false);
                   }}
                   className="hover:text-slate-900 dark:hover:text-white flex items-center gap-1.5 cursor-pointer py-1"
@@ -1071,7 +1132,7 @@ export function Layout({
           onOpenWatchlist={() => onTabChange('watchlists')}
           onOpenAlertRules={() => setAlertRulesModalOpen(true)}
           onOpenHelp={() => setHelpModalOpen(true)}
-          onOpenTerms={() => setTermsModalOpen(true)}
+          onOpenTerms={() => handleOpenTermsModal('terms')}
         />
       )}
       {helpModalOpen && (
@@ -1102,9 +1163,20 @@ export function Layout({
       {termsModalOpen && (
         <TermsModal 
           isOpen={termsModalOpen} 
+          initialTab={termsModalTab}
           onClose={() => setTermsModalOpen(false)}
         />
       )}
+      {securityAuditModalOpen && (
+        <SecurityAuditModal
+          isOpen={securityAuditModalOpen}
+          onClose={() => setSecurityAuditModalOpen(false)}
+        />
+      )}
+      <CookieConsentBanner 
+        onOpenPrivacyPolicy={() => handleOpenTermsModal('privacy')}
+        onOpenCookiePolicy={() => handleOpenTermsModal('cookies')}
+      />
       {notificationInboxOpen && (
         <NotificationInbox
           isOpen={notificationInboxOpen}
@@ -1150,51 +1222,89 @@ export function Layout({
         )}
       </AnimatePresence>
 
-      {/* Modern Compact Footer with Quick Help & Terms */}
-      <footer className="border-t border-slate-200 dark:border-slate-800/80 bg-white dark:bg-[#0F172A] py-4 text-xs text-slate-500 dark:text-slate-400 pb-16 md:pb-4">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+      {/* Modern Compact Footer with Grouped Help & Legal (Clean Instagram Style) */}
+      <footer className="border-t border-slate-200/80 dark:border-slate-800/80 bg-white/90 dark:bg-[#0F172A]/90 backdrop-blur-md py-3 text-xs text-slate-500 dark:text-slate-400 pb-16 md:pb-3">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-[11px]">
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
             <span className="font-semibold text-slate-700 dark:text-slate-300">BSE Nexus Active</span>
-            <span>• Continuous BSE India Disclosure Poller & AI Engine</span>
+            <span className="text-slate-400 dark:text-slate-500 hidden sm:inline">• Live Ingestion (~{bseHealth.latency || 85}ms)</span>
           </div>
 
-          <div className="flex items-center gap-4 text-[11px]">
-            <motion.button
-              whileHover={{ scale: 1.03 }}
-              whileTap={buttonTap}
-              transition={springSnappy}
-              onClick={() => setHelpModalOpen(true)}
-              className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors flex items-center gap-1 cursor-pointer font-medium"
-            >
-              <HelpCircle size={13} />
-              <span>Help & Guides</span>
-            </motion.button>
+          {/* Social Icons row */}
+          <div className="flex items-center justify-center">
+            <SocialIconsRow size={20} />
+          </div>
 
-            <motion.button
-              whileHover={{ scale: 1.03 }}
-              whileTap={buttonTap}
-              transition={springSnappy}
-              onClick={() => setSupportModalOpen(true)}
-              className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors flex items-center gap-1 cursor-pointer font-medium"
+          <div className="flex flex-wrap items-center justify-center md:justify-end gap-2.5 text-[11px]">
+            <a
+              href="/companies"
+              className="hover:text-slate-900 dark:hover:text-white transition-colors flex items-center gap-1 cursor-pointer font-medium"
             >
-              <MessageSquare size={13} />
-              <span>Support</span>
-            </motion.button>
+              <Building2 size={12} className="text-emerald-500" />
+              <span>Companies</span>
+            </a>
 
-            <motion.button
-              whileHover={{ scale: 1.03 }}
-              whileTap={buttonTap}
-              transition={springSnappy}
-              onClick={() => setTermsModalOpen(true)}
-              className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors flex items-center gap-1 cursor-pointer font-medium"
+            <span className="text-slate-300 dark:text-slate-700">&bull;</span>
+
+            <a
+              href="/about"
+              className="hover:text-slate-900 dark:hover:text-white transition-colors font-medium"
             >
-              <Scale size={13} />
-              <span>Terms & SEBI Disclaimer</span>
-            </motion.button>
+              About
+            </a>
 
-            <span className="hidden sm:inline text-slate-300 dark:text-slate-700">|</span>
-            <span className="hidden sm:inline">Latency: ~{bseHealth.latency || 85}ms</span>
+            <span className="text-slate-300 dark:text-slate-700">&bull;</span>
+
+            <a
+              href="/contact"
+              className="hover:text-slate-900 dark:hover:text-white transition-colors font-medium"
+            >
+              Contact
+            </a>
+
+            <span className="text-slate-300 dark:text-slate-700">&bull;</span>
+
+            <a
+              href="/disclaimer"
+              className="hover:text-slate-900 dark:hover:text-white transition-colors font-medium"
+            >
+              Disclaimer
+            </a>
+
+            <span className="text-slate-300 dark:text-slate-700">&bull;</span>
+
+            <a
+              href="/privacy-policy"
+              className="hover:text-slate-900 dark:hover:text-white transition-colors font-medium"
+            >
+              Privacy
+            </a>
+
+            <span className="text-slate-300 dark:text-slate-700">&bull;</span>
+
+            <a
+              href="/terms"
+              className="hover:text-slate-900 dark:hover:text-white transition-colors font-medium"
+            >
+              Terms
+            </a>
+
+            {isAdmin && (
+              <>
+                <span className="text-slate-300 dark:text-slate-700">&bull;</span>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={buttonTap}
+                  transition={springSnappy}
+                  onClick={() => setSecurityAuditModalOpen(true)}
+                  className="hover:text-purple-600 dark:hover:text-purple-400 transition-colors flex items-center gap-1 cursor-pointer font-medium text-purple-600 dark:text-purple-400"
+                >
+                  <ShieldCheck size={12} />
+                  <span>Admin Security</span>
+                </motion.button>
+              </>
+            )}
           </div>
         </div>
       </footer>

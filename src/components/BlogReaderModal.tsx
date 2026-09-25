@@ -20,6 +20,65 @@ interface BlogReaderModalProps {
   onOpenTerminal?: () => void;
 }
 
+const GUIDE_COMPANIES_MAP: Record<string, Array<{ symbol: string; name: string; scripCode: string }>> = {
+  'sebi-lodr-regulation-30': [
+    { symbol: 'RELIANCE', name: 'Reliance Industries Ltd', scripCode: '500325' },
+    { symbol: 'TCS', name: 'Tata Consultancy Services Ltd', scripCode: '532540' },
+    { symbol: 'INFY', name: 'Infosys Ltd', scripCode: '500209' },
+    { symbol: 'HDFCBANK', name: 'HDFC Bank Ltd', scripCode: '500180' },
+    { symbol: 'TATAMOTORS', name: 'Tata Motors Ltd', scripCode: '500570' },
+    { symbol: 'ITC', name: 'ITC Ltd', scripCode: '500875' }
+  ],
+  'board-meeting-results-guide': [
+    { symbol: 'TCS', name: 'Tata Consultancy Services Ltd', scripCode: '532540' },
+    { symbol: 'INFY', name: 'Infosys Ltd', scripCode: '500209' },
+    { symbol: 'RELIANCE', name: 'Reliance Industries Ltd', scripCode: '500325' },
+    { symbol: 'HDFCBANK', name: 'HDFC Bank Ltd', scripCode: '500180' },
+    { symbol: 'SBIN', name: 'State Bank of India', scripCode: '500112' },
+    { symbol: 'ICICIBANK', name: 'ICICI Bank Ltd', scripCode: '532174' }
+  ],
+  'auditor-resignations-red-flags': [
+    { symbol: 'PAYTM', name: 'One97 Communications (Paytm)', scripCode: '543396' },
+    { symbol: 'ZOMATO', name: 'Zomato Ltd', scripCode: '543320' },
+    { symbol: 'YESBANK', name: 'Yes Bank Ltd', scripCode: '532648' },
+    { symbol: 'ADANIENT', name: 'Adani Enterprises Ltd', scripCode: '512599' },
+    { symbol: 'IDEA', name: 'Vodafone Idea Ltd', scripCode: '532822' },
+    { symbol: 'SUZLON', name: 'Suzlon Energy Ltd', scripCode: '532667' }
+  ],
+  'insider-trading-pit-regulations': [
+    { symbol: 'RELIANCE', name: 'Reliance Industries Ltd', scripCode: '500325' },
+    { symbol: 'TCS', name: 'Tata Consultancy Services Ltd', scripCode: '532540' },
+    { symbol: 'BHARTIARTL', name: 'Bharti Airtel Ltd', scripCode: '532454' },
+    { symbol: 'INFY', name: 'Infosys Ltd', scripCode: '500209' },
+    { symbol: 'LT', name: 'Larsen & Toubro Ltd', scripCode: '500510' },
+    { symbol: 'WIPRO', name: 'Wipro Ltd', scripCode: '507685' }
+  ],
+  'cash-flow-forensics-india': [
+    { symbol: 'RELIANCE', name: 'Reliance Industries Ltd', scripCode: '500325' },
+    { symbol: 'ADANIENT', name: 'Adani Enterprises Ltd', scripCode: '512599' },
+    { symbol: 'TATASTEEL', name: 'Tata Steel Ltd', scripCode: '500470' },
+    { symbol: 'VEDL', name: 'Vedanta Ltd', scripCode: '500295' },
+    { symbol: 'JSWSTEEL', name: 'JSW Steel Ltd', scripCode: '500228' },
+    { symbol: 'COALINDIA', name: 'Coal India Ltd', scripCode: '533278' }
+  ],
+  'bse-quarterly-results-calendar-guide': [
+    { symbol: 'RELIANCE', name: 'Reliance Industries Ltd', scripCode: '500325' },
+    { symbol: 'TCS', name: 'Tata Consultancy Services Ltd', scripCode: '532540' },
+    { symbol: 'HDFCBANK', name: 'HDFC Bank Ltd', scripCode: '500180' },
+    { symbol: 'INFY', name: 'Infosys Ltd', scripCode: '500209' },
+    { symbol: 'ICICIBANK', name: 'ICICI Bank Ltd', scripCode: '532174' },
+    { symbol: 'SBIN', name: 'State Bank of India', scripCode: '500112' }
+  ],
+  'bse-shareholding-pattern-explained': [
+    { symbol: 'ADANIENT', name: 'Adani Enterprises Ltd', scripCode: '512599' },
+    { symbol: 'PAYTM', name: 'One97 Communications (Paytm)', scripCode: '543396' },
+    { symbol: 'YESBANK', name: 'Yes Bank Ltd', scripCode: '532648' },
+    { symbol: 'ITC', name: 'ITC Ltd', scripCode: '500875' },
+    { symbol: 'TATAMOTORS', name: 'Tata Motors Ltd', scripCode: '500570' },
+    { symbol: 'BAJFINANCE', name: 'Bajaj Finance Ltd', scripCode: '500034' }
+  ]
+};
+
 export function BlogReaderModal({
   guide,
   isOpen,
@@ -33,7 +92,7 @@ export function BlogReaderModal({
   if (!isOpen || !guide) return null;
 
   const handleShare = () => {
-    navigator.clipboard.writeText(window.location.origin + '#' + (guide.slug || guide.id));
+    navigator.clipboard.writeText(window.location.origin + '/guides/' + (guide.slug || guide.id));
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
   };
@@ -219,6 +278,50 @@ export function BlogReaderModal({
             <span className="font-bold text-slate-900 dark:text-white block mb-1 text-base">Conclusion</span>
             {guide.content.conclusion}
           </div>
+
+          {/* Related Companies */}
+          {(() => {
+            const slug = guide.slug || guide.id;
+            const related = GUIDE_COMPANIES_MAP[slug] || [
+              { symbol: 'RELIANCE', name: 'Reliance Industries Ltd', scripCode: '500325' },
+              { symbol: 'TCS', name: 'Tata Consultancy Services Ltd', scripCode: '532540' },
+              { symbol: 'HDFCBANK', name: 'HDFC Bank Ltd', scripCode: '500180' },
+              { symbol: 'INFY', name: 'Infosys Ltd', scripCode: '500209' },
+              { symbol: 'ITC', name: 'ITC Ltd', scripCode: '500875' },
+              { symbol: 'SBIN', name: 'State Bank of India', scripCode: '500112' }
+            ];
+            return (
+              <div className="border-t border-slate-100 dark:border-slate-800 pt-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-900 dark:text-white text-sm sm:text-base">Related Companies &amp; Live Filings</span>
+                  <span className="text-xs text-slate-400 font-medium">BSE Equity Intelligence</span>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Track real-time corporate announcements, quarterly results, and regulatory disclosures for key market participants:
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 pt-1">
+                  {related.map((company) => (
+                    <a
+                      key={company.symbol}
+                      href={`/company/${company.symbol}`}
+                      className="p-3 bg-slate-50 dark:bg-slate-900/70 hover:bg-white dark:hover:bg-slate-800/90 border border-slate-200/80 dark:border-slate-800 rounded-xl transition-all group flex flex-col justify-between gap-1 shadow-2xs hover:border-emerald-500/50 dark:hover:border-emerald-500/50"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                          {company.symbol}
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-400">BSE: {company.scripCode}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-slate-500">
+                        <span className="truncate max-w-[180px]">{company.name}</span>
+                        <ArrowUpRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-emerald-500 shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Modal Footer Bar with Quick Action */}

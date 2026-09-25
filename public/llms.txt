@@ -17,10 +17,13 @@
 
 ## Key URLs & Resources
 - Main Web Terminal: https://bsenexus.in/
-- Live Announcements Feed: https://bsenexus.in/?tab=announcements
-- Board Meetings & Results Calendar: https://bsenexus.in/?tab=results-calendar
-- User Watchlists & Portfolios: https://bsenexus.in/?tab=watchlists
-- BSE/NSE Market Holidays & Clocks: https://bsenexus.in/?tab=holidays
+- Live Announcements Feed: https://bsenexus.in/announcements
+- Board Meetings & Results Calendar: https://bsenexus.in/results-calendar
+- User Watchlist: https://bsenexus.in/watchlist
+- Listed Companies Directory: https://bsenexus.in/companies
+- Pricing & Free Pro Trial: https://bsenexus.in/pricing
+- Market Guides & Knowledge Base: https://bsenexus.in/guides
+- Live RSS Feed: https://bsenexus.in/rss.xml
 - Complete LLM Specification: https://bsenexus.in/llms-full.txt
 - XML Sitemap: https://bsenexus.in/sitemap.xml
 

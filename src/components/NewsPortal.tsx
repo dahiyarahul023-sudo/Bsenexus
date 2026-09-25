@@ -38,8 +38,12 @@ import { twMerge } from 'tailwind-merge';
 import { springSnappy, containerStaggerVariants, itemFadeUpVariants, buttonTap } from '../utils/motionTokens';
 import { useDeveloperMode } from '../utils/developerMode';
 import { CustomDropdown, DropdownOption } from './ui/CustomDropdown';
+import { NewsFeedSkeleton } from './ui/DesignedSkeletons';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { PullToRefreshIndicator } from './ui/PullToRefreshIndicator';
+import { ActionButton } from './ui/ActionButton';
+import { HonestProgressBar } from './ui/HonestProgressBar';
+import { ShareActionMenu } from './ui/motion/ShareActionMenu';
 import { useVisibilityInterval } from '../hooks/useVisibilityInterval';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { customFetch } from '../api';
@@ -62,10 +66,12 @@ function sanitizeNewsText(text?: string): string {
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
+    .replace(/#39;/g, "'")
     .replace(/&apos;/g, "'")
     .replace(/&nbsp;/g, ' ')
     .replace(/&#x27;/g, "'")
     .replace(/&#x2F;/g, '/')
+    .replace(/''+/g, "'")
     .replace(/<[^>]*>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -165,6 +171,7 @@ const NewsCardItem: React.FC<NewsCardProps> = React.memo(({
 
   return (
     <motion.div 
+      id={`news-${item.id}`}
       variants={itemFadeUpVariants}
       data-news-card="true"
       style={{ touchAction: 'pan-y', pointerEvents: 'auto' }}
@@ -256,9 +263,20 @@ const NewsCardItem: React.FC<NewsCardProps> = React.memo(({
                   </div>
 
                   {isAiLoading ? (
-                    <div className="py-3 flex items-center justify-center gap-2 text-purple-600 dark:text-purple-400 font-medium">
-                      <RefreshCw size={13} className="animate-spin" />
-                      <span>Analyzing financial catalysts with Gemini neural engine...</span>
+                    <div className="py-2 min-h-[110px] space-y-3">
+                      <HonestProgressBar
+                        color="purple"
+                        isRunning={true}
+                        simulatedSteps={[
+                          { label: 'Scanning news headline & corporate disclosures...', durationMs: 1100 },
+                          { label: 'Detecting financial catalyst & sector headwinds...', durationMs: 1600 },
+                          { label: 'Synthesizing concise analyst takeaway...', durationMs: 1400 }
+                        ]}
+                      />
+                      <div className="space-y-1.5 pt-1 animate-pulse">
+                        <div className="h-3 w-4/5 bg-purple-100 dark:bg-purple-950/40 rounded" />
+                        <div className="h-3 w-2/3 bg-purple-100 dark:bg-purple-950/40 rounded" />
+                      </div>
                     </div>
                   ) : (
                     <div className="text-slate-800 dark:text-slate-200 text-xs leading-relaxed font-normal whitespace-pre-line">
@@ -334,6 +352,14 @@ const NewsCardItem: React.FC<NewsCardProps> = React.memo(({
               <span>{isAiExpanded ? 'Hide AI' : 'AI Takeaway'}</span>
             </motion.button>
 
+            {/* 1-Tap Share Action Menu */}
+            <ShareActionMenu
+              title={item.title}
+              headline={item.source ? `Source: ${item.source}` : undefined}
+              url={item.link}
+              size="xs"
+            />
+
             {/* External Source Link */}
             <motion.a
               whileTap={buttonTap}
@@ -358,7 +384,8 @@ export const NewsPortal: React.FC<NewsPortalProps> = ({
   onOpenWatchlists,
   onOpenSettings
 }) => {
-  const { user: authUser, isPro, isAdmin, setIsAuthModalOpen, setIsProModalOpen } = useAuth();
+  const { user: authUser, profile, isPro, isAdmin, setIsAuthModalOpen, setIsProModalOpen } = useAuth();
+  const currentUser = user || authUser;
   const [activeSubTab, setActiveSubTab] = useState<'general' | 'watchlist'>('general');
   const [generalNews, setGeneralNews] = useState<StockNewsItem[]>([]);
   const [watchlistNews, setWatchlistNews] = useState<StockNewsItem[]>([]);
@@ -381,7 +408,7 @@ export const NewsPortal: React.FC<NewsPortalProps> = ({
   // Telegram News Category Preferences Modal State
   const [isTgPrefModalOpen, setIsTgPrefModalOpen] = useState(false);
   const [tgNewsEnabled, setTgNewsEnabled] = useState<boolean>(
-    user?.notificationPreferences?.telegramNewsAlerts !== false
+    Boolean(user?.notificationPreferences?.telegramNewsAlerts === true)
   );
   const [tgSelectedCategories, setTgSelectedCategories] = useState<string[]>(
     user?.notificationPreferences?.telegramNewsCategories || ['all']
@@ -435,6 +462,7 @@ export const NewsPortal: React.FC<NewsPortalProps> = ({
 
   // Fetch preferences on mount
   useEffect(() => {
+    if (!currentUser && !profile) return;
     customFetch('/api/news/telegram/preferences')
       .then(res => res.json())
       .then(data => {
@@ -445,7 +473,7 @@ export const NewsPortal: React.FC<NewsPortalProps> = ({
         }
       })
       .catch(() => {});
-  }, []);
+  }, [currentUser?.uid, profile?.uid]);
 
   // Fetch General Market News
   const fetchGeneralNewsData = useCallback(async (force = false, source = selectedSource) => {
@@ -469,6 +497,11 @@ export const NewsPortal: React.FC<NewsPortalProps> = ({
 
   // Fetch Watchlist News
   const fetchWatchlistNewsData = useCallback(async (source = selectedSource) => {
+    if (!currentUser && !profile) {
+      setWatchlistNews([]);
+      setWatchlistSymbols([]);
+      return;
+    }
     try {
       setIsLoading(true);
       const queryParams = new URLSearchParams();
@@ -485,7 +518,7 @@ export const NewsPortal: React.FC<NewsPortalProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [selectedSource]);
+  }, [selectedSource, currentUser?.uid, profile?.uid]);
 
   // Initial fetch
   useEffect(() => {
@@ -601,14 +634,14 @@ export const NewsPortal: React.FC<NewsPortalProps> = ({
     const isGuestUser = !authUser || authUser.isAnonymous;
     if (isGuestUser) {
       setIsAuthModalOpen(true);
-      setSendError('Google Sign-In Required: Sign in with Google to activate your 30-Day Free Pro trial to broadcast to Telegram!');
+      setSendError('Google Sign-In Required: Sign in with Google to activate your 1-Week Free Pro trial to broadcast to Telegram!');
       setTimeout(() => setSendError(null), 5000);
       return;
     }
 
     if (!isPro && !isAdmin) {
       setIsProModalOpen(true);
-      setSendError('30-Day Free Pro trial has ended. Upgrade to Pro to broadcast to Telegram!');
+      setSendError('1-Week Free Pro trial has ended. Upgrade to Pro (₹499/mo) to broadcast to Telegram!');
       setTimeout(() => setSendError(null), 5000);
       return;
     }
@@ -654,7 +687,7 @@ export const NewsPortal: React.FC<NewsPortalProps> = ({
     const isGuestUser = !authUser || authUser.isAnonymous;
     if (isGuestUser) {
       setIsAuthModalOpen(true);
-      setSendError('Google Sign-In Required: Sign in with Google to get 30 days of Free Pro AI summaries!');
+      setSendError('Google Sign-In Required: Sign in with Google to get 1 week (7 days) of Free Pro AI summaries!');
       setTimeout(() => setSendError(null), 5000);
       return;
     }
@@ -662,7 +695,7 @@ export const NewsPortal: React.FC<NewsPortalProps> = ({
     // 2. Authenticated user without active Pro trial
     if (!isPro && !isAdmin) {
       setIsProModalOpen(true);
-      setSendError('30-Day Free Pro trial has ended. Upgrade to Pro for unlimited AI summaries!');
+      setSendError('1-Week Free Pro trial has ended. Upgrade to Pro (₹499/mo) for unlimited AI summaries!');
       setTimeout(() => setSendError(null), 5000);
       return;
     }
@@ -692,7 +725,7 @@ export const NewsPortal: React.FC<NewsPortalProps> = ({
 
       if (res.status === 401 || data?.authRequired) {
         setIsAuthModalOpen(true);
-        setSendError(data?.error || 'Google Sign-In Required: Sign in to enjoy 30 days of Free Pro AI features.');
+        setSendError(data?.error || 'Google Sign-In Required: Sign in to enjoy 1 week of Free Pro AI features.');
         setTimeout(() => setSendError(null), 5000);
         setExpandedAiIds(prev => ({ ...prev, [item.id]: false }));
         return;
@@ -1215,31 +1248,37 @@ export const NewsPortal: React.FC<NewsPortalProps> = ({
           </div>
         )}
 
-        {/* Loading Spinner for Initial Empty State */}
+        {/* Designed Skeleton for Initial Loading State */}
         {isLoading && filteredNews.length === 0 && (
-          <div className="py-20 text-center space-y-2">
-            <RefreshCw size={22} className="animate-spin mx-auto text-emerald-500" />
-            <p className="text-xs font-medium text-slate-500">Fetching verified financial feeds from ET, LiveMint, Moneycontrol & BS...</p>
+          <div className="p-4 space-y-3">
+            <div className="flex items-center justify-between text-xs text-slate-500 font-mono px-1">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                <span>Streaming verified financial feeds (ET, LiveMint, Moneycontrol)...</span>
+              </span>
+              <span className="text-[11px] text-slate-400">Loading layout...</span>
+            </div>
+            <NewsFeedSkeleton count={5} />
           </div>
         )}
 
-        {/* Empty State */}
+        {/* Empty State - Left aligned with single anchor and strong proximity */}
         {!isLoading && filteredNews.length === 0 && (
-          <div className="py-20 px-4 text-center space-y-3">
-            <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-[#201E2E] flex items-center justify-center mx-auto text-slate-400">
-              <Filter size={20} />
+          <div className="my-8 p-6 sm:p-8 max-w-lg mx-auto bg-white dark:bg-[#161422] border border-slate-200/90 dark:border-[#2C2740] rounded-2xl shadow-xs space-y-4 text-left">
+            <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-[#201E2E] flex items-center justify-center text-slate-500 dark:text-slate-400">
+              <Filter size={18} />
             </div>
             <div className="space-y-1">
-              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
                 No News Found Matching Current Filters
               </h3>
-              <p className="text-xs text-slate-500 max-w-md mx-auto">
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                 {activeSubTab === 'watchlist' && activeTrackedSymbols.length === 0
                   ? "You don't have any active stocks in your watchlist yet."
                   : "Try clearing search keywords, switching publisher source, or changing category."}
               </p>
             </div>
-            <div className="flex items-center justify-center gap-2 pt-2">
+            <div className="pt-1">
               <button
                 type="button"
                 onClick={() => {
@@ -1249,7 +1288,7 @@ export const NewsPortal: React.FC<NewsPortalProps> = ({
                   setSelectedStockFilter('all');
                   setSentimentFilter('all');
                 }}
-                className="px-3 py-1.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg text-xs font-bold transition-all cursor-pointer select-none"
+                className="px-3.5 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl text-xs font-bold transition-all cursor-pointer select-none hover:opacity-90 active:scale-95"
               >
                 Reset All Filters
               </button>
@@ -1501,26 +1540,17 @@ export const NewsPortal: React.FC<NewsPortalProps> = ({
                 >
                   Cancel
                 </button>
-                <button
-                  type="button"
+                <ActionButton
                   onClick={handleSaveTgPreferences}
-                  disabled={isSavingTgPref}
-                  className="px-4 py-2 rounded-xl text-xs font-black bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+                  isLoading={isSavingTgPref}
+                  loadingText="Saving..."
+                  variant="primary"
+                  size="md"
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  icon={tgSaveSuccess ? <Check size={12} className="text-emerald-300" /> : undefined}
                 >
-                  {isSavingTgPref ? (
-                    <>
-                      <RefreshCw size={12} className="animate-spin" />
-                      <span>Saving...</span>
-                    </>
-                  ) : tgSaveSuccess ? (
-                    <>
-                      <Check size={12} className="text-emerald-300" />
-                      <span>Saved!</span>
-                    </>
-                  ) : (
-                    <span>Save Preferences</span>
-                  )}
-                </button>
+                  {tgSaveSuccess ? 'Saved!' : 'Save Preferences'}
+                </ActionButton>
               </div>
             </motion.div>
           </div>

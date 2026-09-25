@@ -16,6 +16,9 @@ import {
   FileText
 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { HonestProgressBar } from './ui/HonestProgressBar';
+import { AiSummarySkeleton } from './ui/DesignedSkeletons';
+import { ActionButton } from './ui/ActionButton';
 
 interface AiSummaryViewerProps {
   summaryText: string;
@@ -209,23 +212,38 @@ export const AiSummaryViewer: React.FC<AiSummaryViewerProps> = ({
           </button>
 
           {onRegenerate && (
-            <button
+            <ActionButton
               type="button"
               onClick={onRegenerate}
-              disabled={isGenerating}
+              isLoading={isGenerating}
+              loadingText=""
+              variant="secondary"
+              size="sm"
               aria-label="Regenerate with Gemini"
               title="Regenerate with Gemini"
-              className="p-1.5 rounded-md bg-slate-100 dark:bg-[#252233] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#352F48] hover:text-slate-900 dark:hover:text-white text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer disabled:opacity-50"
-            >
-              <RotateCw size={13} className={isGenerating ? "animate-spin text-purple-500" : ""} />
-            </button>
+              icon={<RotateCw size={13} />}
+            />
           )}
         </div>
       </div>
 
-      {/* Main Content Area */}
-      {isStructuredResults ? (
-        <div className="space-y-3">
+      {/* Main Content Area with reserved space to prevent layout shift */}
+      {isGenerating ? (
+        <div className="space-y-3 min-h-[260px] animate-in fade-in duration-200">
+          <HonestProgressBar
+            color="purple"
+            isRunning={true}
+            simulatedSteps={[
+              { label: 'Reading official BSE filing & attachment...', durationMs: 1200 },
+              { label: 'Extracting key operational & PAT metrics...', durationMs: 2200 },
+              { label: 'Synthesizing executive analyst takeaway...', durationMs: 2500 },
+              { label: 'Structuring YoY & QoQ growth cards...', durationMs: 1200 }
+            ]}
+          />
+          <AiSummarySkeleton />
+        </div>
+      ) : isStructuredResults ? (
+        <div className="space-y-3 min-h-[160px]">
           {/* Executive AI Summary Callout */}
           {sections.summary.length > 0 && (
             <div className="p-3 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200/80 dark:border-purple-900/50">

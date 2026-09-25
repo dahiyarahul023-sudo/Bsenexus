@@ -612,6 +612,67 @@ export async function removeSymbolFromWatchlist(
   });
 }
 
+export async function removeSymbolsFromWatchlistBatch(
+  watchlistId: string, 
+  symbols: string[], 
+  userId?: string
+): Promise<void> {
+  const uid = sanitizeUserId(userId);
+  return withUidLock(uid, async () => {
+    if (!Array.isArray(symbols) || symbols.length === 0) return;
+    const current = await getAllWatchlists(uid);
+    const symSet = new Set(symbols.map(s => String(s).trim().toUpperCase()).filter(Boolean));
+    const targetList = current.find(l => String(l.id) === String(watchlistId));
+
+    if (targetList && Array.isArray(targetList.items)) {
+      targetList.items = targetList.items.filter((s: any) => !symSet.has(extractSymbol(s)));
+      await persistUserWatchlists(uid, current);
+    }
+  });
+}
+
+export async function updateSymbolsPriorityBatch(
+  watchlistId: string,
+  updates: { symbol: string; priority: 'HIGH' | 'MEDIUM' | 'LOW'; category?: string }[],
+  userId?: string
+): Promise<void> {
+  const uid = sanitizeUserId(userId);
+  return withUidLock(uid, async () => {
+    if (!Array.isArray(updates) || updates.length === 0) return;
+    const current = await getAllWatchlists(uid);
+    const targetList = current.find(l => String(l.id) === String(watchlistId));
+
+    if (targetList && Array.isArray(targetList.items)) {
+      const updateMap = new Map<string, { priority: 'HIGH' | 'MEDIUM' | 'LOW'; category?: string }>();
+      for (const u of updates) {
+        if (u && u.symbol) {
+          updateMap.set(u.symbol.trim().toUpperCase(), u);
+        }
+      }
+
+      let modified = false;
+      for (let i = 0; i < targetList.items.length; i++) {
+        const it = targetList.items[i];
+        const sym = extractSymbol(it);
+        const match = updateMap.get(sym);
+        if (match) {
+          targetList.items[i] = {
+            ...it,
+            symbol: sym,
+            priority: match.priority,
+            category: match.category !== undefined ? match.category : extractCategory(it)
+          };
+          modified = true;
+        }
+      }
+
+      if (modified) {
+        await persistUserWatchlists(uid, current);
+      }
+    }
+  });
+}
+
 export async function renameWatchlist(id: string, newName: string, userId?: string): Promise<void> {
   const uid = sanitizeUserId(userId);
   return withUidLock(uid, async () => {

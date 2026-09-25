@@ -7,6 +7,7 @@ import {
 import { customFetch } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+import { ActionButton } from './ui/ActionButton';
 
 interface HelpModalProps {
   isOpen: boolean;
@@ -57,7 +58,7 @@ export function HelpModal({ isOpen, onClose, onOpenSettings }: HelpModalProps) {
       setChatMessages(prev => [
         ...prev,
         { role: 'user', text: q },
-        { role: 'model', text: '🔒 **Google Sign-In Required**: Guest users have view-only access. Sign in with Google to get **30 days of Free Pro** access including the AI Assistant!' }
+        { role: 'model', text: '🔒 **Google Sign-In Required**: Guest users have view-only access. Sign in with Google to get **1 week (7 days) of Free Pro** access including the AI Assistant!' }
       ]);
       setInputQuestion('');
       setIsAuthModalOpen(true);
@@ -69,7 +70,7 @@ export function HelpModal({ isOpen, onClose, onOpenSettings }: HelpModalProps) {
       setChatMessages(prev => [
         ...prev,
         { role: 'user', text: q },
-        { role: 'model', text: '🔒 **Pro Upgrade Required**: Your 30-Day Free Pro trial has ended. Please upgrade to Pro to continue asking the AI Assistant.' }
+        { role: 'model', text: '🔒 **Pro Upgrade Required**: Your 1-Week Free Pro trial has ended. Please upgrade to Pro (₹499/mo) to continue asking the AI Assistant.' }
       ]);
       setInputQuestion('');
       setIsProModalOpen(true);
@@ -100,7 +101,7 @@ export function HelpModal({ isOpen, onClose, onOpenSettings }: HelpModalProps) {
       }
       if (res.status === 403 || data?.proRequired) {
         setIsProModalOpen(true);
-        setChatMessages([...nextHistory, { role: 'model', text: data.error || '🔒 Your 30-Day Free Pro trial has ended. Please upgrade to Pro.' }]);
+        setChatMessages([...nextHistory, { role: 'model', text: data.error || '🔒 Your 1-Week Free Pro trial has ended. Please upgrade to Pro (₹499/mo).' }]);
         return;
       }
       if (data.success && data.answer) {
@@ -273,13 +274,17 @@ export function HelpModal({ isOpen, onClose, onOpenSettings }: HelpModalProps) {
                 })}
 
                 {isAskingAi && (
-                  <div className="flex gap-2.5 justify-start">
-                    <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0 mt-0.5">
-                      <Bot size={14} className="animate-spin" />
+                  <div className="flex gap-2.5 justify-start items-start">
+                    <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                      <Bot size={14} className="animate-pulse" />
                     </div>
-                    <div className="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700 rounded-2xl p-3.5 text-xs text-slate-500 flex items-center gap-2 shadow-2xs">
-                      <RefreshCw size={13} className="animate-spin text-indigo-500" />
-                      <span>BSE Nexus AI is thinking...</span>
+                    <div className="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700 rounded-2xl px-4 py-3 text-xs text-slate-600 dark:text-slate-300 flex items-center gap-3 shadow-2xs">
+                      <div className="flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce [animation-delay:-0.3s]" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce [animation-delay:-0.15s]" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" />
+                      </div>
+                      <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Synthesizing answer with BSE documentation...</span>
                     </div>
                   </div>
                 )}
@@ -299,14 +304,18 @@ export function HelpModal({ isOpen, onClose, onOpenSettings }: HelpModalProps) {
                   disabled={isAskingAi}
                   className="flex-1 px-3.5 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 text-slate-900 dark:text-white"
                 />
-                <button
+                <ActionButton
                   type="submit"
-                  disabled={isAskingAi || !inputQuestion.trim()}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
+                  isLoading={isAskingAi}
+                  loadingText="Thinking..."
+                  variant="primary"
+                  size="md"
+                  disabled={!inputQuestion.trim()}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white shrink-0"
+                  icon={<Send size={13} />}
                 >
-                  <Send size={13} />
-                  <span>Ask AI</span>
-                </button>
+                  Ask AI
+                </ActionButton>
               </form>
             </div>
           )}
@@ -387,7 +396,7 @@ export function HelpModal({ isOpen, onClose, onOpenSettings }: HelpModalProps) {
                   <div className="space-y-1">
                     <h5 className="font-bold text-slate-900 dark:text-white">Get your Chat ID from Telegram</h5>
                     <p className="text-[11px] text-slate-500">
-                      Open Telegram on your mobile or desktop, search for the userbot <strong className="text-blue-600 dark:text-blue-400">@userinfobot</strong> and press <strong>/start</strong>.
+                      Open Telegram on your mobile or desktop, search for the userbot <strong className="text-blue-600 dark:text-blue-400">@userinfobot</strong> and press <strong>/start</strong> to get your Chat ID. Also search for our alert bot <strong className="text-emerald-600 dark:text-emerald-400">@Dahiyastockbot</strong> and tap <strong>Start</strong> so Telegram permits direct delivery.
                     </p>
                     <p className="text-[11px] text-slate-500">
                       It will immediately respond with your numerical ID (e.g. <span className="font-mono bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded text-slate-800 dark:text-slate-200">987654321</span>).
@@ -491,7 +500,7 @@ export function HelpModal({ isOpen, onClose, onOpenSettings }: HelpModalProps) {
         {/* Footer */}
         <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 flex items-center justify-between shrink-0">
           <div className="text-[11px] text-slate-500">
-            Need more help? Email support at <span className="font-semibold text-slate-700 dark:text-slate-300">support@bsenexus.in</span>
+            Need more help? Email support at <a href="mailto:admin@bsenexus.in" className="font-semibold text-slate-700 dark:text-slate-300 underline hover:text-emerald-500 transition-colors">admin@bsenexus.in</a>
           </div>
           <button
             onClick={onClose}

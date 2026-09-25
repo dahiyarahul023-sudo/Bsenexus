@@ -115,6 +115,7 @@ const INITIAL_STOCKS: StockMasterEntry[] = [
   { symbol: "LT", scripCode: "500510", name: "Larsen & Toubro Ltd", nameKeywords: ["LARSEN & TOUBRO", "LARSEN AND TOUBRO", "L&T"] },
   { symbol: "BAJFINANCE", scripCode: "500034", name: "Bajaj Finance Ltd", nameKeywords: ["BAJAJ FINANCE"] },
   { symbol: "HCLTECH", scripCode: "532281", name: "HCL Technologies Ltd", nameKeywords: ["HCL TECHNOLOGIES", "HCL TECH"] },
+  { symbol: "WIPRO", scripCode: "507685", name: "Wipro Ltd", nameKeywords: ["WIPRO LIMITED", "WIPRO"] },
   { symbol: "MARUTI", scripCode: "532500", name: "Maruti Suzuki India Ltd", nameKeywords: ["MARUTI SUZUKI", "MARUTI"] },
   { symbol: "SUNPHARMA", scripCode: "524715", name: "Sun Pharmaceutical Industries Ltd", nameKeywords: ["SUN PHARMACEUTICAL", "SUN PHARMA"] },
   { symbol: "ADANIENT", scripCode: "512599", name: "Adani Enterprises Ltd", nameKeywords: ["ADANI ENTERPRISES"] },

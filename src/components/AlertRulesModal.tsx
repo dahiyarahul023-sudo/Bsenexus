@@ -7,11 +7,38 @@ import {
 } from 'lucide-react';
 import { customFetch } from '../api';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+import { ActionButton } from './ui/ActionButton';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+function AlertRuleSkeleton() {
+  return (
+    <div className="space-y-3 animate-pulse">
+      {[1, 2, 3].map((i) => (
+        <div 
+          key={i} 
+          className="p-3.5 rounded-xl border border-slate-200/80 dark:border-[#2D283E] bg-white/50 dark:bg-[#1E1C2B]/50 flex items-start justify-between gap-3"
+        >
+          <div className="flex-1 space-y-2">
+            <div className="flex items-center gap-2">
+              <div className="h-4 w-32 bg-slate-200 dark:bg-slate-700/60 rounded" />
+              <div className="h-3.5 w-16 bg-slate-100 dark:bg-slate-800 rounded-full" />
+            </div>
+            <div className="h-3 w-48 bg-slate-100 dark:bg-slate-800/80 rounded" />
+            <div className="flex items-center gap-2 pt-1">
+              <div className="h-4 w-12 bg-slate-100 dark:bg-slate-800 rounded" />
+              <div className="h-4 w-20 bg-slate-100 dark:bg-slate-800 rounded" />
+            </div>
+          </div>
+          <div className="h-6 w-10 bg-slate-200 dark:bg-slate-700/60 rounded-full shrink-0" />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export interface AlertRule {
@@ -500,14 +527,17 @@ export function AlertRulesModal({ isOpen, onClose }: AlertRulesModalProps) {
                   </span>
                 ) : <div />}
 
-                <button
+                <ActionButton
                   type="button"
                   onClick={handleSavePresets}
-                  disabled={saving}
-                  className="px-5 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                  isLoading={saving}
+                  loadingText="Saving..."
+                  variant="primary"
+                  size="md"
+                  icon={presetSavedFeedback ? <Check size={13} className="text-emerald-300" /> : undefined}
                 >
-                  {saving ? 'Saving...' : 'Save Presets'}
-                </button>
+                  {presetSavedFeedback ? 'Saved!' : 'Save Presets'}
+                </ActionButton>
               </div>
             </div>
           )}
@@ -660,13 +690,16 @@ export function AlertRulesModal({ isOpen, onClose }: AlertRulesModalProps) {
                     >
                       Cancel
                     </button>
-                    <button
+                    <ActionButton
                       type="submit"
-                      disabled={saving}
-                      className="px-5 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold rounded-lg transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                      isLoading={saving}
+                      loadingText="Creating..."
+                      variant="primary"
+                      size="md"
+                      disabled={!name.trim()}
                     >
-                      {saving ? "Saving..." : "Create & Activate Rule"}
-                    </button>
+                      Create & Activate Rule
+                    </ActionButton>
                   </div>
                 </form>
               ) : (
@@ -685,9 +718,7 @@ export function AlertRulesModal({ isOpen, onClose }: AlertRulesModalProps) {
                   </div>
 
                   {loading ? (
-                    <div className="py-12 text-center text-xs text-slate-400">
-                      Loading active alert rules...
-                    </div>
+                    <AlertRuleSkeleton />
                   ) : rules.length === 0 ? (
                     <div className="py-12 text-center text-xs text-slate-400 space-y-2 bg-slate-50 dark:bg-[#15141F] rounded-xl border border-slate-200 dark:border-[#2D283E]">
                       <p>No custom alert rules configured yet.</p>

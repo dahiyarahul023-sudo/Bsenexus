@@ -7,7 +7,7 @@ import {
   ExternalLink, BarChart3, Clock, Check, RefreshCw, Sun, Moon,
   User, BookOpen, AlertCircle, Award, Terminal, Flame, Database,
   Building2, Target, Volume2, ShieldCheck, HelpCircle, CheckCheck,
-  Share2, Compass
+  Share2, Compass, Menu, X
 } from 'lucide-react';
 import { BseNexusLogo } from './ui/BseNexusLogo';
 import { MarketClock } from './ui/MarketClock';
@@ -15,11 +15,15 @@ import { MarketTickerTape } from './ui/MarketTickerTape';
 import { MarketGuide } from '../types';
 import { ComponentSkeleton } from './ui/ComponentSkeleton';
 import { useAuth } from '../context/AuthContext';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 import MarketGuidesSection from './MarketGuidesSection';
 import { BlogReaderModal } from './BlogReaderModal';
+import { scrollToElementWithOffset } from '../utils/scrollState';
+import { FollowBseNexusBlock, SocialIconsRow } from './ui/SocialLinks';
+import { CommonQuestionsFAQ } from './ui/CommonQuestionsFAQ';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -52,12 +56,12 @@ const SAMPLE_HERO_ANNOUNCEMENTS = [
     scripCode: '500325',
     companyName: 'Reliance Industries Ltd',
     category: 'Board Meeting',
-    headline: 'Board to consider Interim Dividend & Q4 Earnings on April 24',
+    headline: 'Board to consider Q2 FY27 Financial Results & Dividend on October 24',
     time: '14 mins ago',
     badge: 'DIVIDEND',
     badgeColor: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30',
     aiMetrics: { rev: 'Board Meeting', pat: 'Dividend Agenda', ebitda: 'LODR Reg 29' },
-    summary: 'Meeting of Board of Directors scheduled to consider and approve standalone & consolidated audited financial results and interim dividend.'
+    summary: 'Meeting of Board of Directors scheduled to consider and approve standalone & consolidated financial results and interim dividend.'
   },
   {
     symbol: 'INFY',
@@ -144,13 +148,13 @@ const DEMO_COMPANIES: Record<string, {
       { date: 'Jun 05, 2026', type: 'Dividend', badgeColor: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30', title: 'Annual Final Dividend of ₹3.60 per share approved', impact: 'Total cash payout of ₹4,420 Cr; Record Date Jul 12.', reg: 'Reg 42' }
     ],
     results: [
-      { quarter: 'Q3 FY26', revenue: '₹57,084 Cr', revYoy: '+12.4%', pat: '₹1,420 Cr', patYoy: '+24.8%', ebitdaMargin: '18.2%', status: 'DECLARED' },
-      { quarter: 'Q2 FY26', revenue: '₹53,905 Cr', revYoy: '+8.2%', pat: '₹1,180 Cr', patYoy: '+16.5%', ebitdaMargin: '16.8%', status: 'DECLARED' },
-      { quarter: 'Q1 FY26', revenue: '₹54,771 Cr', revYoy: '+5.4%', pat: '₹918 Cr', patYoy: '-4.2%', ebitdaMargin: '14.9%', status: 'DECLARED' },
-      { quarter: 'Q4 FY26 (Upcoming)', revenue: '₹59,200 Cr (Est)', revYoy: '+14.1%', pat: '₹1,650 Cr (Est)', patYoy: '+32.0%', ebitdaMargin: '19.0%', status: 'UPCOMING' },
+      { quarter: 'Q1 FY27', revenue: '₹57,084 Cr', revYoy: '+12.4%', pat: '₹1,420 Cr', patYoy: '+24.8%', ebitdaMargin: '18.2%', status: 'DECLARED' },
+      { quarter: 'Q4 FY26', revenue: '₹53,905 Cr', revYoy: '+8.2%', pat: '₹1,180 Cr', patYoy: '+16.5%', ebitdaMargin: '16.8%', status: 'DECLARED' },
+      { quarter: 'Q3 FY26', revenue: '₹54,771 Cr', revYoy: '+5.4%', pat: '₹918 Cr', patYoy: '-4.2%', ebitdaMargin: '14.9%', status: 'DECLARED' },
+      { quarter: 'Q2 FY27 (Upcoming)', revenue: '₹59,200 Cr (Est)', revYoy: '+14.1%', pat: '₹1,650 Cr (Est)', patYoy: '+32.0%', ebitdaMargin: '19.0%', status: 'UPCOMING' },
     ],
     filings: [
-      { date: 'Today, 11:24 AM', category: 'Financial Results', headline: 'Outcome of Board Meeting: Unaudited Financial Results for Q3 FY26', pdfSize: '1.4 MB' },
+      { date: 'Today, 11:24 AM', category: 'Financial Results', headline: 'Outcome of Board Meeting: Unaudited Financial Results for Q1 FY27', pdfSize: '1.4 MB' },
       { date: 'Yesterday', category: 'Company Update', headline: 'Operational Update: Record crude steel production in 9M FY26', pdfSize: '420 KB' },
       { date: '3 days ago', category: 'SEBI Reg 30', headline: 'Disclosure under Regulation 30: Execution of long-term pellet supply contract', pdfSize: '680 KB' }
     ]
@@ -174,9 +178,9 @@ const DEMO_COMPANIES: Record<string, {
       { date: 'Jul 30, 2026', type: 'SEBI Reg 30', badgeColor: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30', title: 'Jio Platforms crosses 500 Million 5G Subscriber Milestone', impact: 'ARPU expands to ₹198 per month with AI data pack upsells.', reg: 'Press & Reg 30' }
     ],
     results: [
-      { quarter: 'Q3 FY26', revenue: '₹2,48,200 Cr', revYoy: '+9.8%', pat: '₹19,650 Cr', patYoy: '+11.2%', ebitdaMargin: '17.6%', status: 'DECLARED' },
-      { quarter: 'Q2 FY26', revenue: '₹2,35,480 Cr', revYoy: '+7.4%', pat: '₹18,240 Cr', patYoy: '+8.9%', ebitdaMargin: '17.1%', status: 'DECLARED' },
-      { quarter: 'Q4 FY26 (Upcoming)', revenue: '₹2,55,000 Cr (Est)', revYoy: '+12.0%', pat: '₹20,800 Cr (Est)', patYoy: '+14.5%', ebitdaMargin: '18.0%', status: 'UPCOMING' }
+      { quarter: 'Q1 FY27', revenue: '₹2,48,200 Cr', revYoy: '+9.8%', pat: '₹19,650 Cr', patYoy: '+11.2%', ebitdaMargin: '17.6%', status: 'DECLARED' },
+      { quarter: 'Q4 FY26', revenue: '₹2,35,480 Cr', revYoy: '+7.4%', pat: '₹18,240 Cr', patYoy: '+8.9%', ebitdaMargin: '17.1%', status: 'DECLARED' },
+      { quarter: 'Q2 FY27 (Upcoming)', revenue: '₹2,55,000 Cr (Est)', revYoy: '+12.0%', pat: '₹20,800 Cr (Est)', patYoy: '+14.5%', ebitdaMargin: '18.0%', status: 'UPCOMING' }
     ],
     filings: [
       { date: 'Aug 20, 2026', category: 'Board Meeting Notice', headline: 'Notice of Board Meeting to consider Audited Results & Dividend', pdfSize: '890 KB' },
@@ -249,11 +253,15 @@ export function LandingPage({
   const { user, profile, isPro, isAdmin, setIsAuthModalOpen, setIsProModalOpen } = useAuth();
   
   // Interactive States
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [activeHeroIndex, setActiveHeroIndex] = useState(0);
   const [activeAiDemoTab, setActiveAiDemoTab] = useState<'earnings' | 'acquisition' | 'dividend' | 'reg30'>('earnings');
   const [selectedCompanyKey, setSelectedCompanyKey] = useState<'TATASTEEL' | 'RELIANCE' | 'LT' | 'INFY'>('TATASTEEL');
   const [activeCompanyHubTab, setActiveCompanyHubTab] = useState<'hub' | 'timeline' | 'results' | 'filings' | 'research'>('hub');
   const [selectedGuide, setSelectedGuide] = useState<MarketGuide | null>(null);
+
+  // Lock body scroll when mobile navigation drawer is open
+  useBodyScrollLock(isMobileNavOpen);
 
   // Auto cycle hero items
   useEffect(() => {
@@ -264,10 +272,8 @@ export function LandingPage({
   }, []);
 
   const scrollToSection = (id: string) => {
-    const elem = document.getElementById(id);
-    if (elem) {
-      elem.scrollIntoView({ behavior: 'smooth' });
-    }
+    setIsMobileNavOpen(false);
+    scrollToElementWithOffset(id, 88, 'smooth');
   };
 
   return (
@@ -356,13 +362,19 @@ export function LandingPage({
                 className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400 min-h-[32px] px-1.5 py-1 whitespace-nowrap select-none"
               >
                 <span>Pricing</span>
-                <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-mono">₹10/mo</span>
+                <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-mono">₹499/mo</span>
               </button>
               <button 
                 onClick={() => scrollToSection('market-guides')} 
                 className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer min-h-[32px] px-1.5 py-1 whitespace-nowrap select-none"
               >
                 Guides
+              </button>
+              <button 
+                onClick={() => scrollToSection('about')} 
+                className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer min-h-[32px] px-1.5 py-1 whitespace-nowrap select-none"
+              >
+                About
               </button>
             </nav>
 
@@ -379,13 +391,25 @@ export function LandingPage({
                 {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
               </motion.button>
 
-              {/* User Sign In / Profile status */}
+              {/* Mobile/Tablet Hamburger Toggle (visible below xl) */}
+              <motion.button
+                whileTap={{ scale: 0.92 }}
+                onClick={() => setIsMobileNavOpen(prev => !prev)}
+                aria-label={isMobileNavOpen ? "Close menu" : "Open navigation menu"}
+                aria-expanded={isMobileNavOpen}
+                className="xl:hidden p-2 rounded-xl bg-slate-100 dark:bg-[#252233] hover:bg-slate-200 dark:hover:bg-[#2F2B40] text-slate-700 dark:text-slate-200 transition-colors cursor-pointer shadow-2xs border border-slate-200/80 dark:border-[#352F48] min-h-[38px] min-w-[38px] flex items-center justify-center shrink-0"
+                title="Toggle Navigation Menu"
+              >
+                {isMobileNavOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+              </motion.button>
+
+              {/* User Sign In / Profile status (Desktop/Tablet) */}
               {user || profile ? (
                 <motion.button
                   whileTap={{ scale: 0.96 }}
                   onClick={() => onEnterTerminal('dashboard')}
                   aria-label={`User profile: ${profile?.displayName || 'User profile'}`}
-                  className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-[#222030] hover:bg-slate-200 dark:hover:bg-[#2C293D] text-slate-900 dark:text-white text-xs font-bold transition-all border border-slate-200 dark:border-[#332E45] cursor-pointer shadow-xs min-h-[38px] whitespace-nowrap select-none"
+                  className="hidden sm:flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-[#222030] hover:bg-slate-200 dark:hover:bg-[#2C293D] text-slate-900 dark:text-white text-xs font-bold transition-all border border-slate-200 dark:border-[#332E45] cursor-pointer shadow-xs min-h-[38px] whitespace-nowrap select-none"
                 >
                   <div className="w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] font-black flex items-center justify-center shrink-0">
                     {(profile?.displayName || profile?.email || 'U').substring(0, 1).toUpperCase()}
@@ -395,9 +419,9 @@ export function LandingPage({
               ) : (
                 <motion.button
                   whileTap={{ scale: 0.96 }}
-                  onClick={() => onEnterTerminal('dashboard')}
+                  onClick={() => setIsAuthModalOpen(true)}
                   aria-label="Sign in to your account"
-                  className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-[#222030] hover:bg-slate-200 dark:hover:bg-[#2C293D] text-slate-700 dark:text-slate-200 text-xs font-bold transition-all border border-slate-200 dark:border-[#332E45] cursor-pointer shrink-0 min-h-[38px] whitespace-nowrap select-none"
+                  className="hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-[#222030] hover:bg-slate-200 dark:hover:bg-[#2C293D] text-slate-700 dark:text-slate-200 text-xs font-bold transition-all border border-slate-200 dark:border-[#332E45] cursor-pointer shrink-0 min-h-[38px] whitespace-nowrap select-none"
                 >
                   <User className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300 shrink-0" />
                   <span>Sign In</span>
@@ -419,6 +443,142 @@ export function LandingPage({
             </div>
           </div>
         </div>
+
+        {/* Mobile / Tablet Slide-down Navigation Menu (visible below xl) */}
+        <AnimatePresence>
+          {isMobileNavOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.22, ease: 'easeInOut' }}
+              className="xl:hidden overflow-hidden border-t border-slate-200/80 dark:border-[#2D283E] bg-white/95 dark:bg-[#12131C]/95 backdrop-blur-2xl shadow-xl"
+            >
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 space-y-1">
+                <button
+                  onClick={() => scrollToSection('whats-new')}
+                  className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors text-left"
+                >
+                  <span className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-amber-500" />
+                    <span>What's New</span>
+                  </span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 font-mono">2.0</span>
+                </button>
+
+                <button
+                  onClick={() => scrollToSection('company-hub')}
+                  className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#1C1A27] transition-colors text-left"
+                >
+                  <span>Company Hub</span>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                </button>
+
+                <button
+                  onClick={() => scrollToSection('features')}
+                  className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#1C1A27] transition-colors text-left"
+                >
+                  <span>AI Summarizer</span>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsMobileNavOpen(false);
+                    onEnterTerminal('results-calendar');
+                  }}
+                  className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#1C1A27] transition-colors text-left"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <span>Earnings Ledger</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                  </span>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                </button>
+
+                <button
+                  onClick={() => {
+                    setIsMobileNavOpen(false);
+                    onEnterTerminal('watchlists');
+                  }}
+                  className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#1C1A27] transition-colors text-left"
+                >
+                  <span>Watchlists</span>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                </button>
+
+                <button
+                  onClick={() => scrollToSection('telegram-alerts')}
+                  className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#1C1A27] transition-colors text-left"
+                >
+                  <span>Telegram Bot</span>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                </button>
+
+                <button
+                  onClick={() => scrollToSection('pricing')}
+                  className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:bg-slate-100 dark:hover:bg-[#1C1A27] transition-colors text-left"
+                >
+                  <span>Pricing</span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-mono">₹499/mo</span>
+                </button>
+
+                <button
+                  onClick={() => scrollToSection('market-guides')}
+                  className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#1C1A27] transition-colors text-left"
+                >
+                  <span>Guides</span>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                </button>
+
+                <button
+                  onClick={() => scrollToSection('about')}
+                  className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#1C1A27] transition-colors text-left"
+                >
+                  <span>About</span>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                </button>
+
+                <div className="pt-3 pb-1 border-t border-slate-200/80 dark:border-[#2D283E] grid grid-cols-2 gap-2">
+                  {user || profile ? (
+                    <button
+                      onClick={() => {
+                        setIsMobileNavOpen(false);
+                        onEnterTerminal('dashboard');
+                      }}
+                      className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-[#222030] text-slate-900 dark:text-white text-xs font-bold border border-slate-200 dark:border-[#332E45]"
+                    >
+                      <User className="w-3.5 h-3.5 text-emerald-500" />
+                      <span>{profile?.displayName?.split(' ')[0] || 'My Account'}</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setIsMobileNavOpen(false);
+                        setIsAuthModalOpen(true);
+                      }}
+                      className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-[#222030] text-slate-900 dark:text-white text-xs font-bold border border-slate-200 dark:border-[#332E45]"
+                    >
+                      <User className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300" />
+                      <span>Sign In</span>
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => {
+                      setIsMobileNavOpen(false);
+                      onEnterTerminal('dashboard');
+                    }}
+                    className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-xs"
+                  >
+                    <Zap className="w-3.5 h-3.5 fill-white" />
+                    <span>Terminal</span>
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </header>
 
       {/* Primary Semantic Main Landmark for Screen Readers & Lighthouse Compliance */}
@@ -460,7 +620,7 @@ export function LandingPage({
                 <motion.button
                   whileTap={{ scale: 0.96 }}
                   onClick={() => onEnterTerminal('dashboard')}
-                  className="flex items-center gap-2.5 px-6 py-3.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 dark:bg-emerald-700 dark:hover:bg-emerald-600 text-white text-sm font-black shadow-lg shadow-emerald-700/30 transition-all cursor-pointer select-none min-h-[44px]"
+                  className="flex items-center gap-2.5 px-6 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 dark:bg-emerald-700 dark:hover:bg-emerald-600 text-white text-sm font-black shadow-lg shadow-emerald-700/30 transition-all cursor-pointer select-none min-h-[44px] whitespace-nowrap"
                 >
                   <Zap className="w-4 h-4 fill-white" />
                   <span>Enter Live Terminal</span>
@@ -470,7 +630,7 @@ export function LandingPage({
                 <motion.button
                   whileTap={{ scale: 0.96 }}
                   onClick={() => scrollToSection('features')}
-                  className="flex items-center gap-2 px-5 py-3.5 rounded-xl bg-white dark:bg-[#1A1926] hover:bg-slate-100 dark:hover:bg-[#252233] text-slate-800 dark:text-slate-200 text-sm font-bold border border-slate-200 dark:border-[#2D283E] transition-all shadow-xs cursor-pointer select-none min-h-[44px]"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white dark:bg-[#1A1926] hover:bg-slate-100 dark:hover:bg-[#252233] text-slate-800 dark:text-slate-200 text-sm font-bold border border-slate-200 dark:border-[#2D283E] transition-all shadow-xs cursor-pointer select-none min-h-[44px] whitespace-nowrap"
                 >
                   <Sparkles className="w-4 h-4 text-purple-500" />
                   <span>Explore AI Features</span>
@@ -479,7 +639,7 @@ export function LandingPage({
                 <motion.button
                   whileTap={{ scale: 0.96 }}
                   onClick={() => onEnterTerminal('results-calendar')}
-                  className="flex items-center gap-2 px-4 py-3.5 rounded-xl bg-slate-100 dark:bg-[#222030] hover:bg-slate-200 dark:hover:bg-[#2B273C] text-slate-700 dark:text-slate-300 text-sm font-semibold transition-all cursor-pointer border border-transparent dark:border-[#332E45] select-none min-h-[44px]"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-100 dark:bg-[#222030] hover:bg-slate-200 dark:hover:bg-[#2B273C] text-slate-700 dark:text-slate-300 text-sm font-semibold transition-all cursor-pointer border border-transparent dark:border-[#332E45] select-none min-h-[44px] whitespace-nowrap"
                 >
                   <Calendar className="w-4 h-4 text-rose-500" />
                   <span>Earnings Calendar</span>
@@ -518,7 +678,7 @@ export function LandingPage({
                       <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
                       <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
                     </div>
-                    <h2 className="text-xs font-mono font-bold text-slate-200 ml-2 inline">bse-live-stream.terminal</h2>
+                    <span className="text-xs font-mono font-bold text-slate-200 ml-2 inline">bse-live-stream.terminal</span>
                   </div>
 
                   <div className="flex items-center gap-1.5 text-[10px] font-mono text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800">
@@ -535,7 +695,7 @@ export function LandingPage({
                       whileTap={{ scale: 0.94 }}
                       onClick={() => setActiveHeroIndex(idx)}
                       className={cn(
-                        "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap select-none min-h-[30px]",
+                        "px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer whitespace-nowrap select-none min-h-[32px]",
                         activeHeroIndex === idx
                           ? "bg-emerald-700 text-white dark:bg-emerald-600 dark:text-white shadow-xs"
                           : "bg-white dark:bg-[#201E2E] text-slate-800 dark:text-slate-100 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-[#2B273C]"
@@ -561,7 +721,7 @@ export function LandingPage({
                           className="p-4 sm:p-5 space-y-4 flex-1 flex flex-col justify-between"
                         >
                           {/* Illustrative Disclaimer Tag */}
-                          <div className="flex items-center justify-between text-[10px] px-2.5 py-1 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 rounded-lg border border-amber-200 dark:border-amber-900/60 font-mono select-none">
+                          <div className="flex items-center justify-between text-[10px] px-3 py-1.5 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 rounded-md border border-amber-200 dark:border-amber-900/60 font-mono select-none">
                             <span>⚡ LIVE DISCLOSURE DEMO</span>
                             <span>Illustrative sample • Not investment advice</span>
                           </div>
@@ -586,12 +746,12 @@ export function LandingPage({
                           </div>
 
                           {/* Headline */}
-                          <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100 leading-snug">
+                          <div className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100 leading-snug">
                             {currentItem.headline}
-                          </h3>
+                          </div>
 
                           {/* AI Metrics Table Bar */}
-                          <div className="grid grid-cols-3 gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-[#14131E] border border-slate-200/80 dark:border-[#2D283E] font-mono text-xs">
+                          <div className="grid grid-cols-3 gap-2 p-2.5 rounded-lg bg-slate-50 dark:bg-[#14131E] border border-slate-200/80 dark:border-[#2D283E] font-mono text-xs">
                             <div>
                               <div className="text-[10px] text-slate-700 dark:text-slate-300 uppercase font-semibold select-none">Revenue</div>
                               <div className="font-black text-emerald-700 dark:text-emerald-400">{currentItem.aiMetrics.rev}</div>
@@ -607,7 +767,7 @@ export function LandingPage({
                           </div>
 
                           {/* AI Summary Box */}
-                          <div className="p-3 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-900/50 space-y-1.5">
+                          <div className="p-3 rounded-lg bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-900/50 space-y-1.5">
                             <div className="flex items-center gap-1.5 text-[11px] font-bold text-purple-800 dark:text-purple-300 select-none">
                               <Sparkles className="w-3.5 h-3.5" />
                               <span>Gemini AI Synthesis</span>
@@ -622,7 +782,7 @@ export function LandingPage({
                             <motion.button
                               whileTap={{ scale: 0.97 }}
                               onClick={() => onEnterTerminal('dashboard')}
-                              className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:text-white rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs min-h-[40px] select-none"
+                              className="w-full py-2.5 px-5 bg-slate-900 hover:bg-slate-800 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:text-white rounded-lg text-xs font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs min-h-[40px] select-none whitespace-nowrap"
                             >
                               <span>Open Live Announcement in Terminal</span>
                               <ArrowRight className="w-3.5 h-3.5" />
@@ -636,6 +796,63 @@ export function LandingPage({
               </div>
             </div>
 
+          </div>
+        </div>
+
+        {/* Top Companies Quick Intelligence Strip (Fix 3) */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-10 pt-8 border-t border-slate-200/60 dark:border-slate-800/80">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-md bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+                <Building2 className="w-3.5 h-3.5" />
+              </div>
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 font-mono">
+                Top BSE Companies • Live Dossiers &amp; Filings
+              </span>
+            </div>
+            <a
+              href="/companies"
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 transition-colors group"
+            >
+              <span>View all 26 BSE listed companies</span>
+              <ArrowUpRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+            </a>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
+            {[
+              { symbol: 'RELIANCE', name: 'Reliance Ind.', sector: 'Conglomerate', code: '500325' },
+              { symbol: 'TCS', name: 'Tata Consultancy', sector: 'IT Services', code: '532540' },
+              { symbol: 'HDFCBANK', name: 'HDFC Bank', sector: 'Banking', code: '500180' },
+              { symbol: 'INFY', name: 'Infosys Ltd', sector: 'IT Services', code: '500209' },
+              { symbol: 'ICICIBANK', name: 'ICICI Bank', sector: 'Banking', code: '532174' },
+              { symbol: 'SBIN', name: 'State Bank of India', sector: 'PSU Bank', code: '500112' },
+              { symbol: 'ITC', name: 'ITC Limited', sector: 'FMCG', code: '500875' },
+              { symbol: 'AXISBANK', name: 'Axis Bank', sector: 'Banking', code: '532215' },
+            ].map((co) => (
+              <a
+                key={co.symbol}
+                href={`/company/${co.symbol}`}
+                className="group p-2.5 rounded-xl bg-white/70 dark:bg-[#15141E]/90 hover:bg-emerald-50/50 dark:hover:bg-[#1A2228] border border-slate-200/80 dark:border-white/5 hover:border-emerald-500/40 transition-all shadow-2xs hover:shadow-xs flex flex-col justify-between"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-slate-900 dark:text-white font-mono group-hover:text-emerald-500 transition-colors">
+                    {co.symbol}
+                  </span>
+                  <span className="text-[9px] font-mono text-slate-400 dark:text-slate-500">
+                    {co.code}
+                  </span>
+                </div>
+                <div className="mt-1">
+                  <div className="text-[11px] font-medium text-slate-600 dark:text-slate-300 truncate">
+                    {co.name}
+                  </div>
+                  <div className="text-[9px] text-emerald-600 dark:text-emerald-400 font-semibold truncate">
+                    {co.sector}
+                  </div>
+                </div>
+              </a>
+            ))}
           </div>
         </div>
       </section>
@@ -972,16 +1189,16 @@ export function LandingPage({
                   {/* Price & Action */}
                   <div className="flex items-center gap-3 self-end md:self-auto">
                     <div className="text-right">
-                      <div className="text-lg font-mono font-black text-slate-900 dark:text-white">
+                      <div className="text-lg font-mono font-black text-slate-900 dark:text-white tabular-nums">
                         {company.price}
                       </div>
-                      <div className="text-xs font-bold font-mono text-emerald-600 dark:text-emerald-400">
+                      <div className="text-xs font-bold font-mono text-emerald-600 dark:text-emerald-400 tabular-nums">
                         {company.change} Today
                       </div>
                     </div>
                     <button
                       onClick={() => onEnterTerminal('dashboard')}
-                      className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md shadow-emerald-600/20 cursor-pointer transition-all active:scale-95"
+                      className="py-2.5 px-5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-black flex items-center gap-1.5 shadow-md shadow-emerald-600/20 cursor-pointer transition-all active:scale-95 min-h-[40px] whitespace-nowrap"
                     >
                       <Zap className="w-3.5 h-3.5 fill-white" />
                       <span>Open in Terminal</span>
@@ -1005,7 +1222,7 @@ export function LandingPage({
                         key={tab.id}
                         onClick={() => setActiveCompanyHubTab(tab.id as any)}
                         className={cn(
-                          "flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-t-xl transition-all cursor-pointer whitespace-nowrap border-t-2",
+                          "flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-t-lg transition-all cursor-pointer whitespace-nowrap border-t-2",
                           isActive
                             ? "bg-white dark:bg-[#111625] text-slate-900 dark:text-white border-emerald-500 shadow-xs"
                             : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 border-transparent hover:bg-white/50 dark:hover:bg-slate-800/40"
@@ -1038,30 +1255,30 @@ export function LandingPage({
 
                       {/* 4 Financial Key Metrics Tiles */}
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                        <div className="bg-white dark:bg-[#161D31] p-4 rounded-xl border border-slate-200 dark:border-slate-800">
-                          <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">P/E Ratio</div>
-                          <div className="text-lg font-mono font-black text-slate-900 dark:text-white mt-1">{company.pe}</div>
+                        <div className="bg-white dark:bg-[#161D31] p-4 rounded-lg border border-slate-200 dark:border-slate-800">
+                          <div className="text-xs font-semibold text-slate-600 dark:text-slate-400">P/E Ratio</div>
+                          <div className="text-lg font-mono font-black text-slate-900 dark:text-white mt-1 tabular-nums">{company.pe}</div>
                           <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5">Industry Median: 22.4x</div>
                         </div>
-                        <div className="bg-white dark:bg-[#161D31] p-4 rounded-xl border border-slate-200 dark:border-slate-800">
-                          <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">Price to Book</div>
-                          <div className="text-lg font-mono font-black text-slate-900 dark:text-white mt-1">{company.pb}</div>
+                        <div className="bg-white dark:bg-[#161D31] p-4 rounded-lg border border-slate-200 dark:border-slate-800">
+                          <div className="text-xs font-semibold text-slate-600 dark:text-slate-400">Price to Book</div>
+                          <div className="text-lg font-mono font-black text-slate-900 dark:text-white mt-1 tabular-nums">{company.pb}</div>
                           <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5">Book Value: High safety</div>
                         </div>
-                        <div className="bg-white dark:bg-[#161D31] p-4 rounded-xl border border-slate-200 dark:border-slate-800">
-                          <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">Return on Equity</div>
-                          <div className="text-lg font-mono font-black text-emerald-700 dark:text-emerald-400 mt-1">{company.roe}</div>
+                        <div className="bg-white dark:bg-[#161D31] p-4 rounded-lg border border-slate-200 dark:border-slate-800">
+                          <div className="text-xs font-semibold text-slate-600 dark:text-slate-400">Return on Equity</div>
+                          <div className="text-lg font-mono font-black text-emerald-700 dark:text-emerald-400 mt-1 tabular-nums">{company.roe}</div>
                           <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5">Annualized Average</div>
                         </div>
-                        <div className="bg-white dark:bg-[#161D31] p-4 rounded-xl border border-slate-200 dark:border-slate-800">
-                          <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">Dividend Yield</div>
-                          <div className="text-lg font-mono font-black text-blue-700 dark:text-blue-400 mt-1">{company.dividendYield}</div>
+                        <div className="bg-white dark:bg-[#161D31] p-4 rounded-lg border border-slate-200 dark:border-slate-800">
+                          <div className="text-xs font-semibold text-slate-600 dark:text-slate-400">Dividend Yield</div>
+                          <div className="text-lg font-mono font-black text-blue-700 dark:text-blue-400 mt-1 tabular-nums">{company.dividendYield}</div>
                           <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5">Regular Payout</div>
                         </div>
                       </div>
 
                       {/* Quick Snapshot List */}
-                      <div className="bg-white dark:bg-[#161D31] p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+                      <div className="bg-white dark:bg-[#161D31] p-4 rounded-lg border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
                         <div className="flex items-center gap-2">
                           <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                           <span className="font-semibold text-slate-800 dark:text-slate-200">Continuous 15s BSE Polling Stream Active for {company.symbol}</span>
@@ -1087,7 +1304,7 @@ export function LandingPage({
 
                       <div className="space-y-3">
                         {company.actions.map((act, i) => (
-                          <div key={i} className="bg-white dark:bg-[#161D31] p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2 hover:border-emerald-500/40 transition-colors">
+                          <div key={i} className="bg-white dark:bg-[#161D31] p-4 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2 hover:border-emerald-500/40 transition-colors">
                             <div className="flex items-center justify-between flex-wrap gap-2">
                               <div className="flex items-center gap-2">
                                 <span className={cn("text-[10px] font-black px-2 py-0.5 rounded-full border", act.badgeColor)}>
@@ -1508,7 +1725,7 @@ export function LandingPage({
                     <div className="flex items-center justify-between">
                       <div>
                         <span className="text-xs font-bold font-mono text-emerald-600 dark:text-emerald-400">TATASTEEL (500470)</span>
-                        <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">Unaudited Consolidated Q3 Results for FY26</h3>
+                        <div className="text-sm font-extrabold text-slate-900 dark:text-white">Unaudited Consolidated Q3 Results for FY26</div>
                       </div>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
                         YoY Growth
@@ -1560,7 +1777,7 @@ export function LandingPage({
                     <div className="flex items-center justify-between">
                       <div>
                         <span className="text-xs font-bold font-mono text-purple-600 dark:text-purple-400">INFY (500209)</span>
-                        <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">Acquisition of Cloud AI Leader in Germany</h3>
+                        <div className="text-sm font-extrabold text-slate-900 dark:text-white">Acquisition of Cloud AI Leader in Germany</div>
                       </div>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300">
                         M&A Disclosed
@@ -1604,7 +1821,7 @@ export function LandingPage({
                     <div className="flex items-center justify-between">
                       <div>
                         <span className="text-xs font-bold font-mono text-blue-600 dark:text-blue-400">ITC (500875)</span>
-                        <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">Special Interim Dividend of ₹7.50 per Share</h3>
+                        <div className="text-sm font-extrabold text-slate-900 dark:text-white">Special Interim Dividend of ₹7.50 per Share</div>
                       </div>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
                         Record Date Set
@@ -1647,7 +1864,7 @@ export function LandingPage({
                     <div className="flex items-center justify-between">
                       <div>
                         <span className="text-xs font-bold font-mono text-amber-600 dark:text-amber-400">LT (500510)</span>
-                        <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">Major Hydrocarbon Offshore Order Win of ₹4,200 Cr</h3>
+                        <div className="text-sm font-extrabold text-slate-900 dark:text-white">Major Hydrocarbon Offshore Order Win of ₹4,200 Cr</div>
                       </div>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300">
                         Major Order
@@ -1886,11 +2103,11 @@ export function LandingPage({
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                       {[
-                        { symbol: 'RELIANCE', scrip: '500325', date: 'April 24, 2026', q: 'Q4 FY26 (Audited)', agenda: 'Results & Dividend', color: 'text-emerald-700 dark:text-emerald-400' },
-                        { symbol: 'TCS', scrip: '532540', date: 'April 18, 2026', q: 'Q4 FY26 (Audited)', agenda: 'Results & Special Div', color: 'text-blue-700 dark:text-blue-400' },
-                        { symbol: 'BAJFINANCE', scrip: '500034', date: 'April 28, 2026', q: 'Q4 FY26 (Audited)', agenda: 'Financial Results', color: 'text-purple-700 dark:text-purple-400' },
-                        { symbol: 'LICI', scrip: '543526', date: 'May 04, 2026', q: 'Q4 FY26 (Audited)', agenda: 'Results & Solvency', color: 'text-amber-700 dark:text-amber-400' },
-                        { symbol: 'ZOMATO', scrip: '543320', date: 'May 10, 2026', q: 'Q4 FY26 (Consolidated)', agenda: 'Financial Results', color: 'text-rose-700 dark:text-rose-400' },
+                        { symbol: 'TCS', scrip: '532540', date: 'October 08, 2026', q: 'Q2 FY27 (Unaudited)', agenda: 'Results & Interim Div', color: 'text-blue-700 dark:text-blue-400' },
+                        { symbol: 'HCLTECH', scrip: '532281', date: 'October 12, 2026', q: 'Q2 FY27 (Unaudited)', agenda: 'Results & Dividend', color: 'text-emerald-700 dark:text-emerald-400' },
+                        { symbol: 'HDFCBANK', scrip: '500180', date: 'October 17, 2026', q: 'Q2 FY27 (Unaudited)', agenda: 'Financial Results', color: 'text-purple-700 dark:text-purple-400' },
+                        { symbol: 'INFY', scrip: '500209', date: 'October 23, 2026', q: 'Q2 FY27 (Unaudited)', agenda: 'Results & Interim Div', color: 'text-amber-700 dark:text-amber-400' },
+                        { symbol: 'RELIANCE', scrip: '500325', date: 'October 24, 2026', q: 'Q2 FY27 (Unaudited)', agenda: 'Results & Dividend', color: 'text-rose-700 dark:text-rose-400' },
                       ].map((row, i) => (
                         <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors">
                           <td className="py-2.5">
@@ -1968,7 +2185,7 @@ export function LandingPage({
                   </div>
 
                   <div className="font-black text-sm sm:text-base text-white">
-                    📊 TATA STEEL LTD (500470) | Q3 RESULTS
+                    📊 TATA STEEL LTD (500470) | Q1 RESULTS
                   </div>
 
                   <div className="p-3 bg-slate-900/90 rounded-xl font-mono text-xs space-y-1 text-slate-200 border border-slate-700/60">
@@ -2033,7 +2250,7 @@ export function LandingPage({
                 </div>
                 <div className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200">
                   <CheckCircle2 className="w-4 h-4 text-blue-500 shrink-0" />
-                  <span>Pro Plan: Unlimited Telegram Channel Broadcasts (₹10/mo)</span>
+                  <span>Pro Plan: Unlimited Telegram Channel Broadcasts (₹499/mo after 1-week free trial)</span>
                 </div>
               </div>
 
@@ -2138,8 +2355,8 @@ export function LandingPage({
 
             {/* Pro Tier Card */}
             <div className="bg-white dark:bg-[#1A1926] rounded-3xl border-2 border-emerald-500 p-6 sm:p-8 flex flex-col justify-between shadow-xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 bg-emerald-500 text-slate-950 font-black text-[10px] px-3 py-1 rounded-bl-xl uppercase tracking-wider">
-                100% FREE LAUNCH OFFER
+              <div className="absolute top-0 right-0 bg-emerald-500 text-slate-950 font-black text-[10px] px-3.5 py-1 rounded-bl-xl uppercase tracking-wider">
+                1-WEEK FREE TRIAL
               </div>
 
               <div className="space-y-6">
@@ -2154,11 +2371,11 @@ export function LandingPage({
                 </div>
 
                 <div className="flex items-baseline gap-2">
-                  <span className="text-xl line-through text-slate-400 font-mono">₹10</span>
+                  <span className="text-xl line-through text-slate-400 font-mono">₹499</span>
                   <span className="text-4xl font-black text-emerald-600 dark:text-emerald-400 font-mono">₹0</span>
-                  <span className="text-xs text-slate-500 font-semibold">/ free access</span>
+                  <span className="text-xs text-slate-500 font-semibold">/ 1st week (then ₹499/mo)</span>
                   <span className="text-[10px] text-emerald-700 dark:text-emerald-300 font-bold ml-1 bg-emerald-100 dark:bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-800">
-                    Active For All Users
+                    1 Week Free Trial
                   </span>
                 </div>
 
@@ -2196,7 +2413,7 @@ export function LandingPage({
                   className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-black rounded-xl shadow-lg shadow-emerald-600/25 transition-all cursor-pointer flex items-center justify-center gap-2"
                 >
                   <Zap className="w-4 h-4 fill-white" />
-                  <span>Claim Free Pro Access — ₹0</span>
+                  <span>Claim 1-Week Free Trial — ₹0</span>
                 </button>
               </div>
             </div>
@@ -2213,7 +2430,7 @@ export function LandingPage({
               <div className="grid grid-cols-12 px-6 py-3 font-semibold text-slate-500 dark:text-slate-400 bg-slate-50/50 dark:bg-[#171622]">
                 <div className="col-span-6 sm:col-span-7">Capability</div>
                 <div className="col-span-3 sm:col-span-2 text-center">Free (₹0)</div>
-                <div className="col-span-3 text-center text-emerald-600 dark:text-emerald-400 font-bold">Pro (₹10/mo)</div>
+                <div className="col-span-3 text-center text-emerald-600 dark:text-emerald-400 font-bold">Pro (₹499/mo)</div>
               </div>
 
               {[
@@ -2240,6 +2457,178 @@ export function LandingPage({
 
       {/* 9. BLOG LIST SECTION: MARKET INSIGHTS & BSE GUIDES */}
       <MarketGuidesSection onSelectGuide={(guide) => setSelectedGuide(guide)} />
+
+      {/* 9.2. POPULAR GUIDES SECTION: PLAIN ANCHOR LINKS FOR FAST SEARCH ENGINE DISCOVERY */}
+      <section className="py-12 bg-slate-100/70 dark:bg-[#0E131F] border-b border-slate-200/80 dark:border-slate-800/80">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-bold border border-emerald-500/20 mb-2">
+                <BookOpen className="w-3 h-3" />
+                <span>Popular Research Guides</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                Popular Guides &amp; Regulatory Manuals
+              </h2>
+              <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                Essential regulatory playbooks for Dalal Street investors &amp; equity research analysts
+              </p>
+            </div>
+            <a href="/guides" className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline">
+              <span>View all research guides</span>
+              <ArrowRight className="w-3 h-3" />
+            </a>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            <a href="/guides/sebi-lodr-regulation-30" className="p-4 rounded-xl bg-white dark:bg-[#15141F] border border-slate-200 dark:border-slate-800 hover:border-emerald-500 transition-all block group">
+              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block mb-1">SEBI Regulations</span>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-emerald-500 transition-colors">SEBI LODR Regulation 30: Material Disclosures &amp; Timelines</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">Master material event disclosure rules, 30-minute to 24-hour timelines, and market-moving filings.</p>
+            </a>
+            <a href="/guides/board-meeting-results-guide" className="p-4 rounded-xl bg-white dark:bg-[#15141F] border border-slate-200 dark:border-slate-800 hover:border-emerald-500 transition-all block group">
+              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block mb-1">Corporate Actions</span>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-emerald-500 transition-colors">BSE Board Meetings &amp; Financial Results: Outcome Guide</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">Decode board meeting intimations, dividend approvals, bonus share issues, and quarterly earnings.</p>
+            </a>
+            <a href="/guides/auditor-resignations-red-flags" className="p-4 rounded-xl bg-white dark:bg-[#15141F] border border-slate-200 dark:border-slate-800 hover:border-emerald-500 transition-all block group">
+              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block mb-1">Forensic Analysis</span>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-emerald-500 transition-colors">Auditor Resignations: Forensic Red Flags on Dalal Street</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">Detect early governance warning signs, mid-term auditor exits, and qualified audit opinions.</p>
+            </a>
+            <a href="/guides/insider-trading-pit-regulations" className="p-4 rounded-xl bg-white dark:bg-[#15141F] border border-slate-200 dark:border-slate-800 hover:border-emerald-500 transition-all block group">
+              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block mb-1">Compliance</span>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-emerald-500 transition-colors">SEBI PIT Regulations &amp; Insider Trading Filings Explained</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">Track trading window closures, designated person disclosures, and promoter transaction signals.</p>
+            </a>
+            <a href="/guides/cash-flow-forensics-india" className="p-4 rounded-xl bg-white dark:bg-[#15141F] border border-slate-200 dark:border-slate-800 hover:border-emerald-500 transition-all block group">
+              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block mb-1">Accounting Forensics</span>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-emerald-500 transition-colors">Cash Flow Forensics: Auditing Indian Corporate Earnings</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">Evaluate CFO vs PAT conversion, working capital expansion, and aggressive revenue recognition.</p>
+            </a>
+            <a href="/guides/bse-quarterly-results-calendar-guide" className="p-4 rounded-xl bg-white dark:bg-[#15141F] border border-slate-200 dark:border-slate-800 hover:border-emerald-500 transition-all block group">
+              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block mb-1">Earnings Calendar</span>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-emerald-500 transition-colors">BSE Results Calendar Guide: Earnings &amp; Board Meeting Dates</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">Track Regulation 29 board meeting notices, Regulation 33 quarterly results, and Limited Review Reports.</p>
+            </a>
+            <a href="/guides/bse-shareholding-pattern-explained" className="p-4 rounded-xl bg-white dark:bg-[#15141F] border border-slate-200 dark:border-slate-800 hover:border-emerald-500 transition-all block group">
+              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block mb-1">Corporate Governance</span>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-emerald-500 transition-colors">How to Read BSE Shareholding Patterns: Regulation 31 Guide</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">Decode promoter stakes, promoter share pledges, institutional FII/DII inflows, and retail holding traps.</p>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* 9.5. ABOUT BSE NEXUS SECTION */}
+      <section id="about" aria-labelledby="about-heading" className="py-16 sm:py-24 bg-white dark:bg-[#0B0F17] border-b border-slate-200/80 dark:border-slate-800/80">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-4xl mx-auto space-y-6 mb-12">
+            <div className="text-center space-y-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-bold border border-emerald-500/20">
+                <Building2 className="w-3.5 h-3.5" />
+                <span>Institutional Equity Analytics &amp; AEO Knowledge Base</span>
+              </div>
+              <h2 id="about-heading" className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                About BSE Nexus: Real-Time Corporate Filings &amp; Market Intelligence
+              </h2>
+            </div>
+
+            <div className="prose prose-slate dark:prose-invert max-w-none text-sm sm:text-base text-slate-700 dark:text-slate-300 leading-relaxed space-y-4">
+              <p>
+                <strong>BSE Nexus</strong> is an independent financial technology analytics terminal and research platform engineered specifically for tracking Bombay Stock Exchange (BSE) corporate announcements, regulatory disclosures, and earnings releases in real time. Designed for active retail investors, equity research analysts, and institutional desks, BSE Nexus ingests corporate disclosures directly from the official portal of the <a href="https://www.bseindia.com" target="_blank" rel="noopener noreferrer" className="text-emerald-600 dark:text-emerald-400 font-semibold underline hover:text-emerald-500">Bombay Stock Exchange (BSE India)</a> within 15 seconds of filing.
+              </p>
+
+              <p>
+                The platform continuously monitors regulatory compliance under the SEBI (Listing Obligations and Disclosure Requirements) Regulations, 2015, specifically capturing material events under Regulation 30 and financial outcome declarations under Regulation 33. All regulatory filings mandated by the <a href="https://www.sebi.gov.in" target="_blank" rel="noopener noreferrer" className="text-emerald-600 dark:text-emerald-400 font-semibold underline hover:text-emerald-500">Securities and Exchange Board of India (SEBI)</a>—such as dividend declarations, board meeting intimations, mergers and acquisitions, capital expenditure projects, order wins, management transitions, and forensic auditor resignations—are parsed through an automated neural pipeline powered by Gemini AI. This delivers instantaneous extraction of year-over-year (YoY) and quarter-over-quarter (QoQ) revenue, operating EBITDA, and net profit metrics directly from unformatted corporate PDF documents.
+              </p>
+
+              <p>
+                Beyond real-time disclosure feeds, BSE Nexus maintains an updated <a href="/results-calendar" className="text-emerald-600 dark:text-emerald-400 font-semibold underline hover:text-emerald-500">Quarterly Results Calendar</a> tracking scheduled board meetings, audited and unaudited earnings declarations, and historical corporate actions across 4,000+ listed Indian enterprises. Investors can navigate directly to dedicated company pages—such as <a href="/company/RELIANCE" className="text-emerald-600 dark:text-emerald-400 font-semibold underline hover:text-emerald-500">Reliance Industries</a>, <a href="/company/TCS" className="text-emerald-600 dark:text-emerald-400 font-semibold underline hover:text-emerald-500">Tata Consultancy Services (TCS)</a>, and HDFC Bank—to review comprehensive regulatory histories, price metrics, and peer group benchmarks.
+              </p>
+
+              <p>
+                To empower investors with actionable domain expertise, our <a href="/guides" className="text-emerald-600 dark:text-emerald-400 font-semibold underline hover:text-emerald-500">Market Research Guides</a> offer step-by-step forensic playbooks on decoding corporate actions, analyzing balance sheets, auditing shareholding patterns under Regulation 31, and interpreting SEBI PIT insider trading disclosures. Users can also configure personalized watchlists and receive instant Telegram push notifications the moment target companies submit new filings.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="p-8 rounded-2xl bg-slate-50 dark:bg-[#15141F] border border-slate-200/80 dark:border-slate-800/80 space-y-4">
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xl">
+                01
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                Sub-15s Regulatory Ingestion
+              </h3>
+              <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                BSE Nexus continuously tracks live regulatory feeds under SEBI LODR Regulation 30 &amp; 33. Announcements from 4,000+ BSE-listed companies are ingested, parsed, and categorized within 15 seconds of filing.
+              </p>
+              <div className="pt-2">
+                <a href="/guides/sebi-lodr-reg-30-disclosures" className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline">
+                  <span>SEBI Regulation 30 Guide</span>
+                  <ArrowRight className="w-3 h-3" />
+                </a>
+              </div>
+            </div>
+
+            <div className="p-8 rounded-2xl bg-slate-50 dark:bg-[#15141F] border border-slate-200/80 dark:border-slate-800/80 space-y-4">
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xl">
+                02
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                Gemini AI Financial Extraction
+              </h3>
+              <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                Our neural parsing pipeline extracts YoY &amp; QoQ Revenue, Operating EBITDA, and Net Profit directly from unformatted corporate PDF filings, allowing investors to digest financial results in seconds.
+              </p>
+              <div className="pt-2">
+                <a href="/guides/reading-quarterly-financial-results" className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline">
+                  <span>Guide to Reading Results</span>
+                  <ArrowRight className="w-3 h-3" />
+                </a>
+              </div>
+            </div>
+
+            <div className="p-8 rounded-2xl bg-slate-50 dark:bg-[#15141F] border border-slate-200/80 dark:border-slate-800/80 space-y-4">
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xl">
+                03
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                Multi-Channel Alert Dispatch
+              </h3>
+              <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                Connect custom watchlists with private Telegram bots to receive immediate push alerts for board meetings, dividends, quarterly earnings, and high-impact disclosures directly on mobile.
+              </p>
+              <div className="pt-2">
+                <a href="/pricing" className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline">
+                  <span>Explore Free Launch Access</span>
+                  <ArrowRight className="w-3 h-3" />
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-12 p-6 rounded-2xl bg-slate-100/70 dark:bg-[#111622] border border-slate-200 dark:border-slate-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Entity Clarity &amp; Independence Notice
+              </p>
+              <p className="text-xs text-slate-600 dark:text-slate-300">
+                BSE Nexus is an independent market research platform and is not affiliated with Nexus Select Trust (REIT Scrip: 543913), BSE India Ltd, or SEBI. We are not SEBI-registered financial advisors.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <a href="/faq" className="px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-[#1E1B2E] border border-slate-200 dark:border-slate-700 rounded-lg hover:border-emerald-500 transition-colors">
+                Read FAQ
+              </a>
+              <a href="/results-calendar" className="px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-[#1E1B2E] border border-slate-200 dark:border-slate-700 rounded-lg hover:border-emerald-500 transition-colors">
+                Earnings Calendar
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* 10. CTA SECTION: START TRACKING BSE TODAY */}
       <section className="py-16 sm:py-24 bg-slate-900 text-white relative overflow-hidden">
@@ -2297,6 +2686,16 @@ export function LandingPage({
 
         </div>
       </section>
+
+      {/* Common Questions FAQ Section */}
+      <section className="py-12 sm:py-16 bg-slate-50/60 dark:bg-[#0E0C17]/60 border-t border-slate-200/80 dark:border-slate-800/80">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <CommonQuestionsFAQ id="homepage-faq" />
+        </div>
+      </section>
+
+      {/* Follow BSE Nexus Social Community Block */}
+      <FollowBseNexusBlock />
       </main>
 
       {/* 11. FOOTER */}
@@ -2315,9 +2714,26 @@ export function LandingPage({
               <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed max-w-sm">
                 Advanced financial intelligence platform indexing real-time Bombay Stock Exchange (BSE) corporate filings with neural Gemini AI summaries and instant multi-channel dispatch.
               </p>
-              <div className="flex items-center gap-2 pt-1 font-mono text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>BSE Disclosure Poller: Active (15s polling cycle)</span>
+              {(() => {
+                const now = new Date();
+                const istOffsetMs = (5 * 60 + 30) * 60 * 1000;
+                const istDate = new Date(now.getTime() + istOffsetMs);
+                const day = istDate.getUTCDay();
+                const mins = istDate.getUTCHours() * 60 + istDate.getUTCMinutes();
+                const isMarket = day >= 1 && day <= 5 && mins >= 555 && mins <= 930;
+                const dynamicStatus = isMarket ? "Live (30s)" : "Relaxed (5m)";
+                return (
+                  <div className="flex items-center gap-2 pt-1 font-mono text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>BSE Disclosure Poller: Active ({dynamicStatus})</span>
+                  </div>
+                );
+              })()}
+
+              {/* Official Social Links Row */}
+              <div className="pt-2">
+                <p className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">Official Channels</p>
+                <SocialIconsRow size={22} />
               </div>
             </div>
 
@@ -2336,28 +2752,45 @@ export function LandingPage({
             <div className="md:col-span-2 space-y-2.5">
               <p className="font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider">Resources</p>
               <ul className="space-y-2">
-                <li><button onClick={() => scrollToSection('market-guides')} className="hover:text-emerald-500 transition-colors cursor-pointer text-slate-700 dark:text-slate-300">SEBI Reg 30 Guide</button></li>
-                <li><button onClick={() => scrollToSection('market-guides')} className="hover:text-emerald-500 transition-colors cursor-pointer text-slate-700 dark:text-slate-300">Quarterly Earnings Guide</button></li>
-                <li><button onClick={() => scrollToSection('market-guides')} className="hover:text-emerald-500 transition-colors cursor-pointer text-slate-700 dark:text-slate-300">SAST & Insider Trading</button></li>
-                <li><button onClick={() => scrollToSection('how-it-works')} className="hover:text-emerald-500 transition-colors cursor-pointer text-slate-700 dark:text-slate-300">How Engine Works</button></li>
+                <li><a href="/about" className="hover:text-emerald-500 transition-colors text-slate-700 dark:text-slate-300 block">About BSE Nexus</a></li>
+                <li><a href="/companies" className="hover:text-emerald-500 transition-colors text-emerald-600 dark:text-emerald-400 font-semibold block">BSE Listed Companies</a></li>
+                <li><a href="/pricing" className="hover:text-emerald-500 transition-colors text-slate-700 dark:text-slate-300 block">Pricing &amp; Plans</a></li>
+                <li><a href="/guides" className="hover:text-emerald-500 transition-colors text-slate-700 dark:text-slate-300 block">Market Research Guides</a></li>
+                <li><a href="/faq" className="hover:text-emerald-500 transition-colors text-slate-700 dark:text-slate-300 block">SEBI Disclosures FAQ</a></li>
+                <li><a href="/rss.xml" target="_blank" rel="noopener noreferrer" className="hover:text-emerald-500 transition-colors text-slate-700 dark:text-slate-300 block">RSS Feed</a></li>
+                <li><a href="/sitemap.xml" target="_blank" rel="noopener noreferrer" className="hover:text-emerald-500 transition-colors text-slate-700 dark:text-slate-300 block">XML Sitemap</a></li>
+                <li><a href="/embed/widget?symbol=RELIANCE" target="_blank" rel="noopener noreferrer" className="hover:text-emerald-500 transition-colors text-slate-700 dark:text-slate-300 block">Free Embed Widget</a></li>
               </ul>
             </div>
 
-            {/* Compliance & Status */}
+            {/* Compliance & Trust */}
             <div className="md:col-span-3 space-y-2.5">
-              <p className="font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider">Regulatory Disclaimer</p>
-              <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed">
-                BSE Nexus is an informational data processing terminal. We are not SEBI registered investment advisors. Financial metric summaries and AI extractions are for research purposes only.
+              <p className="font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider">Trust &amp; Legal</p>
+              <ul className="space-y-2">
+                <li><a href="/about" className="hover:text-emerald-500 transition-colors text-slate-700 dark:text-slate-300 block">About Us</a></li>
+                <li><a href="/contact" className="hover:text-emerald-500 transition-colors text-slate-700 dark:text-slate-300 block">Contact &amp; Support</a></li>
+                <li><a href="/disclaimer" className="hover:text-emerald-500 transition-colors text-slate-700 dark:text-slate-300 block">Disclaimer</a></li>
+                <li><a href="/privacy-policy" className="hover:text-emerald-500 transition-colors text-slate-700 dark:text-slate-300 block">Privacy Policy</a></li>
+                <li><a href="/terms" className="hover:text-emerald-500 transition-colors text-slate-700 dark:text-slate-300 block">Terms of Service</a></li>
+              </ul>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed pt-1">
+                BSE Nexus is not affiliated with BSE India Ltd, SEBI, or any exchange; informational use only; not investment advice; verify filings on bseindia.com.
               </p>
             </div>
           </div>
 
-          <div className="border-t border-slate-200 dark:border-slate-800 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-slate-700 dark:text-slate-300 font-medium">
-            <div>© {new Date().getFullYear()} BSE Nexus Technologies. Real-time Indian Equity Intelligence.</div>
-            <div className="flex items-center gap-4">
-              <span>BSE India Disclosure Protocol Compliant</span>
+          <div className="border-t border-slate-200 dark:border-slate-800 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-slate-700 dark:text-slate-300 font-medium">
+            <div>© {new Date().getFullYear()} BSE Nexus. Independent BSE Disclosures Aggregator. Operator: Rahul Dahiya (admin@bsenexus.in).</div>
+            <div className="flex flex-wrap items-center gap-3">
+              <a href="/about" className="hover:text-emerald-500 transition-colors">About</a>
               <span>•</span>
-              <span>Gemini 2.5 Flash Powered</span>
+              <a href="/contact" className="hover:text-emerald-500 transition-colors">Contact</a>
+              <span>•</span>
+              <a href="/disclaimer" className="hover:text-emerald-500 transition-colors">Disclaimer</a>
+              <span>•</span>
+              <a href="/privacy-policy" className="hover:text-emerald-500 transition-colors">Privacy</a>
+              <span>•</span>
+              <a href="/terms" className="hover:text-emerald-500 transition-colors">Terms</a>
             </div>
           </div>
 

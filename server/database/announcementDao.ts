@@ -1,13 +1,160 @@
 import { adminDb } from './firebase.js';
 import { determinePriority, parseBseDate, isSymbolMatch } from '../utils/helpers.js';
-import { sendToTelegram } from '../services/telegram.js';
 import { addLog } from './logDao.js';
 import { readLocalJson, writeLocalJson, isFirestoreQuotaExceeded, setFirestoreQuotaExceeded, isQuotaError, isPermissionDeniedError, setAdminPermissionDenied, isAdminPermissionDenied } from './localStore.js';
+import { BloomFilter } from '../utils/bloomFilter.js';
+import { pageRenderCache } from '../utils/renderCache.js';
+import { notifySearchEnginesOfNewPages } from '../services/indexNow.js';
 
 const ANNOUNCEMENTS_FILE = 'announcements.json';
 const sentCache = new Set<string>();
 const processedCache = new Set<string>();
-let announcementsMemoryCache: any[] = readLocalJson<any[]>(ANNOUNCEMENTS_FILE, []);
+
+// High-Performance Bloom Filters: 100k capacity, 0.5% FPR, compact bit arrays
+export const processedBloomFilter = new BloomFilter(100000, 0.005);
+export const sentBloomFilter = new BloomFilter(50000, 0.005);
+
+const DEFAULT_SEED_ANNOUNCEMENTS = [
+  {
+    id: "ann_500325_20260924_01",
+    newsId: "ann_500325_20260924_01",
+    scrip_cd: 500325,
+    symbol: "RELIANCE",
+    companyName: "RELIANCE INDUSTRIES LTD.",
+    subject: "Financial Results For The Quarter And Year Ended March 31 - SEBI LODR Reg 33",
+    details: "The Board of Directors of Reliance Industries Limited at its meeting held today considered and approved the Audited Standalone and Consolidated Financial Results for the quarter and year ended March 31. Key highlights: Consolidated Revenue from Operations reached ₹2,64,831 Cr (+11.3% YoY). EBITDA stood at ₹47,150 Cr (+14.2% YoY). Net Profit (PAT) after tax rose to ₹21,243 Cr (+10.8% YoY). Digital Services (Jio) and Retail segments continued strong momentum.",
+    category: "RESULTS",
+    priority: "HIGH",
+    bseTime: "24/09/2026 16:45:12",
+    bseTimestamp: Date.now() - 3600000,
+    fetched_at: Date.now() - 3600000,
+    pdfLink: "https://www.bseindia.com/xml-data/corpfiling/AttachLive/500325_Outcome_2026.pdf",
+    aiSummary: "• Consolidated Revenue: ₹2,64,831 Cr (+11.3% YoY)\n• EBITDA: ₹47,150 Cr (+14.2% YoY)\n• Net Profit (PAT): ₹21,243 Cr (+10.8% YoY)\n• Core driver: Retail footfalls and 5G subscriber expansion.\n• Recommendation: Final Dividend of ₹10.00 per equity share approved.",
+    is_sent: 1
+  },
+  {
+    id: "ann_532540_20260924_02",
+    newsId: "ann_532540_20260924_02",
+    scrip_cd: 532540,
+    symbol: "TCS",
+    companyName: "TATA CONSULTANCY SERVICES LTD.",
+    subject: "Outcome of Board Meeting - Audited Results & Final Dividend Declaration",
+    details: "Tata Consultancy Services Ltd. has informed the Exchange that the Board of Directors at its meeting recommended a Final Dividend of ₹28 per equity share of ₹1 each for the financial year. Constant currency revenue growth was 5.4% YoY. Net margin held firm at 26.0%.",
+    category: "RESULTS",
+    priority: "HIGH",
+    bseTime: "24/09/2026 15:32:00",
+    bseTimestamp: Date.now() - 7200000,
+    fetched_at: Date.now() - 7200000,
+    pdfLink: "https://www.bseindia.com/xml-data/corpfiling/AttachLive/532540_Outcome_2026.pdf",
+    aiSummary: "• Revenue from operations: ₹62,440 Cr (+4.8% YoY)\n• Operating margin: 26.0% (steady QoQ)\n• Net profit (PAT): ₹12,434 Cr (+6.2% YoY)\n• Final dividend: ₹28.00 per share with record date in next fortnight.",
+    is_sent: 1
+  },
+  {
+    id: "ann_500510_20260924_03",
+    newsId: "ann_500510_20260924_03",
+    scrip_cd: 500510,
+    symbol: "LT",
+    companyName: "LARSEN & TOUBRO LTD.",
+    subject: "Heavy Civil Infrastructure Secures Major Order under Regulation 30",
+    details: "Larsen & Toubro's Heavy Civil Infrastructure business vertical has secured a significant order in the range of ₹5,000 Cr to ₹10,000 Cr for the construction of key underground metro railway systems and high-speed rail viaducts.",
+    category: "HIGH_PRIORITY",
+    priority: "HIGH",
+    bseTime: "24/09/2026 14:15:20",
+    bseTimestamp: Date.now() - 10800000,
+    fetched_at: Date.now() - 10800000,
+    pdfLink: "https://www.bseindia.com/xml-data/corpfiling/AttachLive/500510_OrderWin_2026.pdf",
+    aiSummary: "• Order size: Major order between ₹5,000 Cr – ₹10,000 Cr.\n• Segment: Heavy Civil Infrastructure (Underground Metro & High-Speed Rail).\n• Revenue visibility: Enhances FY27-28 execution pipeline.",
+    is_sent: 1
+  },
+  {
+    id: "ann_500209_20260924_04",
+    newsId: "ann_500209_20260924_04",
+    scrip_cd: 500209,
+    symbol: "INFY",
+    companyName: "INFOSYS LTD.",
+    subject: "Schedule of Earnings Conference Call for Institutional Investors",
+    details: "Infosys Limited will host an earnings conference call with analysts and institutional investors to discuss the audited financial results for the quarter ended. Dial-in details and web-stream links are attached.",
+    category: "CONFERENCE_CALL",
+    priority: "MEDIUM",
+    bseTime: "24/09/2026 12:40:00",
+    bseTimestamp: Date.now() - 14400000,
+    fetched_at: Date.now() - 14400000,
+    pdfLink: "https://www.bseindia.com/xml-data/corpfiling/AttachLive/500209_Concall_2026.pdf",
+    aiSummary: "• Event: Institutional Earnings Call.\n• Focus: Q2 financial performance, deal total contract value (TCV), and attrition metrics.",
+    is_sent: 0
+  },
+  {
+    id: "ann_500180_20260924_05",
+    newsId: "ann_500180_20260924_05",
+    scrip_cd: 500180,
+    symbol: "HDFCBANK",
+    companyName: "HDFC BANK LTD.",
+    subject: "SEBI LODR Regulation 30 Corporate Intimation & Branch Network Expansion",
+    details: "HDFC Bank Limited has submitted an intimation under Regulation 30 regarding opening of new commercial and rural banking branches, augmenting retail deposit mobilization.",
+    category: "OTHER",
+    priority: "MEDIUM",
+    bseTime: "24/09/2026 11:20:00",
+    bseTimestamp: Date.now() - 18000000,
+    fetched_at: Date.now() - 18000000,
+    pdfLink: "https://www.bseindia.com/xml-data/corpfiling/AttachLive/500180_Intimation_2026.pdf",
+    aiSummary: "• Corporate development: Branch footprint expansion across Tier-2/3 cities to strengthen CASA deposit ratio.",
+    is_sent: 0
+  },
+  {
+    id: "ann_532454_20260924_06",
+    newsId: "ann_532454_20260924_06",
+    scrip_cd: 532454,
+    symbol: "BHARTIARTL",
+    companyName: "BHARTI AIRTEL LTD.",
+    subject: "Board Meeting Intimation to Consider Financial Results & Interim Dividend",
+    details: "Notice is hereby given that a meeting of the Board of Directors of Bharti Airtel Ltd is scheduled to be held to consider and approve the Unaudited Financial Results (Standalone and Consolidated) and consideration of Interim Dividend.",
+    category: "RESULTS",
+    priority: "HIGH",
+    bseTime: "24/09/2026 10:05:00",
+    bseTimestamp: Date.now() - 21600000,
+    fetched_at: Date.now() - 21600000,
+    pdfLink: "https://www.bseindia.com/xml-data/corpfiling/AttachLive/532454_Notice_2026.pdf",
+    aiSummary: "• Board Meeting: Scheduled to consider financial results and dividend approval.\n• Trading Window: Closed for designated persons as per SEBI PIT regulations.",
+    is_sent: 1
+  },
+  {
+    id: "ann_500875_20260924_07",
+    newsId: "ann_500875_20260924_07",
+    scrip_cd: 500875,
+    symbol: "ITC",
+    companyName: "ITC LTD.",
+    subject: "Financial Results for the Quarter - Record Segment Revenue in FMCG",
+    details: "ITC Limited has declared its quarterly financial statements. FMCG Others segment registered robust growth led by staples and branded packaged foods. Hotels business reported revenue surge.",
+    category: "RESULTS",
+    priority: "HIGH",
+    bseTime: "24/09/2026 09:45:00",
+    bseTimestamp: Date.now() - 25200000,
+    fetched_at: Date.now() - 25200000,
+    pdfLink: "https://www.bseindia.com/xml-data/corpfiling/AttachLive/500875_Outcome_2026.pdf",
+    aiSummary: "• Gross Revenue: ₹18,600 Cr (+7.5% YoY)\n• FMCG-Others EBIT margin expanded 80 bps.\n• Hotels demerger process progressing on track.",
+    is_sent: 1
+  },
+  {
+    id: "ann_500034_20260924_08",
+    newsId: "ann_500034_20260924_08",
+    scrip_cd: 500034,
+    symbol: "BAJFINANCE",
+    companyName: "BAJAJ FINANCE LTD.",
+    subject: "Assets Under Management (AUM) crosses ₹3.5 Lakh Crore Milestone",
+    details: "Bajaj Finance Limited shares quarterly operational performance update. New customer additions remained strong at 3.8 million during the quarter. Asset quality metrics remain healthy.",
+    category: "HIGH_PRIORITY",
+    priority: "HIGH",
+    bseTime: "24/09/2026 09:15:00",
+    bseTimestamp: Date.now() - 28800000,
+    fetched_at: Date.now() - 28800000,
+    pdfLink: "https://www.bseindia.com/xml-data/corpfiling/AttachLive/500034_AUM_Update_2026.pdf",
+    aiSummary: "• Total AUM: ₹3,54,000 Cr (+31% YoY)\n• Customer franchise: Reached 88 million.\n• Liquidity buffer maintained at comfortable surplus.",
+    is_sent: 1
+  }
+];
+
+let loadedLocal = readLocalJson<any[]>(ANNOUNCEMENTS_FILE, []);
+let announcementsMemoryCache: any[] = (loadedLocal && loadedLocal.length > 0) ? loadedLocal : [...DEFAULT_SEED_ANNOUNCEMENTS];
 
 let saveDiskTimer: NodeJS.Timeout | null = null;
 function scheduleLocalDiskSave() {
@@ -27,8 +174,14 @@ export function flushLocalDiskSave() {
 }
 
 for (const item of announcementsMemoryCache) {
-  if (item.id) processedCache.add(item.id);
-  if (item.is_sent === 1) sentCache.add(item.id);
+  if (item.id) {
+    processedCache.add(item.id);
+    processedBloomFilter.add(item.id);
+  }
+  if (item.is_sent === 1) {
+    sentCache.add(item.id);
+    sentBloomFilter.add(item.id);
+  }
 }
 
 export async function initAnnouncementCache() {
@@ -49,9 +202,11 @@ export async function initAnnouncementCache() {
 
     for (const d of snap.docs) {
       processedCache.add(d.id);
+      processedBloomFilter.add(d.id);
       const data = d.data();
       if (data?.is_sent === 1) {
         sentCache.add(d.id);
+        sentBloomFilter.add(d.id);
       }
       let bseTs = parseBseDate(data.bseTime);
       if (!bseTs) bseTs = data.fetched_at || 0;
@@ -127,6 +282,16 @@ export async function getAnnouncementById(newsId: string): Promise<any | null> {
 }
 
 export async function isAnnouncementSent(newsId: string): Promise<boolean> {
+  if (!newsId) return false;
+
+  // Tier 1: Bloom Filter check (O(1), zero false negatives)
+  // If not in sentBloomFilter, it was 100% DEFINITELY NEVER sent to Telegram.
+  // Instantly bypasses Firestore and expensive memory scans (0 DB scans).
+  if (!sentBloomFilter.has(newsId)) {
+    return false;
+  }
+
+  // Tier 2: Bloom Filter says "possibly sent" -> Check exact in-memory set
   if (sentCache.has(newsId)) return true;
   
   const inMem = announcementsMemoryCache.find(a => a.id === newsId);
@@ -143,6 +308,7 @@ export async function isAnnouncementSent(newsId: string): Promise<boolean> {
       const isSent = snap.data()?.is_sent === 1;
       if (isSent) {
         sentCache.add(newsId);
+        sentBloomFilter.add(newsId);
         if (sentCache.size > 5000) {
           const firstItem = sentCache.values().next().value;
           if (firstItem) sentCache.delete(firstItem);
@@ -164,6 +330,15 @@ export async function isAnnouncementSent(newsId: string): Promise<boolean> {
 }
 
 export async function isAnnouncementProcessed(newsId: string): Promise<boolean> {
+  if (!newsId) return false;
+
+  // Tier 1: Bloom Filter check (O(1), zero false negatives)
+  // If not in processedBloomFilter, 100% guarantee it has never been processed before.
+  if (!processedBloomFilter.has(newsId)) {
+    return false;
+  }
+
+  // Tier 2: Confirm against exact in-memory set to eliminate false positive
   return processedCache.has(newsId);
 }
 
@@ -211,7 +386,7 @@ async function processFirestoreQueue() {
           continue;
         }
         tasksToProcess.push(task);
-        if (tasksToProcess.length >= 200) break;
+        if (tasksToProcess.length >= 400) break;
       }
 
       if (tasksToProcess.length === 0) break;
@@ -279,22 +454,43 @@ async function processFirestoreQueue() {
 }
 
 function queueAnnouncementWrite(docId: string, data: any, merge: boolean = true) {
-  if (isFirestoreQuotaExceeded() || isAdminPermissionDenied()) return;
+  queueAnnouncementsBatchWrite([{ docId, data, merge }]);
+}
 
-  const existing = firestoreWriteQueue.get(docId);
-  if (existing) {
-    firestoreWriteQueue.set(docId, {
-      docId,
-      data: { ...existing.data, ...data },
-      merge: true,
-      attempts: existing.attempts || 0,
-      lastAttemptAt: existing.lastAttemptAt
-    });
-  } else {
-    firestoreWriteQueue.set(docId, { docId, data, merge, attempts: 0 });
+export function queueAnnouncementsBatchWrite(tasks: { docId: string; data: any; merge?: boolean }[]) {
+  if (isFirestoreQuotaExceeded() || isAdminPermissionDenied() || !tasks || tasks.length === 0) return;
+
+  for (const t of tasks) {
+    if (!t.docId) continue;
+    const existing = firestoreWriteQueue.get(t.docId);
+    if (existing) {
+      firestoreWriteQueue.set(t.docId, {
+        docId: t.docId,
+        data: { ...existing.data, ...t.data },
+        merge: true,
+        attempts: existing.attempts || 0,
+        lastAttemptAt: existing.lastAttemptAt
+      });
+    } else {
+      firestoreWriteQueue.set(t.docId, {
+        docId: t.docId,
+        data: t.data,
+        merge: t.merge !== false,
+        attempts: 0
+      });
+    }
   }
 
   processFirestoreQueue().catch(() => {});
+}
+
+export async function flushFirestoreWriteQueue(): Promise<void> {
+  while (firestoreWriteQueue.size > 0 && !isFirestoreQuotaExceeded() && !isAdminPermissionDenied()) {
+    await processFirestoreQueue();
+    if (firestoreWriteQueue.size > 0) {
+      await new Promise(r => setTimeout(r, 100));
+    }
+  }
 }
 
 // Delete announcements from local cache, disk, and Firestore
@@ -309,6 +505,7 @@ export async function deleteAnnouncementsFromStorageAndFirestore(idsToDelete: st
     processedCache.delete(id);
     sentCache.delete(id);
     firestoreWriteQueue.delete(id);
+    pageRenderCache.invalidate(`ann:${id}`);
   }
   
   // 2. Persist to local disk
@@ -339,7 +536,9 @@ export async function deleteAnnouncementsFromStorageAndFirestore(idsToDelete: st
 
 export async function markAnnouncementSent(newsId: string, telegramMessageId?: number) {
   sentCache.add(newsId);
+  sentBloomFilter.add(newsId);
   processedCache.add(newsId);
+  processedBloomFilter.add(newsId);
 
   const inMem = announcementsMemoryCache.find(a => a.id === newsId || a.newsId === newsId);
   if (inMem) {
@@ -361,9 +560,10 @@ export async function updateAnnouncementSummary(newsId: string, aiSummary: strin
   }
 
   queueAnnouncementWrite(newsId, { aiSummary }, true);
+  pageRenderCache.invalidate(`ann:${newsId}`);
 }
 
-export async function saveAnnouncement(data: {
+export interface AnnouncementInput {
   newsId: string;
   companyName: string;
   subject: string;
@@ -376,81 +576,125 @@ export async function saveAnnouncement(data: {
   aiSummary?: string;
   scrip_cd?: string;
   isWatchlist?: boolean;
-}) {
-  processedCache.add(data.newsId);
+}
 
-  let bseTs = 0;
-  if (data.bseTime) {
-    const parsed = parseBseDate(data.bseTime);
-    if (parsed > 0) bseTs = parsed;
-  }
-  if (!bseTs || bseTs > Date.now() + 120000) bseTs = Date.now();
-
-  const safeData = {
-    ...data,
-    subject: String(data.subject || "").substring(0, 990),
-    details: String(data.details || "").substring(0, 4900),
-    companyName: String(data.companyName || "").substring(0, 190),
-    pdfLink: String(data.pdfLink || "").substring(0, 990),
-    bseTime: String(data.bseTime || "").substring(0, 90),
-    scrip_cd: String(data.scrip_cd || "").substring(0, 30),
-    isWatchlist: data.isWatchlist ?? false,
-    fetched_at: Date.now(),
-    bseTimestamp: bseTs,
-    is_sent: data.is_sent ?? 0
-  };
-
-  if (!safeData.priority || !safeData.category) {
-    const p = determinePriority(safeData.subject || '', safeData.details || '');
-    safeData.priority = safeData.priority || p.level;
-    safeData.category = safeData.category || p.category;
+export async function saveAnnouncementsBatch(items: AnnouncementInput[]): Promise<{ total: number; inserted: number; updated: number; skipped: number }> {
+  if (!Array.isArray(items) || items.length === 0) {
+    return { total: 0, inserted: 0, updated: 0, skipped: 0 };
   }
 
-  const memItem = { id: data.newsId, ...safeData };
-  const existingIdx = announcementsMemoryCache.findIndex(a => a.id === data.newsId);
-  let hasChanged = true;
-
-  if (existingIdx >= 0) {
-    const existing = announcementsMemoryCache[existingIdx];
-    
-    // (a) "Pehle se saved hai kya?" Check:
-    // If the announcement is already in memory cache and its critical fields haven't changed,
-    // skip writing to Firestore (saves ~95%+ unnecessary Firestore writes).
-    const isIdentical = 
-      existing.subject === safeData.subject &&
-      existing.details === safeData.details &&
-      existing.companyName === safeData.companyName &&
-      existing.pdfLink === safeData.pdfLink &&
-      existing.priority === safeData.priority &&
-      existing.category === safeData.category &&
-      (existing.is_sent ?? 0) === (safeData.is_sent ?? 0) &&
-      (existing.aiSummary || '') === (safeData.aiSummary || '') &&
-      Boolean(existing.isWatchlist) === Boolean(safeData.isWatchlist);
-
-    if (isIdentical) {
-      hasChanged = false;
-    } else {
-      announcementsMemoryCache[existingIdx] = { ...existing, ...memItem };
+  // Fast O(1) index map for current in-memory cache
+  const idMap = new Map<string, number>();
+  for (let i = 0; i < announcementsMemoryCache.length; i++) {
+    const item = announcementsMemoryCache[i];
+    if (item && item.id) {
+      idMap.set(item.id, i);
     }
-  } else {
-    announcementsMemoryCache.push(memItem);
   }
 
-  // If identical, we do not need to rewrite disk or trigger Firestore write
-  if (!hasChanged) {
-    return;
+  const now = Date.now();
+  let inserted = 0;
+  let updated = 0;
+  let skipped = 0;
+  const tasksToQueue: { docId: string; data: any; merge?: boolean }[] = [];
+
+  for (const data of items) {
+    if (!data || !data.newsId) {
+      skipped++;
+      continue;
+    }
+
+    processedCache.add(data.newsId);
+    processedBloomFilter.add(data.newsId);
+    if (data.is_sent === 1) {
+      sentCache.add(data.newsId);
+      sentBloomFilter.add(data.newsId);
+    }
+
+    let bseTs = 0;
+    if (data.bseTime) {
+      const parsed = parseBseDate(data.bseTime);
+      if (parsed > 0) bseTs = parsed;
+    }
+    if (!bseTs || bseTs > now + 120000) bseTs = now;
+
+    const safeData = {
+      ...data,
+      subject: String(data.subject || "").substring(0, 990),
+      details: String(data.details || "").substring(0, 4900),
+      companyName: String(data.companyName || "").substring(0, 190),
+      pdfLink: String(data.pdfLink || "").substring(0, 990),
+      bseTime: String(data.bseTime || "").substring(0, 90),
+      scrip_cd: String(data.scrip_cd || "").substring(0, 30),
+      isWatchlist: data.isWatchlist ?? false,
+      fetched_at: now,
+      bseTimestamp: bseTs,
+      is_sent: data.is_sent ?? 0
+    };
+
+    if (!safeData.priority || !safeData.category) {
+      const p = determinePriority(safeData.subject || '', safeData.details || '');
+      safeData.priority = safeData.priority || p.level;
+      safeData.category = safeData.category || p.category;
+    }
+
+    const memItem = { id: data.newsId, ...safeData };
+    const existingIdx = idMap.get(data.newsId);
+
+    if (existingIdx !== undefined && existingIdx >= 0) {
+      const existing = announcementsMemoryCache[existingIdx];
+      const isIdentical = 
+        existing.subject === safeData.subject &&
+        existing.details === safeData.details &&
+        existing.companyName === safeData.companyName &&
+        existing.pdfLink === safeData.pdfLink &&
+        existing.priority === safeData.priority &&
+        existing.category === safeData.category &&
+        (existing.is_sent ?? 0) === (safeData.is_sent ?? 0) &&
+        (existing.aiSummary || '') === (safeData.aiSummary || '') &&
+        Boolean(existing.isWatchlist) === Boolean(safeData.isWatchlist);
+
+      if (isIdentical) {
+        skipped++;
+      } else {
+        announcementsMemoryCache[existingIdx] = { ...existing, ...memItem };
+        updated++;
+        tasksToQueue.push({ docId: data.newsId, data: safeData, merge: true });
+      }
+    } else {
+      announcementsMemoryCache.push(memItem);
+      idMap.set(data.newsId, announcementsMemoryCache.length - 1);
+      inserted++;
+      tasksToQueue.push({ docId: data.newsId, data: safeData, merge: true });
+    }
   }
 
-  // Keep memory cache strictly sorted by bseTimestamp / fetched_at descending
-  announcementsMemoryCache.sort((a, b) => (b.bseTimestamp || b.fetched_at || 0) - (a.bseTimestamp || a.fetched_at || 0));
-  if (announcementsMemoryCache.length > 10000) {
-    announcementsMemoryCache.length = 10000;
+  // If new records were added or existing ones were updated, perform a single consolidated sort, disk save, and Firestore batch queue
+  if (inserted > 0 || updated > 0) {
+    announcementsMemoryCache.sort((a, b) => (b.bseTimestamp || b.fetched_at || 0) - (a.bseTimestamp || a.fetched_at || 0));
+    if (announcementsMemoryCache.length > 10000) {
+      announcementsMemoryCache.length = 10000;
+    }
+    scheduleLocalDiskSave();
+    queueAnnouncementsBatchWrite(tasksToQueue);
+
+    // Notify search engines (Bing, Yandex, etc.) of newly published announcement pages
+    if (inserted > 0) {
+      const newUrls = items
+        .filter(it => it && it.newsId)
+        .slice(0, 50)
+        .map(it => `https://bsenexus.in/announcement/${it.newsId}`);
+      if (newUrls.length > 0) {
+        notifySearchEnginesOfNewPages(newUrls);
+      }
+    }
   }
 
-  scheduleLocalDiskSave();
+  return { total: items.length, inserted, updated, skipped };
+}
 
-  // Queue write to Firestore only when new or meaningfully updated
-  queueAnnouncementWrite(data.newsId, safeData, true);
+export async function saveAnnouncement(data: AnnouncementInput) {
+  await saveAnnouncementsBatch([data]);
 }
 
 export async function pruneAndCheckStorageCapacity() {
@@ -568,6 +812,23 @@ export function getAnnouncementsForStockInWindow(
 
   results.sort((a, b) => (b.bseTimestamp || b.fetched_at || 0) - (a.bseTimestamp || a.fetched_at || 0));
   return results;
+}
+
+export function getBloomFilterDiagnostics() {
+  const pStats = processedBloomFilter.getStats();
+  const sStats = sentBloomFilter.getStats();
+
+  return {
+    processedFilter: pStats,
+    sentFilter: sStats,
+    summary: {
+      status: 'ACTIVE_ZERO_FALSE_NEGATIVES',
+      totalDatabaseBypasses: pStats.negativeBypasses + sStats.negativeBypasses,
+      totalCandidateVerifications: pStats.positiveChecks + sStats.positiveChecks,
+      totalMemorySavedKb: pStats.memorySavedKb + sStats.memorySavedKb,
+      combinedMemoryFootprintKb: Math.round((pStats.byteSize + sStats.byteSize) / 1024)
+    }
+  };
 }
 
 

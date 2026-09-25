@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, Check, Sparkles, Send, ShieldCheck, Zap, 
   BellRing, Filter, ExternalLink, Bot, ArrowRight 
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+import { ActionButton } from './ui/ActionButton';
 
 export function ProUpgradeModal() {
   const { 
@@ -17,6 +18,17 @@ export function ProUpgradeModal() {
   } = useAuth();
 
   useBodyScrollLock(isProModalOpen);
+
+  useEffect(() => {
+    if (!isProModalOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsProModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isProModalOpen, setIsProModalOpen]);
 
   const [isActivating, setIsActivating] = useState(false);
   const [activatedSuccess, setActivatedSuccess] = useState(false);
@@ -31,7 +43,7 @@ export function ProUpgradeModal() {
     }
 
     setIsActivating(true);
-    const success = await upgradeToPro('30-Day Pro Trial');
+    const success = await upgradeToPro('7-Day Pro Trial');
     setIsActivating(false);
     if (success) {
       setActivatedSuccess(true);
@@ -62,7 +74,7 @@ export function ProUpgradeModal() {
           <div className="flex items-center justify-between relative z-10">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-[11px] font-black uppercase tracking-wider">
               <Sparkles size={13} />
-              <span>30-Day Trial • Google Sign-In</span>
+              <span>1-Week Free Trial • Google Sign-In</span>
             </div>
             
             <button
@@ -76,19 +88,19 @@ export function ProUpgradeModal() {
 
           <div className="mt-4 relative z-10">
             <h2 id="pro-upgrade-title" className="text-2xl font-black tracking-tight">
-              30-Day Free Pro Intelligence
+              1-Week Free Pro Intelligence
             </h2>
             <p className="text-xs text-white/80 mt-1">
-              Sign in with your genuine Google account to activate 30 days of Free Pro access: Gemini AI summaries, Telegram alerts, and custom filtering.
+              Sign in with your genuine Google account to activate 1 week (7 days) of Free Pro access: Gemini AI summaries, Telegram alerts, and custom filtering.
             </p>
           </div>
 
           {/* Pricing Tag */}
           <div className="mt-5 inline-flex items-baseline gap-2 bg-black/20 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/20">
-            <span className="text-base line-through text-white/60">₹10/mo</span>
+            <span className="text-base line-through text-white/60">₹499/mo</span>
             <span className="text-3xl font-black text-white">₹0</span>
             <span className="text-[11px] bg-emerald-400 text-slate-950 font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
-              30 Days Free with Google
+              1 Week Free with Google
             </span>
           </div>
         </div>
@@ -138,23 +150,31 @@ export function ProUpgradeModal() {
             {activatedSuccess ? (
               <div className="w-full py-3 bg-emerald-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md animate-in zoom-in-95">
                 <Check size={16} />
-                <span>30-Day Free Pro Activated!</span>
+                <span>1-Week Free Pro Activated!</span>
               </div>
             ) : (
-              <button
+              <ActionButton
                 onClick={handleActivate}
-                disabled={isActivating}
-                className="w-full py-3.5 px-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-black text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50"
+                isLoading={isActivating}
+                loadingText="Activating..."
+                variant="emerald"
+                size="lg"
+                icon={<Sparkles size={16} />}
+                className="w-full font-black text-sm"
               >
-                <Sparkles size={16} />
-                <span>{isActivating ? 'Activating...' : ((!user || user.isAnonymous) ? 'Sign In with Google for 30-Day Free Pro' : 'Activate 30-Day Free Pro (₹0)')}</span>
-                <ArrowRight size={15} />
-              </button>
+                <span>{(!user || user.isAnonymous) ? 'Sign In with Google for 1-Week Free Pro' : 'Activate 1-Week Free Pro (₹0)'}</span>
+                <ArrowRight size={15} className="ml-1" />
+              </ActionButton>
             )}
             
-            <p className="text-center text-[10px] text-slate-400 mt-2">
-              Sign in with Google to get 30 days free. Guests can freely view public filings & live data.
-            </p>
+            <div className="text-left text-[10px] text-slate-400 dark:text-slate-500 mt-3 p-2.5 rounded-xl bg-slate-50/80 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/80 space-y-1">
+              <p className="text-slate-600 dark:text-slate-300 font-medium leading-relaxed">
+                <span className="font-bold text-slate-900 dark:text-white">Zero Risk Guarantee:</span> No credit card required upfront &bull; Zero automatic recurring debit &bull; Cancel anytime with 1-click in Settings.
+              </p>
+              <p className="text-[9px] text-slate-400/80 leading-relaxed">
+                Protected by our 7-Day Refund Policy &amp; Terms of Service &bull; RBI &amp; SEBI compliant.
+              </p>
+            </div>
           </div>
         </div>
       </div>

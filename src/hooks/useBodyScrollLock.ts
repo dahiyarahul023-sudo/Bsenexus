@@ -4,11 +4,13 @@ import { useEffect, useRef } from 'react';
 const activeLocks = new Set<string>();
 let originalBodyOverflow = '';
 let originalPaddingRight = '';
+let lockedScrollY = 0;
 
 function applyLock(id: string) {
   if (typeof document === 'undefined') return;
 
   if (activeLocks.size === 0) {
+    lockedScrollY = window.scrollY || document.documentElement.scrollTop || 0;
     originalBodyOverflow = document.body.style.overflow || '';
     originalPaddingRight = document.body.style.paddingRight || '';
 
@@ -34,6 +36,11 @@ function releaseLock(id: string) {
     document.body.classList.remove('modal-open');
     document.documentElement.classList.remove('modal-open');
     document.documentElement.style.overflow = '';
+    
+    // Restore exact position in case browser reset scroll
+    if (lockedScrollY > 0) {
+      window.scrollTo({ top: lockedScrollY, behavior: 'instant' });
+    }
   }
 }
 

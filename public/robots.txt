@@ -3,32 +3,46 @@ Allow: /
 Disallow: /api/
 Disallow: /auth/
 
-# Allow major AI and Search Crawlers for Generative Engine Optimization (GEO/AEO)
-User-agent: Googlebot
-Allow: /
-
-User-agent: Google-Extended
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
+# AI crawlers explicitly allowed with endpoint boundaries
 User-agent: GPTBot
 Allow: /
+Disallow: /api/
+Disallow: /auth/
+
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /api/
+Disallow: /auth/
 
 User-agent: ClaudeBot
 Allow: /
+Disallow: /api/
+Disallow: /auth/
+
+User-agent: Google-Extended
+Allow: /
+Disallow: /api/
+Disallow: /auth/
 
 User-agent: PerplexityBot
 Allow: /
+Disallow: /api/
+Disallow: /auth/
 
-User-agent: Applebot
+User-agent: CCBot
 Allow: /
+Disallow: /api/
+Disallow: /auth/
 
-User-agent: Applebot-Extended
+User-agent: anthropic-ai
 Allow: /
+Disallow: /api/
+Disallow: /auth/
 
+User-agent: Claude-Web
+Allow: /
+Disallow: /api/
+Disallow: /auth/
+
+# Sitemap
 Sitemap: https://bsenexus.in/sitemap.xml
-# AI Discovery Standard: https://llmstxt.org/
-# LLMs specification file: https://bsenexus.in/llms.txt
-# Full LLMs context: https://bsenexus.in/llms-full.txt

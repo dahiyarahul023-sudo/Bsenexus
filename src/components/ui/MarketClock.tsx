@@ -161,10 +161,10 @@ export function MarketClock({ className }: { className?: string }) {
     if (!canBroadcast) {
       if (!user && !profile) {
         setIsAuthModalOpen(true);
-        alert('🔒 Holiday Telegram Broadcasting is reserved for Pro & Admin users.\n\nPlease Sign In or Upgrade to Pro to broadcast market holiday notices!');
+        alert('🔒 Holiday Telegram Broadcasting is reserved for Pro & Admin users.\n\nSign In to activate your 1-Week Free Pro Trial or Upgrade to Pro (₹499/mo)!');
       } else {
         setIsProModalOpen(true);
-        alert('🔒 Market Holiday Telegram Broadcast is a Pro & Admin feature (₹10/mo).\n\nUpgrade to Pro to broadcast official exchange circulars and trading schedules to your Telegram channel!');
+        alert('🔒 Market Holiday Telegram Broadcast is a Pro & Admin feature (₹499/mo).\n\nUpgrade to Pro to broadcast official exchange circulars and trading schedules to your Telegram channel!');
       }
       return;
     }
@@ -264,7 +264,7 @@ export function MarketClock({ className }: { className?: string }) {
           
           {/* Digital Time */}
           <div className="flex items-baseline tabular-nums">
-            <span className="font-mono tracking-tight font-bold text-slate-900 dark:text-white text-[11px] sm:text-xs">{timeFormatted}</span>
+            <span className="font-mono tracking-tight font-bold text-slate-900 dark:text-white text-xs tabular-nums">{timeFormatted}</span>
           </div>
 
           <ChevronDown className={cn("w-3 h-3 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200 transition-transform duration-200 shrink-0", showDetails && "rotate-180")} />

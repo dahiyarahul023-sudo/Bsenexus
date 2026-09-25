@@ -23,6 +23,8 @@ import {
 } from '../utils/motionTokens';
 import { getSafePdfUrl } from '../utils/pdfHelper';
 import { CustomDropdown } from './ui/CustomDropdown';
+import { HonestProgressBar } from './ui/HonestProgressBar';
+import { ActionButton } from './ui/ActionButton';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -171,19 +173,34 @@ export const QuarterlyResultsLedger: React.FC<QuarterlyResultsLedgerProps> = ({
               align="right"
             />
 
-            <motion.button
-              type="button"
-              whileTap={buttonTap}
+            <ActionButton
               onClick={() => onFetchDeepHistory(selectedYears)}
-              disabled={isFetchingDeep}
-              className="px-3 py-1.5 text-xs font-bold bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 rounded-lg flex items-center gap-1.5 shadow-sm transition-all cursor-pointer font-mono"
+              isLoading={isFetchingDeep}
+              loadingText="Syncing BSE..."
+              variant="primary"
+              size="sm"
+              className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-mono"
             >
-              <RefreshCw size={12} className={cn(isFetchingDeep && "animate-spin")} />
-              <span>{isFetchingDeep ? "Syncing BSE..." : `Sync ${selectedYears}Y BSE History`}</span>
-            </motion.button>
+              Sync {selectedYears}Y BSE History
+            </ActionButton>
           </div>
         )}
       </div>
+
+      {isFetchingDeep && (
+        <div className="animate-in fade-in duration-200">
+          <HonestProgressBar
+            color="amber"
+            isRunning={true}
+            simulatedSteps={[
+              { label: `Accessing BSE financial registry for ${selectedYears}Y records...`, durationMs: 1500 },
+              { label: 'Parsing standalone & consolidated financial statements...', durationMs: 2500 },
+              { label: 'Calculating YoY & QoQ variance and PAT margins...', durationMs: 2200 },
+              { label: 'Indexing board meeting timestamps & release latency...', durationMs: 1200 }
+            ]}
+          />
+        </div>
+      )}
 
       {deepHistoryMsg && (
         <div className="p-3 bg-amber-950/40 border border-amber-800/80 rounded-xl text-xs text-amber-300 flex items-center gap-2 animate-in fade-in">
@@ -192,17 +209,44 @@ export const QuarterlyResultsLedger: React.FC<QuarterlyResultsLedgerProps> = ({
         </div>
       )}
 
-      {/* Loading state */}
+      {/* Loading state - Show shape not spin */}
       {isLoading ? (
-        <div className="py-12 flex flex-col items-center justify-center gap-3 text-slate-400 bg-slate-900/40 rounded-xl border border-slate-800">
-          <RefreshCw size={24} className="animate-spin text-emerald-500" />
-          <div className="text-sm font-medium">Loading verified quarterly outcomes...</div>
+        <div className="space-y-3 animate-pulse">
+          <div className="flex items-center justify-between text-xs text-slate-500 font-mono px-1">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+              <span>Loading verified quarterly financial results...</span>
+            </span>
+            <span className="text-[11px] text-slate-400">Rendering ledger...</span>
+          </div>
+          {[1, 2, 3].map((sk) => (
+            <div
+              key={`quarter-skeleton-${sk}`}
+              className="p-4 rounded-xl border border-slate-200/80 dark:border-[#2D283E] bg-white dark:bg-[#181624] space-y-3"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="h-5 w-20 bg-slate-200 dark:bg-slate-800 rounded-md" />
+                  <div className="h-4 w-28 bg-slate-200/70 dark:bg-slate-800/70 rounded" />
+                </div>
+                <div className="h-4 w-16 bg-slate-200/60 dark:bg-slate-800/60 rounded" />
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800/60">
+                {[1, 2, 3, 4].map((col) => (
+                  <div key={col} className="p-2 rounded bg-slate-50 dark:bg-[#14131E] space-y-1">
+                    <div className="h-2.5 w-12 bg-slate-200/60 dark:bg-slate-800/60 rounded" />
+                    <div className="h-4 w-16 bg-slate-200 dark:bg-slate-800 rounded" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       ) : displayItems.length === 0 ? (
-        <div className="py-12 px-4 text-center bg-slate-900/40 rounded-xl border border-slate-800 space-y-2">
-          <div className="text-sm font-semibold text-slate-300">No quarterly results indexed yet for {displaySymbol || 'this stock'}.</div>
-          <p className="text-xs text-slate-500 max-w-md mx-auto">
-            Click <strong>Sync BSE History</strong> above to automatically pull and parse the last 1 to 5 years of verified financial result filings and release timestamps.
+        <div className="p-6 sm:p-7 text-left bg-slate-900/40 rounded-2xl border border-slate-800 space-y-2 max-w-lg">
+          <div className="text-sm font-bold text-slate-200">No quarterly results indexed yet for {displaySymbol || 'this stock'}.</div>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            Click <strong className="text-slate-200">Sync BSE History</strong> above to automatically pull and parse the last 1 to 5 years of verified financial result filings and release timestamps.
           </p>
         </div>
       ) : (

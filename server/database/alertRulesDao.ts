@@ -255,7 +255,6 @@ export function evaluateAlertRulesForUser(
   const combinedText = `${announcement.subject || ''} ${announcement.details || ''} ${announcement.companyName || ''}`.toLowerCase();
   const annSym = (announcement.symbol || '').toUpperCase();
   const annScrip = String(announcement.scripCode || '');
-  const annCat = (announcement.category || '').toUpperCase();
   const annPrio = (announcement.priority || 'LOW').toUpperCase();
 
   for (const rule of activeRules) {

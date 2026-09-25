@@ -374,44 +374,68 @@ export function determinePriority(subject: string, details: string): { level: st
   return { level: 'LOW', icon: '🟢', category: 'OTHER' };
 }
 
-export function isMarketHoursIST(): boolean {
+export function getISTMarketStatus(): {
+  isMarketHours: boolean;
+  intervalMs: number;
+  statusLabel: string;
+  cycleLabel: string;
+  dayOfWeek: number;
+  hours: number;
+  minutes: number;
+} {
   const now = new Date();
-  const options: Intl.DateTimeFormatOptions = {
-    timeZone: 'Asia/Kolkata',
-    hour12: false,
-    weekday: 'short',
-    hour: '2-digit',
-    minute: '2-digit'
-  };
-  const formatter = new Intl.DateTimeFormat('en-US', options);
-  const parts = formatter.formatToParts(now);
+  // IST is UTC + 5:30 fixed (no Daylight Savings Time)
+  const istOffsetMs = (5 * 60 + 30) * 60 * 1000;
+  const istDate = new Date(now.getTime() + istOffsetMs);
 
-  let weekday = '';
-  let hour = 0;
-  let minute = 0;
-  for (const part of parts) {
-    if (part.type === 'weekday') weekday = part.value;
-    if (part.type === 'hour') hour = parseInt(part.value, 10);
-    if (part.type === 'minute') minute = parseInt(part.value, 10);
+  const dayOfWeek = istDate.getUTCDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+  const hours = istDate.getUTCHours();
+  const minutes = istDate.getUTCMinutes();
+  const totalMinutes = hours * 60 + minutes;
+
+  // Monday (1) to Friday (5), between 09:15 (555m) and 15:30 (930m) IST
+  const isWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
+  const isMarketHours = isWeekday && totalMinutes >= 555 && totalMinutes <= 930;
+
+  if (isMarketHours) {
+    return {
+      isMarketHours: true,
+      intervalMs: 30 * 1000, // 30 seconds during active market trading hours
+      statusLabel: 'Live (30s)',
+      cycleLabel: '30s polling cycle',
+      dayOfWeek,
+      hours,
+      minutes
+    };
   }
 
-  if (weekday === 'Sat' || weekday === 'Sun') return false;
+  return {
+    isMarketHours: false,
+    intervalMs: 5 * 60 * 1000, // 5 minutes off-hours / nights / weekends
+    statusLabel: 'Relaxed (5m)',
+    cycleLabel: '5m polling cycle',
+    dayOfWeek,
+    hours,
+    minutes
+  };
+}
 
-  const currentMinutes = hour * 60 + minute;
-  // Official Market Hours: 9:15 AM (555m) to 3:30 PM (930m) IST Mon-Fri
-  return currentMinutes >= 555 && currentMinutes <= 930;
+export function isMarketHoursIST(): boolean {
+  return getISTMarketStatus().isMarketHours;
 }
 
 export function getPollingIntervalMs(consecutiveFailures: number = 0): number {
-  // Circuit breaker backoff: If repeated failures occur (WAF / network / 429), back off temporarily
+  const { isMarketHours, intervalMs } = getISTMarketStatus();
+
+  // If there are failures, apply modest backoff
   if (consecutiveFailures >= 5) {
-    return 60000; // 60s cooldown
+    return isMarketHours ? 60000 : 300000; // 60s during market hours, 5m off-hours
   }
   if (consecutiveFailures >= 3) {
-    return 30000; // 30s backoff
+    return isMarketHours ? 45000 : 300000;
   }
 
-  // Base 15s with subtle natural jitter (13.5s - 16.5s) to avoid bot-like fixed patterns on WAF
-  const jitter = Math.floor(Math.random() * 3000) - 1500; // -1500ms to +1500ms
-  return Math.max(13000, 15000 + jitter);
+  // Base interval: 30s during market hours, 5m off-hours (with +/- 1s natural jitter to avoid bot pattern)
+  const jitter = Math.floor(Math.random() * 2000) - 1000;
+  return Math.max(20000, intervalMs + jitter);
 }

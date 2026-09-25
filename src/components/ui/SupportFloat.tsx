@@ -98,14 +98,12 @@ export function SupportModal({ isOpen, onClose, onOpenHelp }: SupportModalProps)
             {/* Quick Action Channels */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <a
-                href="https://t.me/bse_nexus_support"
-                target="_blank"
-                rel="noopener noreferrer"
+                href="mailto:admin@bsenexus.in?subject=BSE%20Nexus%20Feedback%20%26%20Support"
                 className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-[#201E2E] hover:bg-slate-100 dark:hover:bg-[#282438] border border-slate-200 dark:border-[#352F48] text-xs font-bold text-slate-800 dark:text-slate-200 transition-colors group"
               >
                 <span className="flex items-center gap-2">
-                  <Send size={15} className="text-blue-500 shrink-0 group-hover:scale-110 transition-transform" />
-                  <span>Telegram Support</span>
+                  <Mail size={15} className="text-emerald-500 shrink-0 group-hover:scale-110 transition-transform" />
+                  <span>Email: admin@bsenexus.in</span>
                 </span>
                 <ExternalLink size={12} className="text-slate-400" />
               </a>
@@ -192,10 +190,14 @@ export function SupportModal({ isOpen, onClose, onOpenHelp }: SupportModalProps)
 
             {/* Direct Email fallback */}
             <div className="pt-2 border-t border-slate-100 dark:border-[#2D283E] flex items-center justify-between text-[11px] text-slate-500">
-              <span className="flex items-center gap-1">
+              <a 
+                href="mailto:admin@bsenexus.in" 
+                className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-white transition-colors"
+                aria-label="Email BSE Nexus Support (admin@bsenexus.in)"
+              >
                 <Mail size={12} className="text-slate-400" />
-                <span>Email: support@bsenexus.in</span>
-              </span>
+                <span>Email: <span className="underline font-medium">admin@bsenexus.in</span></span>
+              </a>
               <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Live Mon-Sat</span>
             </div>
           </motion.div>

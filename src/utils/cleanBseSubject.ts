@@ -53,7 +53,10 @@ export function cleanBseSubject(
     .replace(/&amp;/g, '&')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
+    .replace(/#39;/g, "'")
     .replace(/&apos;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/''+/g, "'")
     .replace(/([a-zA-Z])"([a-zA-Z])/g, "$1'$2") // Fixes e.g. "Scrutinizer"s" -> "Scrutinizer's"
     .replace(/""+/g, '"')
     .trim();

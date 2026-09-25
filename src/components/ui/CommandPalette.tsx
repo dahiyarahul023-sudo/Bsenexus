@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, X, Flame, List, CalendarDays, Newspaper, Settings, 
   Moon, Sun, Zap, Sparkles, Building2, TrendingUp, ExternalLink, 
-  ChevronRight, Command, CornerDownLeft
+  ChevronRight, Command, CornerDownLeft, Loader2, Plus, Star
 } from 'lucide-react';
 import { springSnappy } from '../../utils/motionTokens';
 import { useIntelModal } from '../../context/IntelModalContext';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
+import { customFetch } from '../../api';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -25,11 +26,13 @@ interface PaletteItem {
   id: string;
   title: string;
   subtitle?: string;
-  category: 'Navigation' | 'Actions' | 'Top Stocks' | 'Topics';
+  category: 'Companies & Stocks' | 'Navigation' | 'Actions' | 'Topics';
   icon: any;
   action: () => void;
   badge?: string;
   keywords?: string[];
+  scripCode?: string;
+  symbol?: string;
 }
 
 const TOP_BSE_STOCKS = [
@@ -44,10 +47,21 @@ const TOP_BSE_STOCKS = [
   { name: 'Hindustan Unilever Ltd', symbol: 'HINDUNILVR', scrip: '500696', sector: 'FMCG' },
   { name: 'Larsen & Toubro Ltd', symbol: 'LT', scrip: '500510', sector: 'Infrastructure' },
   { name: 'Tata Motors Ltd', symbol: 'TATAMOTORS', scrip: '500570', sector: 'Automobile' },
+  { name: 'Tata Steel Ltd', symbol: 'TATASTEEL', scrip: '500470', sector: 'Metals & Mining' },
+  { name: 'Tata Power Company Ltd', symbol: 'TATAPOWER', scrip: '500400', sector: 'Power' },
+  { name: 'Tata Consumer Products Ltd', symbol: 'TATACONSUM', scrip: '500800', sector: 'FMCG' },
   { name: 'Bajaj Finance Ltd', symbol: 'BAJFINANCE', scrip: '500034', sector: 'NBFC' },
   { name: 'Sun Pharmaceutical', symbol: 'SUNPHARMA', scrip: '524715', sector: 'Pharma' },
   { name: 'Maruti Suzuki India', symbol: 'MARUTI', scrip: '532500', sector: 'Automobile' },
   { name: 'Adani Enterprises Ltd', symbol: 'ADANIENT', scrip: '512599', sector: 'Conglomerate' },
+  { name: 'Adani Ports & SEZ', symbol: 'ADANIPORTS', scrip: '532921', sector: 'Infrastructure' },
+  { name: 'Titan Company Ltd', symbol: 'TITAN', scrip: '500114', sector: 'Consumer Goods' },
+  { name: 'Trent Ltd', symbol: 'TRENT', scrip: '500251', sector: 'Retail' },
+  { name: 'State Bank of India', symbol: 'SBIN', scrip: '500112', sector: 'Banking' },
+  { name: 'Zomato Ltd', symbol: 'ZOMATO', scrip: '543320', sector: 'Tech' },
+  { name: 'IRFC', symbol: 'IRFC', scrip: '543257', sector: 'Railways & PSU' },
+  { name: 'RVNL', symbol: 'RVNL', scrip: '542649', sector: 'Railways & PSU' },
+  { name: 'Suzlon Energy Ltd', symbol: 'SUZLON', scrip: '532667', sector: 'Renewable Energy' }
 ];
 
 export function CommandPalette({
@@ -63,6 +77,9 @@ export function CommandPalette({
 }: CommandPaletteProps) {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [masterStocks, setMasterStocks] = useState<any[]>([]);
+  const [apiResults, setApiResults] = useState<any[]>([]);
+  const [isSearchingApi, setIsSearchingApi] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const { openIntelModal } = useIntelModal();
@@ -74,9 +91,52 @@ export function CommandPalette({
     if (isOpen) {
       setQuery('');
       setSelectedIndex(0);
+      setApiResults([]);
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [isOpen]);
+
+  // Load master stocks directory on mount / when opened
+  useEffect(() => {
+    if (!isOpen || masterStocks.length > 0) return;
+    customFetch('/api/stock-master')
+      .then(r => r.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setMasterStocks(data);
+        }
+      })
+      .catch(() => {});
+  }, [isOpen, masterStocks.length]);
+
+  // Live dynamic debounced search against search-company API
+  useEffect(() => {
+    const q = query.trim();
+    if (!isOpen || !q || q.length < 1) {
+      setApiResults([]);
+      setIsSearchingApi(false);
+      return;
+    }
+
+    setIsSearchingApi(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await customFetch(`/api/search-company?q=${encodeURIComponent(q)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            setApiResults(data);
+          }
+        }
+      } catch (e) {
+        // Quiet fallback
+      } finally {
+        setIsSearchingApi(false);
+      }
+    }, 120);
+
+    return () => clearTimeout(timer);
+  }, [query, isOpen]);
 
   // Keyboard shortcut listener (Cmd+K or Ctrl+K)
   useEffect(() => {
@@ -86,7 +146,6 @@ export function CommandPalette({
         if (isOpen) {
           onClose();
         } else {
-          // Open
           setQuery('');
         }
       }
@@ -95,7 +154,8 @@ export function CommandPalette({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  const items: PaletteItem[] = useMemo(() => {
+  // Base system navigation & action items
+  const baseItems: PaletteItem[] = useMemo(() => {
     const list: PaletteItem[] = [
       // Navigation
       {
@@ -176,25 +236,6 @@ export function CommandPalette({
         keywords: ['engine', 'poller', 'stream', 'pause', 'resume', 'toggle', 'bse']
       },
 
-      // Stocks
-      ...TOP_BSE_STOCKS.map((stock) => ({
-        id: `stock_${stock.symbol}`,
-        title: `${stock.name} (${stock.symbol})`,
-        subtitle: `BSE Code: ${stock.scrip} • ${stock.sector}`,
-        category: 'Top Stocks' as const,
-        icon: Building2,
-        action: () => {
-          openIntelModal({
-            scripCode: stock.scrip,
-            symbol: stock.symbol,
-            companyName: stock.name,
-          });
-          onClose();
-        },
-        badge: stock.scrip,
-        keywords: [stock.name, stock.symbol, stock.scrip, stock.sector, 'stock', 'intelligence']
-      })),
-
       // Topics / Common Filings Search
       {
         id: 'topic_results',
@@ -225,20 +266,122 @@ export function CommandPalette({
     ];
 
     return list;
-  }, [theme, isRunning, onTabChange, setTheme, onToggleEngine, openIntelModal, onClose]);
+  }, [theme, isRunning, onTabChange, setTheme, onToggleEngine, isAdmin, onClose]);
 
-  // Filter items based on query
-  const filteredItems = useMemo(() => {
+  // Merge dynamic API results + local master stocks + base items
+  const filteredItems: PaletteItem[] = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((item) => {
+    const cleanQ = q.replace(/[^a-z0-9]/g, '');
+
+    // 1. If no query, show standard quick links + top stocks
+    if (!q) {
+      const topStockItems: PaletteItem[] = TOP_BSE_STOCKS.slice(0, 10).map((stock) => ({
+        id: `stock_${stock.symbol}`,
+        title: `${stock.name} (${stock.symbol})`,
+        subtitle: `BSE Code: ${stock.scrip} • ${stock.sector}`,
+        category: 'Companies & Stocks',
+        icon: Building2,
+        action: () => {
+          openIntelModal({
+            scripCode: stock.scrip,
+            symbol: stock.symbol,
+            companyName: stock.name,
+          });
+          onClose();
+        },
+        badge: stock.scrip,
+        symbol: stock.symbol,
+        scripCode: stock.scrip,
+        keywords: [stock.name, stock.symbol, stock.scrip, stock.sector]
+      }));
+
+      return [...topStockItems, ...baseItems];
+    }
+
+    // 2. Build comprehensive company matches from API results and local master stocks
+    const companyItemsMap = new Map<string, PaletteItem>();
+
+    // Add API results first (they are already ranked server-side with conglomerate search)
+    apiResults.forEach((stock) => {
+      const sym = (stock.symbol || '').toUpperCase().trim();
+      const scrip = stock.scripCode || '';
+      const name = stock.name || sym;
+      if (sym && !companyItemsMap.has(sym)) {
+        companyItemsMap.set(sym, {
+          id: `stock_api_${sym}`,
+          title: `${name} (${sym})`,
+          subtitle: `BSE: ${scrip || 'Exchange Listed'} ${stock.sector ? `• ${stock.sector}` : ''}`,
+          category: 'Companies & Stocks',
+          icon: Building2,
+          action: () => {
+            openIntelModal({
+              scripCode: scrip,
+              symbol: sym,
+              companyName: name,
+            });
+            onClose();
+          },
+          badge: scrip || sym,
+          symbol: sym,
+          scripCode: scrip,
+          keywords: [name, sym, scrip, stock.sector || '']
+        });
+      }
+    });
+
+    // Add local master stocks / TOP_BSE_STOCKS matches
+    const sourceStocks = masterStocks.length > 0 ? masterStocks : TOP_BSE_STOCKS;
+    for (const stock of sourceStocks) {
+      const sym = (stock.symbol || '').toUpperCase().trim();
+      const scrip = stock.scripCode || stock.scrip || '';
+      const name = stock.name || sym;
+      const sector = stock.sector || stock.industry || '';
+      const symLower = sym.toLowerCase();
+      const nameLower = name.toLowerCase();
+      const kwLower = (stock.nameKeywords || []).map((k: string) => k.toLowerCase());
+
+      const isMatch = 
+        symLower.includes(cleanQ) || 
+        nameLower.includes(q) || 
+        (scrip && scrip.includes(cleanQ)) ||
+        kwLower.some((k: string) => k.includes(q));
+
+      if (isMatch && !companyItemsMap.has(sym)) {
+        companyItemsMap.set(sym, {
+          id: `stock_master_${sym}`,
+          title: `${name} (${sym})`,
+          subtitle: `BSE: ${scrip || 'Exchange Listed'} ${sector ? `• ${sector}` : ''}`,
+          category: 'Companies & Stocks',
+          icon: Building2,
+          action: () => {
+            openIntelModal({
+              scripCode: scrip,
+              symbol: sym,
+              companyName: name,
+            });
+            onClose();
+          },
+          badge: scrip || sym,
+          symbol: sym,
+          scripCode: scrip,
+          keywords: [name, sym, scrip, sector]
+        });
+      }
+    }
+
+    const companyResults = Array.from(companyItemsMap.values());
+
+    // 3. Filter Navigation & Action commands
+    const matchingBaseItems = baseItems.filter((item) => {
       if (item.title.toLowerCase().includes(q)) return true;
       if (item.subtitle?.toLowerCase().includes(q)) return true;
       if (item.badge?.toLowerCase().includes(q)) return true;
       if (item.keywords?.some((k) => k.toLowerCase().includes(q))) return true;
       return false;
     });
-  }, [items, query]);
+
+    return [...companyResults, ...matchingBaseItems];
+  }, [query, apiResults, masterStocks, baseItems, openIntelModal, onClose]);
 
   // Handle keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -296,7 +439,11 @@ export function CommandPalette({
       >
         {/* Search Header */}
         <div className="flex items-center gap-3 px-4 py-3.5 border-b border-slate-100 dark:border-[#2D283E]">
-          <Search className="w-5 h-5 text-emerald-500 shrink-0" />
+          {isSearchingApi ? (
+            <Loader2 className="w-5 h-5 text-emerald-500 shrink-0 animate-spin" />
+          ) : (
+            <Search className="w-5 h-5 text-emerald-500 shrink-0" />
+          )}
           <input
             ref={inputRef}
             type="text"
@@ -306,13 +453,16 @@ export function CommandPalette({
               setSelectedIndex(0);
             }}
             onKeyDown={handleKeyDown}
-            placeholder="Type a company, symbol, or command (e.g. Reliance, dark mode)..."
+            placeholder="Search all Indian listed companies, Tata, Adani, BSE scrip (⌘K)..."
             className="flex-1 bg-transparent text-sm sm:text-base font-medium text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none"
           />
           {query && (
             <button
               type="button"
-              onClick={() => setQuery('')}
+              onClick={() => {
+                setQuery('');
+                setSelectedIndex(0);
+              }}
               className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer rounded-md"
             >
               <X size={16} />
@@ -332,10 +482,10 @@ export function CommandPalette({
             <div className="py-12 text-center text-slate-400 space-y-2">
               <Building2 className="w-8 h-8 mx-auto opacity-40 text-slate-400" />
               <div className="text-sm font-semibold text-slate-600 dark:text-slate-300">
-                No matching results found
+                No matching results found for "{query}"
               </div>
               <p className="text-xs max-w-xs mx-auto text-slate-400">
-                Try searching by stock name, BSE Scrip code (e.g., 500325), or keyword like "results"
+                Try searching by stock name (e.g. Tata Steel), symbol (TCS), BSE Scrip code (500325), or sector.
               </p>
             </div>
           ) : (
@@ -350,7 +500,7 @@ export function CommandPalette({
                   onMouseEnter={() => setSelectedIndex(index)}
                   className={`flex items-center justify-between p-2.5 rounded-xl cursor-pointer select-none transition-all ${
                     isSelected
-                      ? 'bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/30'
+                      ? 'bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/30 shadow-xs'
                       : 'hover:bg-slate-100/70 dark:hover:bg-[#222030] border border-transparent'
                   }`}
                 >
@@ -358,6 +508,8 @@ export function CommandPalette({
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
                       isSelected
                         ? 'bg-emerald-500 text-white'
+                        : item.category === 'Companies & Stocks'
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                         : 'bg-slate-100 dark:bg-[#252233] text-slate-600 dark:text-slate-300'
                     }`}>
                       <Icon size={16} />
@@ -404,14 +556,14 @@ export function CommandPalette({
               <kbd className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-[#252233] text-slate-700 dark:text-slate-300 font-mono text-[9px]">↑↓</kbd> Navigate
             </span>
             <span className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-[#252233] text-slate-700 dark:text-slate-300 font-mono text-[9px]">↵</kbd> Open
+              <kbd className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-[#252233] text-slate-700 dark:text-slate-300 font-mono text-[9px]">↵</kbd> Select
             </span>
             <span className="flex items-center gap-1">
               <kbd className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-[#252233] text-slate-700 dark:text-slate-300 font-mono text-[9px]">Esc</kbd> Dismiss
             </span>
           </div>
           <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-            BSE Nexus Command
+            BSE Nexus Smart Search
           </span>
         </div>
       </motion.div>

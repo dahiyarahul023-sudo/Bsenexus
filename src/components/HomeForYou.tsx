@@ -24,6 +24,8 @@ import { getSafePdfUrl } from '../utils/pdfHelper';
 import { parseMeetingDateTile } from './ResultsCalendar';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { springSnappy, containerStaggerVariants, itemFadeUpVariants, buttonTap } from '../utils/motionTokens';
+import { ActionButton } from './ui/ActionButton';
+import { CommonQuestionsFAQ } from './ui/CommonQuestionsFAQ';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -71,7 +73,7 @@ export function HomeForYou({ onNavigate }: HomeForYouProps) {
     try {
       setLoading(true);
       const [wlRes, calRes, filRes, newsRes] = await Promise.all([
-        customFetch('/api/watchlists').catch(() => null),
+        (user || profile) ? customFetch('/api/watchlists').catch(() => null) : Promise.resolve(null),
         customFetch('/api/results-calendar?filter=upcoming&limit=8').catch(() => null),
         customFetch('/api/announcements?limit=50').catch(() => null),
         customFetch('/api/news?limit=6').catch(() => null),
@@ -441,6 +443,11 @@ export function HomeForYou({ onNavigate }: HomeForYouProps) {
           </section>
         )}
 
+        {/* Common questions FAQ Section */}
+        <section className="pt-2">
+          <CommonQuestionsFAQ id="home-for-you-faq" compact />
+        </section>
+
       </div>
 
       {/* Add Companies Modal */}
@@ -516,29 +523,21 @@ export function HomeForYou({ onNavigate }: HomeForYouProps) {
                           </div>
                         </div>
 
-                        <button
-                          type="button"
-                          disabled={isTracked || isBusy}
+                        <ActionButton
                           onClick={() => handleAddStock(stk.symbol, stk.scripCode, stk.name)}
+                          isLoading={isBusy}
+                          loadingText="Adding..."
+                          disabled={isTracked}
+                          variant={isTracked ? "secondary" : "primary"}
+                          size="sm"
                           className={cn(
-                            "min-h-[36px] px-3 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shrink-0 border",
-                            isTracked
-                              ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
-                              : "bg-white dark:bg-[#181624] text-slate-800 dark:text-slate-200 border-slate-200 dark:border-[#352F48] hover:bg-slate-100"
+                            "min-h-[36px] shrink-0 text-xs font-bold",
+                            isTracked && "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100"
                           )}
+                          icon={isTracked ? <Check size={13} className="text-emerald-600" /> : <Plus size={13} />}
                         >
-                          {isTracked ? (
-                            <>
-                              <Check size={13} className="text-emerald-600" />
-                              <span>Added</span>
-                            </>
-                          ) : (
-                            <>
-                              <Plus size={13} className={isBusy ? "animate-spin" : ""} />
-                              <span>Add</span>
-                            </>
-                          )}
-                        </button>
+                          {isTracked ? 'Added' : 'Add'}
+                        </ActionButton>
                       </div>
                     );
                   })}

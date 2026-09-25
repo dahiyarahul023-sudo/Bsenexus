@@ -1,5 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { initializeAppCheck, ReCaptchaEnterpriseProvider, type AppCheck } from 'firebase/app-check';
+import { loadRecaptchaScript } from './utils/recaptcha';
 
 const configModules = typeof (import.meta as any)?.glob === 'function'
   ? (import.meta as any).glob('../firebase-applet-config.json', { eager: true })
@@ -48,6 +50,27 @@ if (typeof window !== 'undefined') {
     if (existingFbToken && existingFbToken.split('.').length !== 3) {
       localStorage.removeItem('bse_nexus_fb_id_token');
     }
+
+    // Suppress known benign internal assertion in @firebase/auth ("Pending promise was never set")
+    const isPendingPromiseAssertion = (err: any) => {
+      const msg = err?.message || String(err || '');
+      return msg.includes('Pending promise was never set');
+    };
+
+    window.addEventListener('error', (event) => {
+      if (isPendingPromiseAssertion(event.error) || isPendingPromiseAssertion(event.message)) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        return true;
+      }
+    }, true);
+
+    window.addEventListener('unhandledrejection', (event) => {
+      if (isPendingPromiseAssertion(event.reason)) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+    }, true);
   } catch {}
 }
 
@@ -60,5 +83,49 @@ export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({
   prompt: 'select_account'
 });
+
+/**
+ * Firebase App Check Integration Readiness:
+ * Pre-configures reCAPTCHA Enterprise provider for client-side attestation.
+ * NOTE: App Check tokens are automatically attached to outgoing Firestore & Cloud Storage calls.
+ * Enforcement MUST be turned on explicitly in the Firebase Console (Firestore -> App Check tab).
+ */
+export let appCheckInstance: AppCheck | null = null;
+
+export function initAppCheck(): AppCheck | null {
+  if (typeof window === 'undefined' || appCheckInstance) {
+    return appCheckInstance;
+  }
+
+  try {
+       const recaptchaSiteKey = (import.meta as any).env?.VITE_RECAPTCHA_SITE_KEY; // single source of truth: App Check and login flow must use the same Enterprise key
+
+    // Optional debug token support for local development
+    const debugToken = (import.meta as any).env?.VITE_APPCHECK_DEBUG_TOKEN;
+    if (debugToken) {
+      (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = debugToken;
+    }
+
+    if (recaptchaSiteKey && recaptchaSiteKey.trim() !== '' && !recaptchaSiteKey.includes('placeholder')) {
+      appCheckInstance = initializeAppCheck(app, {
+        provider: new ReCaptchaEnterpriseProvider(recaptchaSiteKey.trim()),
+        isTokenAutoRefreshEnabled: true
+      });
+      console.info('[Firebase] App Check initialized with reCAPTCHA Enterprise provider readiness.');
+    }
+  } catch (err: any) {
+    console.info('[Firebase] App Check initialization note (Console activation pending):', err?.message || err);
+  }
+
+  return appCheckInstance;
+}
+
+if (typeof window !== "undefined" && isFirebaseConfigured) {
+  (async () => {
+    try { await loadRecaptchaScript(); } catch { }
+    try { initAppCheck(); } catch { }
+  })();
+}
+
 
 

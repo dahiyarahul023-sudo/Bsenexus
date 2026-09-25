@@ -1,39 +1,49 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>https://bsenexus.in/</loc>
-    <lastmod>2026-09-06</lastmod>
-    <changefreq>hourly</changefreq>
-    <priority>1.0</priority>
-  </url>
-  <url>
-    <loc>https://bsenexus.in/?tab=announcements</loc>
-    <lastmod>2026-09-06</lastmod>
-    <changefreq>always</changefreq>
-    <priority>0.9</priority>
-  </url>
-  <url>
-    <loc>https://bsenexus.in/?tab=results-calendar</loc>
-    <lastmod>2026-09-06</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://bsenexus.in/?tab=watchlists</loc>
-    <lastmod>2026-09-06</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://bsenexus.in/?tab=guides</loc>
-    <lastmod>2026-09-06</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://bsenexus.in/?tab=holidays</loc>
-    <lastmod>2026-09-06</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
+<url><loc>https://bsenexus.in/</loc><lastmod>2026-09-20</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url>
+<url><loc>https://bsenexus.in/announcements</loc><lastmod>2026-09-20</lastmod><changefreq>hourly</changefreq><priority>0.9</priority></url>
+<url><loc>https://bsenexus.in/results-calendar</loc><lastmod>2026-09-20</lastmod><changefreq>daily</changefreq><priority>0.9</priority></url>
+<url><loc>https://bsenexus.in/watchlist</loc><lastmod>2026-09-20</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+<url><loc>https://bsenexus.in/guides</loc><lastmod>2026-09-20</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+<url><loc>https://bsenexus.in/guides/sebi-lodr-regulation-30</loc><lastmod>2026-09-20</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/guides/board-meeting-results-guide</loc><lastmod>2026-09-20</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/guides/auditor-resignations-red-flags</loc><lastmod>2026-09-20</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/guides/insider-trading-pit-regulations</loc><lastmod>2026-09-20</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/guides/cash-flow-forensics-india</loc><lastmod>2026-09-20</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/guides/bse-quarterly-results-calendar-guide</loc><lastmod>2026-09-21</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/guides/bse-shareholding-pattern-explained</loc><lastmod>2026-09-21</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/faq</loc><lastmod>2026-09-20</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/companies</loc><lastmod>2026-09-24</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+<url><loc>https://bsenexus.in/pricing</loc><lastmod>2026-09-25</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+<url><loc>https://bsenexus.in/about</loc><lastmod>2026-09-24</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+<url><loc>https://bsenexus.in/contact</loc><lastmod>2026-09-24</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+<url><loc>https://bsenexus.in/disclaimer</loc><lastmod>2026-09-24</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+<url><loc>https://bsenexus.in/privacy-policy</loc><lastmod>2026-09-24</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/terms</loc><lastmod>2026-09-24</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/company/RELIANCE</loc><lastmod>2026-09-20</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/company/TCS</loc><lastmod>2026-09-20</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/company/HDFCBANK</loc><lastmod>2026-09-20</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/company/INFY</loc><lastmod>2026-09-20</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/company/ICICIBANK</loc><lastmod>2026-09-20</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/company/SBIN</loc><lastmod>2026-09-20</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/company/BHARTIARTL</loc><lastmod>2026-09-20</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/company/ITC</loc><lastmod>2026-09-20</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/company/KOTAKBANK</loc><lastmod>2026-09-20</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/company/LT</loc><lastmod>2026-09-20</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/company/AXISBANK</loc><lastmod>2026-09-20</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/company/MARUTI</loc><lastmod>2026-09-20</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/company/TITAN</loc><lastmod>2026-09-20</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/company/ASIANPAINT</loc><lastmod>2026-09-20</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/company/HCLTECH</loc><lastmod>2026-09-20</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/company/SUNPHARMA</loc><lastmod>2026-09-20</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/company/TATAMOTORS</loc><lastmod>2026-09-20</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/company/TATASTEEL</loc><lastmod>2026-09-20</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/company/WIPRO</loc><lastmod>2026-09-20</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/company/ULTRACEMCO</loc><lastmod>2026-09-20</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/company/NTPC</loc><lastmod>2026-09-20</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/company/POWERGRID</loc><lastmod>2026-09-20</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/company/ONGC</loc><lastmod>2026-09-20</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/company/COALINDIA</loc><lastmod>2026-09-20</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/company/BAJFINANCE</loc><lastmod>2026-09-20</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
+<url><loc>https://bsenexus.in/company/TRENT</loc><lastmod>2026-09-20</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>
 </urlset>

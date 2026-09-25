@@ -110,6 +110,79 @@ export function addNotification(notif: Omit<AppNotification, 'id' | 'timestamp' 
   return newNotif;
 }
 
+export function addNotificationsBatch(
+  notifs: (Omit<AppNotification, 'id' | 'timestamp' | 'isRead'> & { id?: string; timestamp?: number; isRead?: boolean })[]
+): AppNotification[] {
+  if (!Array.isArray(notifs) || notifs.length === 0) return [];
+
+  const added: AppNotification[] = [];
+  let modified = false;
+
+  for (const notif of notifs) {
+    if (!notif) continue;
+    const ownerId = notif.userId && typeof notif.userId === 'string' ? notif.userId : 'system';
+    const id = notif.id || `notif_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+    const existing = notificationsCache.find(n => 
+      (n.userId === ownerId) &&
+      ((notif.newsId && n.newsId === notif.newsId) ||
+      (n.symbol === notif.symbol && n.title === notif.title && Math.abs(n.timestamp - (notif.timestamp || Date.now())) < 7200000))
+    );
+
+    if (existing) {
+      if (notif.isWatchlist && !existing.isWatchlist) {
+        existing.isWatchlist = true;
+        modified = true;
+      }
+      added.push(existing);
+      continue;
+    }
+
+    const newNotif: AppNotification = {
+      id,
+      timestamp: notif.timestamp || Date.now(),
+      isRead: notif.isRead || false,
+      ...notif,
+      userId: ownerId
+    };
+
+    notificationsCache.unshift(newNotif);
+    added.push(newNotif);
+    modified = true;
+  }
+
+  if (notificationsCache.length > 500) {
+    notificationsCache = notificationsCache.slice(0, 500);
+  }
+
+  if (modified) {
+    scheduleSave();
+  }
+
+  return added;
+}
+
+export function markNotificationsReadBatch(ids: string[], userId: string = 'guest'): number {
+  if (!Array.isArray(ids) || ids.length === 0) return 0;
+  const idSet = new Set(ids);
+  let changedCount = 0;
+
+  notificationsCache = notificationsCache.map(n => {
+    if (idSet.has(n.id) && (n.userId === userId || !n.userId || n.userId === 'system' || n.userId === 'all')) {
+      if (!n.isRead) {
+        changedCount++;
+        return { ...n, isRead: true };
+      }
+    }
+    return n;
+  });
+
+  if (changedCount > 0) {
+    scheduleSave();
+  }
+  return changedCount;
+}
+
 export function markNotificationRead(id: string, userId: string = 'guest'): boolean {
   let changed = false;
   notificationsCache = notificationsCache.map(n => {

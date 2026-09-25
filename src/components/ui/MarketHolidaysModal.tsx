@@ -23,6 +23,7 @@ import {
   downloadMultiIcsCalendarFile
 } from '../../utils/marketHolidays';
 import { useAuth } from '../../context/AuthContext';
+import { ActionButton } from './ActionButton';
 import { customFetch } from '../../api';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
 
@@ -344,20 +345,19 @@ export const MarketHolidaysModal: React.FC<MarketHolidaysModalProps> = ({ isOpen
                       )}
                     </button>
 
-                    <button
-                      type="button"
+                    <ActionButton
                       onClick={() => handleSendHolidayTelegram(holiday)}
-                      disabled={isSendingHolidayTelegram === holiday.date}
+                      isLoading={isSendingHolidayTelegram === holiday.date}
+                      loadingText=""
+                      variant={isProOrAdmin ? "primary" : "secondary"}
+                      size="sm"
                       className={cn(
-                        "p-1.5 rounded-lg transition-colors shadow-2xs cursor-pointer",
-                        isProOrAdmin
-                          ? "bg-blue-600 hover:bg-blue-700 text-white" 
-                          : "bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 text-slate-500 hover:text-blue-600"
+                        "p-1.5 min-h-[30px] min-w-[30px] rounded-lg",
+                        isProOrAdmin ? "bg-blue-600 hover:bg-blue-700 text-white" : ""
                       )}
+                      icon={<Send size={13} />}
                       title={isProOrAdmin ? "Broadcast Market Holiday to Telegram Channel" : "Broadcast to Telegram (Pro / Admin)"}
-                    >
-                      <Send size={13} className={cn(isSendingHolidayTelegram === holiday.date && "animate-spin")} />
-                    </button>
+                    />
                   </div>
                 </div>
               );

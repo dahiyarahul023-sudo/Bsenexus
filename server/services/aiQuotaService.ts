@@ -27,35 +27,35 @@ export async function checkServerAiQuota(
       allowed: false,
       remaining: 0,
       dailyLimit: 0,
-      error: "Google Sign-In Required: Sign in with Google to activate your 30-Day Free Pro trial with Gemini AI summaries.",
+      error: "Google Sign-In Required: Sign in with Google to activate your 1-Week Free Pro trial with Gemini AI summaries.",
       isPro: false
     };
   }
 
-  // 3. Authenticated User: Verify active 30-Day Pro Trial
+  // 3. Authenticated User: Verify active 1-Week Pro Trial
   const profile = await getUserProfile(uid);
   const now = Date.now();
   const proExpiresAt = profile?.proExpiresAt;
   const isProActive = Boolean(proExpiresAt && proExpiresAt > now);
 
-  // If user's 30-day Pro trial has expired
+  // If user's 1-week Pro trial has expired
   if (!isProActive && profile?.tier !== 'admin') {
     return {
       allowed: false,
       remaining: 0,
       dailyLimit: 0,
-      error: "Your 30-Day Free Pro trial has ended. Upgrade to Pro to continue generating Gemini AI summaries.",
+      error: "Your 1-Week Free Pro trial has ended. Upgrade to Pro (₹499/mo) to continue generating Gemini AI summaries.",
       isPro: false
     };
   }
 
-  // 4. User has active 30-Day Pro Trial: Provide generous 100 summaries/day fair-use rate limit
+  // 4. User has active 1-Week Pro Trial: Provide generous 100 summaries/day fair-use rate limit
   const todayKey = getTodayKeyIST();
   const usageKey = `${uid}_${todayKey}`;
   const usageMap = readLocalJson<Record<string, number>>(AI_USAGE_FILE, {});
   const used = usageMap[usageKey] || 0;
 
-  const dailyLimit = 100; // Fair-use daily limit for 30-day Pro trial
+  const dailyLimit = 100; // Fair-use daily limit for 1-week Pro trial
   const remaining = Math.max(0, dailyLimit - used);
 
   if (used >= dailyLimit) {
@@ -99,7 +99,7 @@ export async function consumeServerAiQuota(
     return { remaining: 0, dailyLimit: 0, isPro: false };
   }
 
-  // 3. Authenticated user: Check 30-day Pro trial
+  // 3. Authenticated user: Check 1-week (7-day) Pro trial
   const profile = await getUserProfile(uid);
   const now = Date.now();
   const proExpiresAt = profile?.proExpiresAt;
@@ -169,7 +169,7 @@ export async function getServerAiQuotaStatus(
     };
   }
 
-  // Authenticated user: Check 30-day Pro trial
+  // Authenticated user: Check 1-week (7-day) Pro trial
   const profile = await getUserProfile(uid);
   const now = Date.now();
   const proExpiresAt = profile?.proExpiresAt;

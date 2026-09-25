@@ -2,9 +2,18 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper functions
+    // Core helper functions
     function isAuthenticated() {
       return request.auth != null;
+    }
+
+    function isAnonymous() {
+      return isAuthenticated() && (
+        request.auth.token.firebase.sign_in_provider == 'anonymous' ||
+        !('email' in request.auth.token) ||
+        request.auth.token.email == null ||
+        request.auth.token.email == ''
+      );
     }
 
     function isOwner(userId) {
@@ -12,14 +21,22 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isAuthenticated() && (
+      return isAuthenticated() && !isAnonymous() && (
         (request.auth.token.email == 'dahiyarahul023@gmail.com' && request.auth.token.email_verified == true) ||
         request.auth.token.role == 'admin' ||
         request.auth.token.admin == true
       );
     }
 
-    // BSE Announcements: Public read, writes restricted to Admin/Server
+    // Role tampering / privilege escalation guard
+    function isNotElevatingRole() {
+      return (!('role' in request.resource.data) || request.resource.data.role != 'admin') &&
+             (!('isAdmin' in request.resource.data) || request.resource.data.isAdmin != true) &&
+             (!('admin' in request.resource.data) || request.resource.data.admin != true) &&
+             (!('isPro' in request.resource.data) || request.resource.data.isPro != true);
+    }
+
+    // BSE Announcements: Public read for regulatory disclosure, writes restricted to Admin/Server
     match /announcements/{announcementId} {
       allow read: if true;
       allow write: if isAdmin();
@@ -31,17 +48,18 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // System Settings: Read & Write restricted to Admin/Server
+    // System Settings: Read & Write restricted to Admin/Server (Strictly denied to anonymous)
     match /settings/{settingId} {
       allow read, write: if isAdmin();
     }
 
-    // System Logs: Read restricted to Admin/Server, Writes restricted to Admin/Server
+    // System Logs: Read & Write restricted to Admin/Server (Strictly denied to anonymous)
     match /logs/{logId} {
       allow read, write: if isAdmin();
     }
 
-    // User Watchlists: Strict ownership enforcement (including subcollections)
+    // User Watchlists: Strict UID-scoped access.
+    // Anonymous guests & authenticated users can only access their OWN UID document.
     match /user_watchlists/{userId} {
       allow read, write: if isOwner(userId) || isAdmin();
     }
@@ -49,26 +67,36 @@ service cloud.firestore {
       allow read, write: if isOwner(userId) || isAdmin();
     }
 
-    // User Profiles & Subcollections (watchlists, logs, settings): Strict ownership enforcement
+    // User Profiles & Subcollections: Strict UID-scoped ownership enforcement.
+    // Anonymous guests & users can manage their own profile and subcollections,
+    // but cannot elevate privileges or read/write other users' data.
     match /users/{userId} {
-      allow read, write: if isOwner(userId) || isAdmin();
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isNotElevatingRole();
+      allow update: if (isOwner(userId) && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isAdmin', 'admin', 'isPro']))) || isAdmin();
+      allow delete: if isAdmin();
     }
     match /users/{userId}/{document=**} {
       allow read, write: if isOwner(userId) || isAdmin();
     }
 
-    // Alert Rules: Read/write own rules, system presets readable, strictly guarded create/update/delete
+    // Alert Rules: Private notification rules. Strictly forbidden for anonymous users.
     match /alert_rules/{ruleId} {
-      allow read: if isAuthenticated() && (
+      allow read: if isAuthenticated() && !isAnonymous() && (
         resource.data.userId == 'system' || 
         resource.data.userId == request.auth.uid || 
         isAdmin()
       );
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && !isAnonymous() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && !isAnonymous() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
-    // Admins collection
+    // Sent News Alerts: Internal server dispatch tracking
+    match /sent_news_alerts/{alertId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Admins collection: Strictly restricted to Admin/Server
     match /admins/{adminId} {
       allow read, write: if isAdmin();
     }

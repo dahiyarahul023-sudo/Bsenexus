@@ -5,53 +5,42 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
       (function() {
-        var isDev = window.location.hostname === 'localhost' || 
-                    window.location.hostname === '127.0.0.1' || 
-                    window.location.hostname.indexOf('-dev-') !== -1 || 
-                    window.location.hostname.indexOf('-pre-') !== -1 ||
-                    window.location.hostname.indexOf('run.app') !== -1 ||
-                    window.location.port === '3000';
-        if ('serviceWorker' in navigator) {
-          if (isDev) {
-            // In development or preview container environments, ensure no Service Worker intercepts Vite modules
-            if (navigator.serviceWorker.controller && !sessionStorage.getItem('__dev_sw_purged__')) {
-              sessionStorage.setItem('__dev_sw_purged__', '1');
-              navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                return Promise.all(registrations.map(function(r) { return r.unregister(); }));
-              }).then(function() {
-                if ('caches' in window) {
-                  return caches.keys().then(function(names) {
-                    return Promise.all(names.map(function(n) { return caches.delete(n); }));
-                  });
-                }
-              }).then(function() {
-                window.location.reload();
-              });
-            } else {
+        try {
+          var isDev = window.location.hostname === 'localhost' || 
+                      window.location.hostname === '127.0.0.1' || 
+                      window.location.hostname.indexOf('-dev-') !== -1 || 
+                      window.location.hostname.indexOf('-pre-') !== -1 ||
+                      window.location.hostname.indexOf('run.app') !== -1 ||
+                      window.location.port === '3000';
+          if ('serviceWorker' in navigator) {
+            if (isDev) {
+              // In development or preview container environments, ensure no Service Worker intercepts Vite modules
               navigator.serviceWorker.getRegistrations().then(function(registrations) {
                 for (var i = 0; i < registrations.length; i++) {
                   registrations[i].unregister();
                 }
-              });
+              }).catch(function() {});
               if ('caches' in window) {
                 caches.keys().then(function(names) {
                   for (var j = 0; j < names.length; j++) {
                     caches.delete(names[j]);
                   }
-                });
+                }).catch(function() {});
               }
+            } else {
+              window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/sw.js', { scope: '/' })
+                  .then(function(registration) {
+                    console.log('[PWA] ServiceWorker registered with scope:', registration.scope);
+                  })
+                  .catch(function(error) {
+                    console.warn('[PWA] ServiceWorker registration failed:', error);
+                  });
+              });
             }
-          } else {
-            window.addEventListener('load', function() {
-              navigator.serviceWorker.register('/sw.js', { scope: '/' })
-                .then(function(registration) {
-                  console.log('[PWA] ServiceWorker registered with scope:', registration.scope);
-                })
-                .catch(function(error) {
-                  console.warn('[PWA] ServiceWorker registration failed:', error);
-                });
-            });
           }
+        } catch (e) {
+          console.warn('[PWA] Service worker init safe skip:', e);
         }
       })();
     </script>
@@ -64,13 +53,37 @@
     <noscript>
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" />
     </noscript>
-    <title>BSE Nexus | Real-Time BSE Corporate Filings &amp; AI Equity Terminal</title>
+    <title>BSE Nexus — Real-Time BSE Corporate Announcements &amp; Disclosures</title>
     <link rel="canonical" href="https://bsenexus.in/" />
+    <link rel="sitemap" type="application/xml" title="Sitemap" href="https://bsenexus.in/sitemap.xml" />
+    <link rel="search" type="application/opensearchdescription+xml" title="BSE Nexus Search" href="/opensearch.xml" />
+    <link rel="alternate" type="application/rss+xml" title="BSE Nexus Announcements Feed" href="https://bsenexus.in/rss.xml" />
     <link rel="alternate" type="text/plain" href="/llms.txt" title="LLMs.txt Specification" />
-    <meta name="description" content="Real-time BSE corporate disclosures tracker with AI financial YoY/QoQ breakdown, custom watchlists, and Telegram alert integration. Independent financial terminal for Indian equities (BSE)." />
+    <meta name="msvalidate.01" content="BSE_NEXUS_BING_VERIFICATION" />
+    <meta name="google-site-verification" content="BSE_NEXUS_GOOGLE_VERIFICATION" />
+    <meta name="yandex-verification" content="BSE_NEXUS_YANDEX_VERIFICATION" />
+    <meta name="description" content="Track latest BSE corporate announcements, board meeting outcomes, financial results, and regulatory filings in real time on BSE Nexus." />
     <meta name="keywords" content="BSE Nexus, BSE Nexus Terminal, BSE corporate announcements, BSE results calendar, stock filings India, earnings conference calls, Gemini AI stock summary, Telegram stock alerts, NSE BSE trading holidays, Indian stock market clock, SEBI LODR 30" />
     <meta name="author" content="BSE Nexus" />
     <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+    <script>
+      (function() {
+        try {
+          if (window.location.hostname && window.location.hostname.indexOf('ai.studio') !== -1) {
+            var robotsMeta = document.querySelector('meta[name="robots"]');
+            if (robotsMeta) {
+              robotsMeta.setAttribute('content', 'noindex, nofollow');
+            } else {
+              robotsMeta = document.createElement('meta');
+              robotsMeta.name = 'robots';
+              robotsMeta.content = 'noindex, nofollow';
+              document.head.appendChild(robotsMeta);
+            }
+            window.location.replace('https://bsenexus.in' + window.location.pathname + window.location.search);
+          }
+        } catch (e) {}
+      })();
+    </script>
     <meta name="theme-color" content="#0B0F19" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -124,6 +137,34 @@
     {
       "@context": "https://schema.org",
       "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://bsenexus.in/#organization",
+          "name": "BSE Nexus",
+          "alternateName": ["BSE Nexus India", "BSENexus", "BSE Nexus Terminal"],
+          "url": "https://bsenexus.in/",
+          "founder": {
+            "@type": "Person",
+            "name": "Rahul Dahiya"
+          },
+          "contactPoint": {
+            "@type": "ContactPoint",
+            "email": "admin@bsenexus.in",
+            "contactType": "customer support"
+          },
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://bsenexus.in/icon-512.png",
+            "width": 512,
+            "height": 512
+          },
+          "description": "BSE Nexus is an independent BSE corporate announcement aggregator run by Rahul Dahiya, tracking Bombay Stock Exchange (BSE) corporate announcements, SEBI LODR disclosures, and financial results.",
+          "sameAs": [
+            "https://x.com/bsenexus",
+            "https://instagram.com/bsenexus",
+            "https://threads.net/@bsenexus"
+          ]
+        },
         {
           "@type": "WebApplication",
           "@id": "https://bsenexus.in/#webapp",
@@ -189,34 +230,50 @@
           "mainEntity": [
             {
               "@type": "Question",
-              "name": "What is BSE Nexus?",
+              "name": "What is BSE Nexus and what services does it provide?",
               "acceptedAnswer": {
                 "@type": "Answer",
-                "text": "BSE Nexus is an independent real-time financial tracking terminal and web application designed for investors and traders tracking Bombay Stock Exchange (BSE) companies. It provides sub-15-second corporate filing alerts, Gemini AI earnings breakdowns, and custom watchlists."
+                "text": "BSE Nexus is an independent real-time equity research terminal and corporate disclosure tracking platform for Indian capital markets. It ingests Bombay Stock Exchange (BSE) regulatory filings within 15 seconds, provides Gemini AI YoY/QoQ financial metric summaries, hosts an updated quarterly results calendar, tracks dedicated company pages, and delivers instant Telegram alerts."
               }
             },
             {
               "@type": "Question",
-              "name": "Is BSE Nexus the same as Nexus Select Trust (REIT)?",
+              "name": "How do I check upcoming BSE quarterly results and board meetings?",
               "acceptedAnswer": {
                 "@type": "Answer",
-                "text": "No. Nexus Select Trust is a publicly traded real estate investment trust (BSE Scrip: 543913). BSE Nexus is an independent financial technology research platform and corporate disclosure terminal."
+                "text": "Visit the BSE Nexus Results Calendar (/results-calendar) or the Live BSE Docket on the homepage. Meeting dates, audited/unaudited quarterly periods, dividend agendas, and LODR Regulation 29 notices are synchronized directly from live BSE exchange disclosures."
               }
             },
             {
               "@type": "Question",
-              "name": "How does BSE Nexus deliver real-time BSE announcements?",
+              "name": "How does BSE Nexus process SEBI LODR Regulation 30 corporate announcements?",
               "acceptedAnswer": {
                 "@type": "Answer",
-                "text": "BSE Nexus continuously monitors official regulatory feeds under SEBI LODR Regulations 30 and 33 with automated pipelines, parsing PDF attachments and extracting financial metrics in seconds."
+                "text": "Under SEBI LODR Regulations 30 and 33, listed Indian companies must disclose material events such as dividend declarations, acquisitions, Capex projects, order wins, and financial results. BSE Nexus automatically parses official PDF filings from bseindia.com in real-time, extracting revenue, PAT, and EBITDA numbers with AI."
               }
             },
             {
               "@type": "Question",
-              "name": "Can I receive Telegram alerts for corporate filings on BSE Nexus?",
+              "name": "Where can I find research guides on Indian stock market filings?",
               "acceptedAnswer": {
                 "@type": "Answer",
-                "text": "Yes. BSE Nexus integrates directly with Telegram bots to deliver instantaneous push alerts whenever a company on your custom watchlist submits a regulatory disclosure."
+                "text": "Explore the BSE Nexus Market Research Guides (/guides) to read in-depth educational tutorials on analyzing balance sheets, tracking promoter shareholding patterns under Regulation 31, decoding auditor resignations, and interpreting SEBI PIT insider trading rules."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Can I track announcements for specific stocks like Reliance Industries or TCS?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes. Search any listed BSE scrip or navigate directly to dedicated company pages (such as /company/RELIANCE or /company/TCS) to review comprehensive historical filings, upcoming board meetings, live price data, and peer comparisons."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Is BSE Nexus affiliated with the Bombay Stock Exchange or Nexus Select Trust?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "No. BSE Nexus is an independent market intelligence terminal. It is not affiliated with BSE India Ltd (bseindia.com), SEBI (sebi.gov.in), or Nexus Select Trust (REIT Scrip: 543913). All regulatory disclosures originate from public stock exchange feeds."
               }
             }
           ]
@@ -298,7 +355,7 @@
   </head>
   <body>
     <div id="root">
-      <div class="critical-preloader" aria-hidden="true">
+      <div class="critical-preloader">
         <header class="critical-header">
           <div class="critical-logo">
             <div class="critical-logo-icon"></div>
@@ -306,17 +363,159 @@
             <span class="critical-badge">15s Live Feed</span>
           </div>
           <div style="display:flex;gap:8px;align-items:center;">
-            <div class="critical-shimmer" style="width:68px;height:28px;border-radius:8px;"></div>
-            <div class="critical-shimmer" style="width:28px;height:28px;border-radius:8px;"></div>
+            <a href="/announcements" style="color: #94A3B8; font-size: 12px; font-weight: 600; text-decoration: none; padding: 4px 8px;">Announcements</a>
+            <a href="/results-calendar" style="color: #94A3B8; font-size: 12px; font-weight: 600; text-decoration: none; padding: 4px 8px;">Results Calendar</a>
+            <a href="/guides" style="color: #94A3B8; font-size: 12px; font-weight: 600; text-decoration: none; padding: 4px 8px;">Guides</a>
           </div>
         </header>
-        <div class="critical-body">
-          <div class="critical-shimmer" style="width:200px;height:28px;margin-bottom:16px;"></div>
-          <div class="critical-shimmer" style="width:100%;height:100px;margin-bottom:14px;border-radius:14px;"></div>
-          <div class="critical-shimmer" style="width:100%;height:180px;border-radius:14px;"></div>
-        </div>
+
+        <main class="critical-body">
+          <div style="margin-bottom: 20px;">
+            <h1 style="font-size: 20px; font-weight: 800; color: #F8FAFC; margin: 0 0 6px 0; letter-spacing: -0.02em;">
+              Live BSE Corporate Announcements &amp; Disclosures Feed
+            </h1>
+            <p style="font-size: 13px; color: #94A3B8; margin: 0; line-height: 1.5;">
+              Real-time Bombay Stock Exchange (BSE India) corporate disclosures, quarterly financial results (SEBI LODR 33), material events (Reg 30), and Gemini AI summaries.
+            </p>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px;">
+            <article style="background: #181624; border: 1px solid #2D283E; border-radius: 12px; padding: 14px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span style="font-weight: 700; font-size: 13px; color: #FFFFFF;">RELIANCE INDUSTRIES LTD.</span>
+                <span style="font-family: monospace; font-size: 11px; background: #221F30; color: #10B981; padding: 2px 6px; border-radius: 4px; border: 1px solid #342E46;">BSE: 500325</span>
+              </div>
+              <p style="font-size: 12px; color: #94A3B8; margin: 0 0 8px 0; line-height: 1.4;">
+                Financial Results For The Quarter And Year Ended March 31 - SEBI LODR Regulation 33
+              </p>
+              <span style="font-size: 10px; font-weight: 700; background: rgba(16, 185, 129, 0.15); color: #10B981; padding: 2px 6px; border-radius: 4px;">RESULTS</span>
+            </article>
+
+            <article style="background: #181624; border: 1px solid #2D283E; border-radius: 12px; padding: 14px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span style="font-weight: 700; font-size: 13px; color: #FFFFFF;">TATA CONSULTANCY SERVICES LTD.</span>
+                <span style="font-family: monospace; font-size: 11px; background: #221F30; color: #10B981; padding: 2px 6px; border-radius: 4px; border: 1px solid #342E46;">BSE: 532540</span>
+              </div>
+              <p style="font-size: 12px; color: #94A3B8; margin: 0 0 8px 0; line-height: 1.4;">
+                Outcome Of Board Meeting - Audited Financial Results and Declaration of Final Dividend
+              </p>
+              <span style="font-size: 10px; font-weight: 700; background: rgba(16, 185, 129, 0.15); color: #10B981; padding: 2px 6px; border-radius: 4px;">RESULTS</span>
+            </article>
+
+            <article style="background: #181624; border: 1px solid #2D283E; border-radius: 12px; padding: 14px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span style="font-weight: 700; font-size: 13px; color: #FFFFFF;">LARSEN &amp; TOUBRO LTD.</span>
+                <span style="font-family: monospace; font-size: 11px; background: #221F30; color: #60A5FA; padding: 2px 6px; border-radius: 4px; border: 1px solid #342E46;">BSE: 500510</span>
+              </div>
+              <p style="font-size: 12px; color: #94A3B8; margin: 0 0 8px 0; line-height: 1.4;">
+                Heavy Civil Infrastructure Secures Mega Order (₹5,000 - ₹10,000 Cr) under Regulation 30
+              </p>
+              <span style="font-size: 10px; font-weight: 700; background: rgba(96, 165, 250, 0.15); color: #60A5FA; padding: 2px 6px; border-radius: 4px;">ORDER WIN</span>
+            </article>
+
+            <article style="background: #181624; border: 1px solid #2D283E; border-radius: 12px; padding: 14px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span style="font-weight: 700; font-size: 13px; color: #FFFFFF;">INFOSYS LTD.</span>
+                <span style="font-family: monospace; font-size: 11px; background: #221F30; color: #A78BFA; padding: 2px 6px; border-radius: 4px; border: 1px solid #342E46;">BSE: 500209</span>
+              </div>
+              <p style="font-size: 12px; color: #94A3B8; margin: 0 0 8px 0; line-height: 1.4;">
+                Schedule of Earnings Conference Call for Q4 and Full Year Ended March 31
+              </p>
+              <span style="font-size: 10px; font-weight: 700; background: rgba(167, 139, 250, 0.15); color: #A78BFA; padding: 2px 6px; border-radius: 4px;">CONCALL</span>
+            </article>
+          </div>
+        </main>
       </div>
+
+      <!-- Semantic Initial HTML for Answer Engine Optimization (AEO) & Search Engine Indexing -->
+      <main style="display: none;">
+        <h1>Real-time BSE India Corporate Filings, Earnings Calendar &amp; AI Intelligence</h1>
+        <p>Never miss a market-moving announcement. Get instant Gemini AI financial summaries, YoY &amp; QoQ metric breakdowns, custom watchlist filtering, and high-speed Telegram alerts the moment companies file on BSE.</p>
+
+        <section id="about">
+          <h2>About BSE Nexus: Real-Time Corporate Filings &amp; Market Intelligence</h2>
+          <p>
+            <strong>BSE Nexus</strong> is an independent financial technology analytics terminal and research platform engineered specifically for tracking Bombay Stock Exchange (BSE) corporate announcements, regulatory disclosures, and earnings releases in real time. Designed for active retail investors, equity research analysts, and institutional desks, BSE Nexus ingests corporate disclosures directly from the official portal of the <a href="https://www.bseindia.com" target="_blank" rel="noopener noreferrer">Bombay Stock Exchange (BSE India)</a> within 15 seconds of filing.
+          </p>
+          <p>
+            The platform continuously monitors regulatory compliance under the SEBI (Listing Obligations and Disclosure Requirements) Regulations, 2015, specifically capturing material events under Regulation 30 and financial outcome declarations under Regulation 33. All regulatory filings mandated by the <a href="https://www.sebi.gov.in" target="_blank" rel="noopener noreferrer">Securities and Exchange Board of India (SEBI)</a>—such as dividend declarations, board meeting intimations, mergers and acquisitions, capital expenditure projects, order wins, management transitions, and forensic auditor resignations—are parsed through an automated neural pipeline powered by Gemini AI. This delivers instantaneous extraction of year-over-year (YoY) and quarter-over-quarter (QoQ) revenue, operating EBITDA, and net profit metrics directly from unformatted corporate PDF documents.
+          </p>
+          <p>
+            Beyond real-time disclosure feeds, BSE Nexus maintains an updated <a href="/results-calendar">Quarterly Results Calendar</a> tracking scheduled board meetings, audited and unaudited earnings declarations, and historical corporate actions across 4,000+ listed Indian enterprises. Investors can navigate directly to dedicated company pages—such as <a href="/company/RELIANCE">Reliance Industries</a>, <a href="/company/TCS">Tata Consultancy Services (TCS)</a>, and HDFC Bank—to review comprehensive regulatory histories, price metrics, and peer group benchmarks.
+          </p>
+          <p>
+            To empower investors with actionable domain expertise, our <a href="/guides">Market Research Guides</a> offer step-by-step forensic playbooks on decoding corporate actions, analyzing balance sheets, auditing shareholding patterns under Regulation 31, and interpreting SEBI PIT insider trading disclosures. Users can also configure personalized watchlists and receive instant Telegram push notifications the moment target companies submit new filings.
+          </p>
+        </section>
+
+        <section id="faq">
+          <h2>Frequently Asked Questions about BSE Nexus &amp; Indian Stock Disclosures</h2>
+          <article>
+            <h3>What is BSE Nexus and what services does it provide?</h3>
+            <p>BSE Nexus is an independent real-time equity research terminal and corporate disclosure tracking platform for Indian capital markets. It ingests Bombay Stock Exchange (BSE) regulatory filings within 15 seconds, provides Gemini AI YoY/QoQ financial metric summaries, hosts an updated quarterly results calendar, tracks dedicated company pages, and delivers instant Telegram alerts.</p>
+          </article>
+          <article>
+            <h3>How do I check upcoming BSE quarterly results and board meetings?</h3>
+            <p>Visit the BSE Nexus Results Calendar (/results-calendar) or the Live BSE Docket on the homepage. Meeting dates, audited/unaudited quarterly periods, dividend agendas, and LODR Regulation 29 notices are synchronized directly from live BSE exchange disclosures.</p>
+          </article>
+          <article>
+            <h3>How does BSE Nexus process SEBI LODR Regulation 30 corporate announcements?</h3>
+            <p>Under SEBI LODR Regulations 30 and 33, listed Indian companies must disclose material events such as dividend declarations, acquisitions, Capex projects, order wins, and financial results. BSE Nexus automatically parses official PDF filings from bseindia.com in real-time, extracting revenue, PAT, and EBITDA numbers with AI.</p>
+          </article>
+          <article>
+            <h3>Where can I find research guides on Indian stock market filings?</h3>
+            <p>Explore the BSE Nexus Market Research Guides (/guides) to read in-depth educational tutorials on analyzing balance sheets, tracking promoter shareholding patterns under Regulation 31, decoding auditor resignations, and interpreting SEBI PIT insider trading rules.</p>
+          </article>
+          <article>
+            <h3>Can I track announcements for specific stocks like Reliance Industries or TCS?</h3>
+            <p>Yes. Search any listed BSE scrip or navigate directly to dedicated company pages (such as /company/RELIANCE or /company/TCS) to review comprehensive historical filings, upcoming board meetings, live price data, and peer comparisons.</p>
+          </article>
+          <article>
+            <h3>Is BSE Nexus affiliated with the Bombay Stock Exchange or Nexus Select Trust?</h3>
+            <p>No. BSE Nexus is an independent market intelligence terminal. It is not affiliated with BSE India Ltd (bseindia.com), SEBI (sebi.gov.in), or Nexus Select Trust (REIT Scrip: 543913). All regulatory disclosures originate from public stock exchange feeds.</p>
+          </article>
+        </section>
+      </main>
     </div>
+
+    <noscript>
+      <main style="max-width: 900px; margin: 40px auto; padding: 20px; font-family: system-ui, sans-serif; line-height: 1.6; color: #0F172A;">
+        <h1>Real-time BSE India Corporate Filings, Earnings Calendar &amp; AI Intelligence</h1>
+        <p>Never miss a market-moving announcement. Get instant Gemini AI financial summaries, YoY &amp; QoQ metric breakdowns, custom watchlist filtering, and high-speed Telegram alerts the moment companies file on BSE.</p>
+
+        <section>
+          <h2>About BSE Nexus: Real-Time Corporate Filings &amp; Market Intelligence</h2>
+          <p>
+            <strong>BSE Nexus</strong> is an independent financial technology analytics terminal and research platform engineered specifically for tracking Bombay Stock Exchange (BSE) corporate announcements, regulatory disclosures, and earnings releases in real time. Designed for active retail investors, equity research analysts, and institutional desks, BSE Nexus ingests corporate disclosures directly from the official portal of the <a href="https://www.bseindia.com" target="_blank" rel="noopener noreferrer">Bombay Stock Exchange (BSE India)</a> within 15 seconds of filing.
+          </p>
+          <p>
+            The platform continuously monitors regulatory compliance under the SEBI (Listing Obligations and Disclosure Requirements) Regulations, 2015, specifically capturing material events under Regulation 30 and financial outcome declarations under Regulation 33. All regulatory filings mandated by the <a href="https://www.sebi.gov.in" target="_blank" rel="noopener noreferrer">Securities and Exchange Board of India (SEBI)</a>—such as dividend declarations, board meeting intimations, mergers and acquisitions, capital expenditure projects, order wins, management transitions, and forensic auditor resignations—are parsed through an automated neural pipeline powered by Gemini AI. This delivers instantaneous extraction of year-over-year (YoY) and quarter-over-quarter (QoQ) revenue, operating EBITDA, and net profit metrics directly from unformatted corporate PDF documents.
+          </p>
+          <p>
+            Beyond real-time disclosure feeds, BSE Nexus maintains an updated <a href="/results-calendar">Quarterly Results Calendar</a> tracking scheduled board meetings, audited and unaudited earnings declarations, and historical corporate actions across 4,000+ listed Indian enterprises. Investors can navigate directly to dedicated company pages—such as <a href="/company/RELIANCE">Reliance Industries</a>, <a href="/company/TCS">Tata Consultancy Services (TCS)</a>, and HDFC Bank—to review comprehensive regulatory histories, price metrics, and peer group benchmarks.
+          </p>
+          <p>
+            To empower investors with actionable domain expertise, our <a href="/guides">Market Research Guides</a> offer step-by-step forensic playbooks on decoding corporate actions, analyzing balance sheets, auditing shareholding patterns under Regulation 31, and interpreting SEBI PIT insider trading disclosures.
+          </p>
+        </section>
+
+        <section>
+          <h2>Frequently Asked Questions</h2>
+          <h3>What is BSE Nexus and what services does it provide?</h3>
+          <p>BSE Nexus is an independent real-time equity research terminal and corporate disclosure tracking platform for Indian capital markets. It ingests Bombay Stock Exchange (BSE) regulatory filings within 15 seconds, provides Gemini AI YoY/QoQ financial metric summaries, hosts an updated quarterly results calendar, tracks dedicated company pages, and delivers instant Telegram alerts.</p>
+          <h3>How do I check upcoming BSE quarterly results and board meetings?</h3>
+          <p>Visit the BSE Nexus Results Calendar (/results-calendar) or the Live BSE Docket on the homepage. Meeting dates, audited/unaudited quarterly periods, dividend agendas, and LODR Regulation 29 notices are synchronized directly from live BSE exchange disclosures.</p>
+          <h3>How does BSE Nexus process SEBI LODR Regulation 30 corporate announcements?</h3>
+          <p>Under SEBI LODR Regulations 30 and 33, listed Indian companies must disclose material events such as dividend declarations, acquisitions, Capex projects, order wins, and financial results. BSE Nexus automatically parses official PDF filings from bseindia.com in real-time, extracting revenue, PAT, and EBITDA numbers with AI.</p>
+          <h3>Where can I find research guides on Indian stock market filings?</h3>
+          <p>Explore the BSE Nexus Market Research Guides (/guides) to read in-depth educational tutorials on analyzing balance sheets, tracking promoter shareholding patterns under Regulation 31, decoding auditor resignations, and interpreting SEBI PIT insider trading rules.</p>
+          <h3>Can I track announcements for specific stocks like Reliance Industries or TCS?</h3>
+          <p>Yes. Search any listed BSE scrip or navigate directly to dedicated company pages (such as /company/RELIANCE or /company/TCS) to review comprehensive historical filings, upcoming board meetings, live price data, and peer comparisons.</p>
+          <h3>Is BSE Nexus affiliated with the Bombay Stock Exchange or Nexus Select Trust?</h3>
+          <p>No. BSE Nexus is an independent market intelligence terminal. It is not affiliated with BSE India Ltd (bseindia.com), SEBI (sebi.gov.in), or Nexus Select Trust (REIT Scrip: 543913). All regulatory disclosures originate from public stock exchange feeds.</p>
+        </section>
+      </main>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
