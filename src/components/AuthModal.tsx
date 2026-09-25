@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { ModernAuthCard } from './ui/ModernAuthCard';
 
-export function AuthModal() {
+export function AuthModal({ onSuccess }: { onSuccess?: () => void }) {
   const { 
     isAuthModalOpen, 
     setIsAuthModalOpen, 
@@ -40,6 +40,7 @@ export function AuthModal() {
           mode="modal"
           initialTab="signin"
           onClose={() => setIsAuthModalOpen(false)}
+          onSuccess={onSuccess}
         />
       </div>
     </div>
