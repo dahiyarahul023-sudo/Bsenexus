@@ -818,6 +818,20 @@ export async function fetchLiveStoryChapters(): Promise<StoryChapter[]> {
           s0.statsLabel = 'Market Breadth';
           s0.statsValue = feed.indices.marketBreadth;
         }
+
+        // Keep narrative copy consistent with live numbers (avoid hardcoded demo text contradicting real data)
+        const sxChgPct = sensex.changePercent || 0;
+        const sxPts = Math.round(sensex.change || 0);
+        s0.description = isBull
+          ? 'Dalal Street benchmarks trade in green as market breadth favors advances.'
+          : 'Dalal Street benchmarks trade under pressure as market breadth favors declines.';
+        s0.bulletPoints = [
+          `SENSEX ${sxChgPct >= 0 ? 'up' : 'down'} ${Math.abs(sxChgPct).toFixed(2)}% (${sxPts >= 0 ? '+' : ''}${sxPts.toLocaleString('en-IN')} pts)`,
+          ...(feed.indices.marketBreadth ? [`Market breadth: ${feed.indices.marketBreadth}`] : []),
+        ];
+        if (feed.indices.marketBreadth) {
+          s0.imageCaption = `Market breadth: ${feed.indices.marketBreadth}`;
+        }
       }
 
       // If Session Shows Market Moves (After 3:00 PM closing until next day 9:00 AM)
