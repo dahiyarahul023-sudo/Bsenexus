@@ -339,6 +339,10 @@ export function determinePriority(subject: string, details: string): { level: st
       return { level: 'MEDIUM', icon: '🟡', category: 'BOARD_MEETING' };
     }
   } else {
+    // Shareholder meetings (AGM/EGM) are NOT board meetings — tag as governance
+    if (text.includes('SHAREHOLDER') || text.includes('GENERAL MEETING') || text.includes('ANNUAL GENERAL') || text.includes('EXTRAORDINARY GENERAL') || /\bAGM\b/.test(text) || /\bEGM\b/.test(text)) {
+      return { level: 'MEDIUM', icon: '🟡', category: 'GOVERNANCE' };
+    }
     // If it's a Board Meeting Intimation / Notice
     if (text.includes('BOARD') || text.includes('MEETING')) {
       return { level: 'MEDIUM', icon: '🟡', category: 'BOARD_MEETING' };
