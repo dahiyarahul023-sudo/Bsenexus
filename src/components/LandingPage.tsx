@@ -7,7 +7,7 @@ import {
   ExternalLink, BarChart3, Clock, Check, RefreshCw, Sun, Moon,
   User, BookOpen, AlertCircle, Award, Terminal, Flame, Database,
   Building2, Target, Volume2, ShieldCheck, HelpCircle, CheckCheck,
-  Share2, Compass, Menu, X
+  Share2, Compass, X, MoreVertical
 } from 'lucide-react';
 import { BseNexusLogo } from './ui/BseNexusLogo';
 import { MarketClock } from './ui/MarketClock';
@@ -306,7 +306,7 @@ export function LandingPage({
                   <span className="font-black text-lg tracking-tight text-slate-900 dark:text-white">
                     BSE<span className="text-emerald-500">NEXUS</span>
                   </span>
-                  <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 whitespace-nowrap select-none">
+                  <span className="hidden sm:inline text-[9px] font-black px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 whitespace-nowrap select-none">
                     TERMINAL
                   </span>
                 </div>
@@ -391,25 +391,13 @@ export function LandingPage({
                 {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
               </motion.button>
 
-              {/* Mobile/Tablet Hamburger Toggle (visible below xl) */}
-              <motion.button
-                whileTap={{ scale: 0.92 }}
-                onClick={() => setIsMobileNavOpen(prev => !prev)}
-                aria-label={isMobileNavOpen ? "Close menu" : "Open navigation menu"}
-                aria-expanded={isMobileNavOpen}
-                className="xl:hidden p-2 rounded-xl bg-slate-100 dark:bg-[#252233] hover:bg-slate-200 dark:hover:bg-[#2F2B40] text-slate-700 dark:text-slate-200 transition-colors cursor-pointer shadow-2xs border border-slate-200/80 dark:border-[#352F48] min-h-[38px] min-w-[38px] flex items-center justify-center shrink-0"
-                title="Toggle Navigation Menu"
-              >
-                {isMobileNavOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
-              </motion.button>
-
-              {/* User Sign In / Profile status (Desktop/Tablet) */}
+              {/* User Sign In / Profile status (all screens — visible on mobile too) */}
               {user || profile ? (
                 <motion.button
                   whileTap={{ scale: 0.96 }}
                   onClick={() => onEnterTerminal('dashboard')}
                   aria-label={`User profile: ${profile?.displayName || 'User profile'}`}
-                  className="hidden sm:flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-[#222030] hover:bg-slate-200 dark:hover:bg-[#2C293D] text-slate-900 dark:text-white text-xs font-bold transition-all border border-slate-200 dark:border-[#332E45] cursor-pointer shadow-xs min-h-[38px] whitespace-nowrap select-none"
+                  className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-[#222030] hover:bg-slate-200 dark:hover:bg-[#2C293D] text-slate-900 dark:text-white text-xs font-bold transition-all border border-slate-200 dark:border-[#332E45] cursor-pointer shadow-xs min-h-[38px] whitespace-nowrap select-none"
                 >
                   <div className="w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] font-black flex items-center justify-center shrink-0">
                     {(profile?.displayName || profile?.email || 'U').substring(0, 1).toUpperCase()}
@@ -421,7 +409,7 @@ export function LandingPage({
                   whileTap={{ scale: 0.96 }}
                   onClick={() => setIsAuthModalOpen(true)}
                   aria-label="Sign in to your account"
-                  className="hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-[#222030] hover:bg-slate-200 dark:hover:bg-[#2C293D] text-slate-700 dark:text-slate-200 text-xs font-bold transition-all border border-slate-200 dark:border-[#332E45] cursor-pointer shrink-0 min-h-[38px] whitespace-nowrap select-none"
+                  className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-slate-100 dark:bg-[#222030] hover:bg-slate-200 dark:hover:bg-[#2C293D] text-slate-700 dark:text-slate-200 text-xs font-bold transition-all border border-slate-200 dark:border-[#332E45] cursor-pointer shrink-0 min-h-[38px] whitespace-nowrap select-none"
                 >
                   <User className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300 shrink-0" />
                   <span>Sign In</span>
@@ -433,12 +421,24 @@ export function LandingPage({
                 whileTap={{ scale: 0.95 }}
                 onClick={() => onEnterTerminal('dashboard')}
                 aria-label="Launch Live Terminal Dashboard"
-                className="flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white text-xs font-black shadow-md shadow-emerald-700/25 transition-all cursor-pointer select-none shrink-0 min-h-[38px]"
+                className="hidden sm:flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white text-xs font-black shadow-md shadow-emerald-700/25 transition-all cursor-pointer select-none shrink-0 min-h-[38px]"
               >
                 <Zap className="w-3.5 sm:w-4 h-3.5 sm:h-4 fill-white shrink-0" />
                 <span className="hidden xs:inline sm:inline">Launch Live Terminal</span>
                 <span className="inline xs:hidden sm:hidden">Terminal</span>
                 <ArrowRight className="w-3.5 h-3.5 hidden sm:inline shrink-0" />
+              </motion.button>
+
+              {/* Three-dot menu (mobile/tablet, visible below xl) — rightmost */}
+              <motion.button
+                whileTap={{ scale: 0.92 }}
+                onClick={() => setIsMobileNavOpen(prev => !prev)}
+                aria-label={isMobileNavOpen ? "Close menu" : "Open navigation menu"}
+                aria-expanded={isMobileNavOpen}
+                className="xl:hidden p-2 rounded-xl bg-slate-100 dark:bg-[#252233] hover:bg-slate-200 dark:hover:bg-[#2F2B40] text-slate-700 dark:text-slate-200 transition-colors cursor-pointer shadow-2xs border border-slate-200/80 dark:border-[#352F48] min-h-[38px] min-w-[38px] flex items-center justify-center shrink-0"
+                title="Open Menu"
+              >
+                {isMobileNavOpen ? <X className="w-4 h-4" /> : <MoreVertical className="w-4 h-4" />}
               </motion.button>
             </div>
           </div>
@@ -539,37 +539,13 @@ export function LandingPage({
                   <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
                 </button>
 
-                <div className="pt-3 pb-1 border-t border-slate-200/80 dark:border-[#2D283E] grid grid-cols-2 gap-2">
-                  {user || profile ? (
-                    <button
-                      onClick={() => {
-                        setIsMobileNavOpen(false);
-                        onEnterTerminal('dashboard');
-                      }}
-                      className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-[#222030] text-slate-900 dark:text-white text-xs font-bold border border-slate-200 dark:border-[#332E45]"
-                    >
-                      <User className="w-3.5 h-3.5 text-emerald-500" />
-                      <span>{profile?.displayName?.split(' ')[0] || 'My Account'}</span>
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        setIsMobileNavOpen(false);
-                        setIsAuthModalOpen(true);
-                      }}
-                      className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-[#222030] text-slate-900 dark:text-white text-xs font-bold border border-slate-200 dark:border-[#332E45]"
-                    >
-                      <User className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300" />
-                      <span>Sign In</span>
-                    </button>
-                  )}
-
+                <div className="pt-3 pb-1 border-t border-slate-200/80 dark:border-[#2D283E]">
                   <button
                     onClick={() => {
                       setIsMobileNavOpen(false);
                       onEnterTerminal('dashboard');
                     }}
-                    className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-xs"
+                    className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-xs"
                   >
                     <Zap className="w-3.5 h-3.5 fill-white" />
                     <span>Terminal</span>
