@@ -3,7 +3,7 @@
   "id": "/",
   "name": "BSE Nexus - Indian Corporate Disclosures",
   "short_name": "BSE Nexus",
-  "description": "Real-time BSE corporate disclosures tracker with AI financial YoY/QoQ breakdown, custom watchlists, and Telegram alert integration.",
+  "description": "BSE corporate disclosures tracker with AI financial YoY/QoQ breakdown, custom watchlists, and Telegram alert integration.",
   "lang": "en",
   "dir": "ltr",
   "start_url": "/",
@@ -64,7 +64,7 @@
     {
       "name": "BSE Filings Feed",
       "short_name": "Filings",
-      "description": "Real-time BSE corporate disclosures and AI summary feed",
+      "description": "BSE corporate disclosures and AI summary feed",
       "tag": "bse-filings",
       "template": "filings-widget",
       "ms_ac_template": "/widgets/filings.json",
@@ -119,7 +119,7 @@
     {
       "name": "Live Announcements",
       "short_name": "Filings",
-      "description": "View real-time BSE corporate filings and disclosures",
+      "description": "View BSE corporate filings and disclosures",
       "url": "/?tab=announcements",
       "icons": [
         {
