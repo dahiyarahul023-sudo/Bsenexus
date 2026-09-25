@@ -995,7 +995,7 @@ export function Announcements({
                 <div className="space-y-0.5 flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap justify-between">
                     <span className="text-xs font-bold text-purple-800 dark:text-purple-200 uppercase tracking-wider font-display">
-                      Gemini 3.8 Flash Neural Engine
+                      AI Summary Engine
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-700 dark:text-slate-300 font-medium leading-normal">
