@@ -7,6 +7,7 @@ import {
 import { springSnappy, buttonTap } from '../../utils/motionTokens';
 import { useToast } from '../../context/ToastContext';
 import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
+import { customFetch } from '../../api';
 
 export interface SupportModalProps {
   isOpen: boolean;
@@ -25,19 +26,32 @@ export function SupportModal({ isOpen, onClose, onOpenHelp }: SupportModalProps)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim()) return;
+    if (!message.trim() || isSubmitting) return;
 
     setIsSubmitting(true);
-    // Simulate instantaneous receipt & dispatch event
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      const res = await customFetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: feedbackType, message: message.trim(), email: email.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Submit failed');
+      }
       onClose();
       setMessage('');
       setEmail('');
       toast.success('Thank you! Your feedback has been received.', {
         duration: 4000
       });
-    }, 600);
+    } catch (err: any) {
+      toast.error(err.message || 'Could not send feedback. Please try again.', {
+        duration: 4000
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
