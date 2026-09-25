@@ -361,7 +361,7 @@ export const CompaniesPage: React.FC<CompaniesPageProps> = ({ onEnterTerminal })
             BSE Listed Companies — Profiles, Earnings Results &amp; Regulatory Filings
           </h1>
           <p className="mt-2 text-sm sm:text-base text-slate-600 dark:text-slate-400 max-w-3xl leading-relaxed">
-            Direct access to dedicated company intelligence hubs for India's 26 leading listed equities. Track real-time Bombay Stock Exchange (BSE) regulatory disclosures, quarterly earnings metrics, investor presentations, and SEBI LODR corporate actions.
+            Direct access to dedicated company intelligence hubs for India's 26 leading listed equities. Track Bombay Stock Exchange (BSE) regulatory disclosures, quarterly earnings metrics, investor presentations, and SEBI LODR corporate actions.
           </p>
         </div>
 
@@ -494,7 +494,7 @@ export const CompaniesPage: React.FC<CompaniesPageProps> = ({ onEnterTerminal })
                 Track Live BSE Disclosures for All 26 Bluechips
               </h2>
               <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-                Receive instant sub-minute Telegram alerts with AI-powered financial metric extraction whenever any of these companies files a board meeting outcome, quarterly financial result, or material event with the Bombay Stock Exchange.
+                Receive fast Telegram alerts with AI-powered financial metric extraction whenever any of these companies files a board meeting outcome, quarterly financial result, or material event with the Bombay Stock Exchange.
               </p>
             </div>
             <button
