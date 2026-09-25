@@ -297,6 +297,10 @@ export async function getCompanyIntelligence(scripCode: string, symbol: string):
   }
   uniqueTimeline.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
+  // Filings shown per company in the modal: enough for recent context (20-30).
+  // Deeper history is fetched on demand, not preloaded for every stock.
+  const PER_STOCK_FILINGS = 25;
+
   return {
     symbol: targetSym || quote?.name || targetScrip,
     scripCode: targetScrip,
@@ -305,7 +309,7 @@ export async function getCompanyIntelligence(scripCode: string, symbol: string):
     upcomingEvent,
     quarterlyResults,
     materialTimeline: uniqueTimeline,
-    recentFilings: allStockFilings.slice(0, 100)
+    recentFilings: allStockFilings.slice(0, PER_STOCK_FILINGS)
   };
 }
 
