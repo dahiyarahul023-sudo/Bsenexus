@@ -522,6 +522,30 @@ export function WatchlistManager() {
 
   // Dropdown menu & Safe Confirmation Modal states
   const [openMenuForList, setOpenMenuForList] = useState<string | null>(null);
+  const listMenuRef = useRef<HTMLDivElement | null>(null);
+  const allMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // Close the list-options dropdown on outside pointer-down WITHOUT swallowing
+  // the click — the underlying button still receives it (no blocking overlay).
+  useEffect(() => {
+    if (!openMenuForList) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const inListMenu = listMenuRef.current?.contains(e.target as Node);
+      const inAllMenu = allMenuRef.current?.contains(e.target as Node);
+      if (!inListMenu && !inAllMenu) {
+        setOpenMenuForList(null);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpenMenuForList(null);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [openMenuForList]);
   const [confirmModalState, setConfirmModalState] = useState<{
     isOpen: boolean;
     title: string;
@@ -2907,7 +2931,7 @@ export function WatchlistManager() {
                     </div>
 
                     {/* List Actions Menu */}
-                    <div className="relative">
+                    <div className="relative" ref={listMenuRef}>
                       <motion.button
                         type="button"
                         whileTap={buttonTap}
@@ -2921,7 +2945,6 @@ export function WatchlistManager() {
 
                       {openMenuForList === activeListId && (
                         <>
-                          <div className="fixed inset-0 z-20" onClick={() => setOpenMenuForList(null)} />
                           <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-[#1E1C2B] border border-slate-200 dark:border-[#38324E] rounded-xl shadow-xl p-1 z-30 animate-in fade-in duration-100">
                             <motion.button
                               type="button"
@@ -3254,7 +3277,7 @@ export function WatchlistManager() {
                   </div>
 
                   {/* Options Menu */}
-                  <div className="relative">
+                  <div className="relative" ref={allMenuRef}>
                     <motion.button
                       type="button"
                       whileTap={buttonTap}
@@ -3269,7 +3292,6 @@ export function WatchlistManager() {
 
                     {openMenuForList === 'ALL' && (
                       <>
-                        <div className="fixed inset-0 z-20" onClick={() => setOpenMenuForList(null)} />
                         <div className="absolute right-0 mt-1 w-56 bg-white dark:bg-[#1E1C2B] border border-slate-200 dark:border-[#38324E] rounded-xl shadow-xl p-1.5 z-30 animate-in fade-in duration-100 space-y-1">
                           <motion.button
                             type="button"
