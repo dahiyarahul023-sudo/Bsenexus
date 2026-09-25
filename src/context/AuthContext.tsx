@@ -810,6 +810,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsAuthModalOpen(false);
     setIsAdminPinModalOpen(false);
     setIsProModalOpen(false);
+
+    // Centralized post-logout navigation: every sign-out entry point
+    // (header, settings tab, profile modal, account deletion) lands back on
+    // the public landing page instead of stranding the user in guest mode on
+    // the previous screen. replace() also keeps the back button from
+    // returning to authenticated views.
+    if (typeof window !== 'undefined') {
+      window.location.replace('/');
+    }
   };
 
   const checkUsernameAvailability = async (
