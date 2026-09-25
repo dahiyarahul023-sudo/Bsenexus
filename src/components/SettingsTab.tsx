@@ -17,6 +17,7 @@ import { SecurityAuditModal } from './SecurityAuditModal';
 import { useAuth } from '../context/AuthContext';
 import { customFetch } from '../api';
 import { useDeveloperMode } from '../utils/developerMode';
+import { APP_VERSION } from '../version';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { springSnappy, buttonTap } from '../utils/motionTokens';
 import { SupportModal } from './ui/SupportFloat';
@@ -1563,7 +1564,7 @@ export function SettingsTab({
 
             <div className="p-3.5 flex items-center justify-between text-xs">
               <span className="font-semibold text-slate-900 dark:text-white">Version</span>
-              <span className="font-mono text-slate-400 text-[11px]">v2.6.0 (System-Hardened)</span>
+              <span className="font-mono text-slate-400 text-[11px]">v{APP_VERSION}</span>
             </div>
 
             <div className="p-3.5 flex items-center justify-between text-xs">
