@@ -7,7 +7,7 @@ import { getRecentAnnouncements, markAnnouncementSent, getAnnouncementById, proc
 import { generateDirectSummary, generateAndSendSummary, askAppHelpAI } from "../services/gemini.js";
 import { escapeHTML } from "../utils/helpers.js";
 import { resumeFirestoreNetwork, pauseFirestoreNetwork } from "../database/firebase.js";
-import { requireAuth, requireAdmin, requireProOrAdmin, aiRateLimiter, telegramRateLimiter } from "../security/auth.js";
+import { requireAuth, requireAdmin, requireProOrAdmin, aiRateLimiter, telegramRateLimiter, apiRateLimiter } from "../security/auth.js";
 import { runSecurityAudit, executeSimulatedPenTest } from "../security/hardening.js";
 import {
   getAllWatchlists,
