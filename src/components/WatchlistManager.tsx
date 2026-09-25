@@ -557,7 +557,19 @@ export function WatchlistManager() {
   } | null>(null);
 
   // Disclosures Feed states
-  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [announcements, setAnnouncements] = useState<any[]>(() => {
+    // Show last cached feed instantly on login; fresh data replaces it in background.
+    try {
+      const cached = localStorage.getItem('bsenexus_watchlist_feed');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed.items) && Date.now() - (parsed.ts || 0) < 30 * 60 * 1000) {
+          return parsed.items;
+        }
+      }
+    } catch { /* ignore corrupt cache */ }
+    return [];
+  });
   const [selectedStockFilter, setSelectedStockFilter] = useState<string | null>(null);
   const [announcementCategory, setAnnouncementCategory] = useState<string>('ALL');
   const [announcementPriorityFilter, setAnnouncementPriorityFilter] = useState<string>('ALL');
@@ -822,6 +834,10 @@ export function WatchlistManager() {
       if (res.ok) {
         const data = await res.json();
         setAnnouncements(data);
+        // Cache for instant display on next login (stale-while-revalidate).
+        try {
+          localStorage.setItem('bsenexus_watchlist_feed', JSON.stringify({ ts: Date.now(), items: data }));
+        } catch { /* storage full or unavailable */ }
       }
     } catch (e) {
       console.warn("Error fetching announcements in WatchlistManager:", e);
