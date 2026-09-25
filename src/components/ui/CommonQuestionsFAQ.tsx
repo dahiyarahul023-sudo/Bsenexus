@@ -10,27 +10,27 @@ export interface FAQItem {
 export const COMMON_QUESTIONS: FAQItem[] = [
   {
     question: 'What is BSE Nexus and what services does it provide?',
-    answer: 'BSE Nexus is an independent real-time equity research terminal and corporate disclosure tracking platform for Indian capital markets. It ingests Bombay Stock Exchange (BSE) regulatory filings within 15 seconds, provides Gemini AI YoY/QoQ financial metric summaries, hosts an updated quarterly results calendar, tracks dedicated company pages, and delivers instant Telegram alerts.'
+    answer: 'BSE Nexus structures official BSE India corporate announcements into a searchable feed — filings, quarterly results, board meeting notices, and company pages. It adds AI-generated filing summaries, a results calendar, watchlists, and Telegram alerts on top of the official disclosures.'
   },
   {
     question: 'How do I check upcoming BSE quarterly results and board meetings?',
-    answer: 'Visit the BSE Nexus Results Calendar (/results-calendar) or the Live BSE Docket on the homepage. Meeting dates, audited/unaudited quarterly periods, dividend agendas, and LODR Regulation 29 notices are synchronized directly from live BSE exchange disclosures.'
+    answer: 'Open the Results Calendar (/results-calendar) or the Live BSE Docket on the homepage. Meeting dates, quarterly periods, dividend agendas, and board meeting notices are synced from official BSE India disclosures.'
   },
   {
     question: 'How does BSE Nexus process SEBI LODR Regulation 30 corporate announcements?',
-    answer: 'Under SEBI LODR Regulations 30 and 33, listed Indian companies must disclose material events such as dividend declarations, acquisitions, Capex projects, order wins, and financial results. BSE Nexus automatically parses official PDF filings from bseindia.com in real-time, extracting revenue, PAT, and EBITDA numbers with AI.'
+    answer: 'Listed companies disclose material events — dividends, acquisitions, order wins, financial results — under SEBI LODR Regulations 30 and 33. BSE Nexus parses the official PDF filings from bseindia.com and extracts key figures like revenue, PAT, and EBITDA into readable summaries.'
   },
   {
     question: 'Where can I find research guides on Indian stock market filings?',
-    answer: 'Explore the BSE Nexus Market Research Guides (/guides) to read in-depth educational tutorials on analyzing balance sheets, tracking promoter shareholding patterns under Regulation 31, decoding auditor resignations, and interpreting SEBI PIT insider trading rules.'
+    answer: 'The Market Research Guides (/guides) cover how to read balance sheets, track promoter shareholding, decode auditor resignations, and interpret insider trading disclosures.'
   },
   {
     question: 'Can I track announcements for specific stocks like Reliance Industries or TCS?',
-    answer: 'Yes. Search any listed BSE scrip or navigate directly to dedicated company pages (such as /company/RELIANCE or /company/TCS) to review comprehensive historical filings, upcoming board meetings, live price data, and peer comparisons.'
+    answer: 'Yes. Search any listed BSE scrip or open a dedicated company page (such as /company/RELIANCE or /company/TCS) for its filings history, upcoming board meetings, price data, and peer comparisons.'
   },
   {
     question: 'Is BSE Nexus affiliated with the Bombay Stock Exchange or Nexus Select Trust?',
-    answer: 'No. BSE Nexus is an independent market intelligence terminal. It is not affiliated with BSE India Ltd (bseindia.com), SEBI (sebi.gov.in), or Nexus Select Trust (REIT Scrip: 543913). All regulatory disclosures originate from public stock exchange feeds.'
+    answer: 'No. BSE Nexus is not affiliated with BSE India Ltd, SEBI, or Nexus Select Trust (REIT Scrip: 543913). All disclosures shown here originate from official BSE India filings — always verify critical filings on bseindia.com.'
   }
 ];
 
