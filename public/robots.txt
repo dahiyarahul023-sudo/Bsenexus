@@ -5,40 +5,12 @@ Disallow: /auth/
 
 # AI crawlers explicitly allowed with endpoint boundaries
 User-agent: GPTBot
-Allow: /
-Disallow: /api/
-Disallow: /auth/
-
 User-agent: OAI-SearchBot
-Allow: /
-Disallow: /api/
-Disallow: /auth/
-
 User-agent: ClaudeBot
-Allow: /
-Disallow: /api/
-Disallow: /auth/
-
 User-agent: Google-Extended
-Allow: /
-Disallow: /api/
-Disallow: /auth/
-
 User-agent: PerplexityBot
-Allow: /
-Disallow: /api/
-Disallow: /auth/
-
 User-agent: CCBot
-Allow: /
-Disallow: /api/
-Disallow: /auth/
-
 User-agent: anthropic-ai
-Allow: /
-Disallow: /api/
-Disallow: /auth/
-
 User-agent: Claude-Web
 Allow: /
 Disallow: /api/
