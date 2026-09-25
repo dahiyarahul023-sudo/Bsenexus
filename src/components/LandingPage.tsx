@@ -2615,7 +2615,7 @@ export function LandingPage({
           
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold border border-emerald-500/40">
             <Zap className="w-3.5 h-3.5 fill-emerald-400" />
-            <span>Continuous BSE Disclosure Stream • Institutional Grade</span>
+            <span>Continuous BSE Disclosure Stream</span>
           </div>
 
           <h2 className="text-3xl sm:text-5xl font-black tracking-tight leading-tight max-w-3xl mx-auto">
@@ -2623,7 +2623,7 @@ export function LandingPage({
           </h2>
 
           <p className="text-sm sm:text-base text-slate-300 leading-relaxed max-w-2xl mx-auto">
-            Join thousands of active investors, equity analysts, and prop desks who use BSE Nexus to capture corporate earnings and critical disclosures before the broader market reacts.
+            Follow official BSE filings with AI-powered summaries — quarterly results, corporate disclosures, and board actions, all in one live terminal.
           </p>
 
           <div className="flex flex-wrap items-center justify-center gap-4 pt-4">

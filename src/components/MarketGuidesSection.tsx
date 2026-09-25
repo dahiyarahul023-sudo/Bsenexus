@@ -18,7 +18,6 @@ export const MARKET_GUIDES: MarketGuide[] = [
     author: {
       name: 'BSE Nexus Intelligence Desk',
       role: 'Regulatory & Market Research',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'
     },
     content: {
       introduction: 'Regulation 30 of the SEBI (Listing Obligations and Disclosure Requirements) Regulations, 2015 is the backbone of transparency in Indian financial markets. It mandates listed companies to promptly notify stock exchanges of any event or information which, in the opinion of the board of directors, is material.',
@@ -73,9 +72,8 @@ export const MARKET_GUIDES: MarketGuide[] = [
     date: 'Sep 08, 2026',
     publishedAt: 'Sep 08, 2026',
     author: {
-      name: 'Aditya Sen, CFA',
-      role: 'Head of Quantitative Research',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80'
+      name: 'BSE Nexus Intelligence Desk',
+      role: 'Earnings Research',
     },
     content: {
       introduction: 'Every quarter, thousands of Indian companies file earnings statements with the BSE and NSE. The vast majority of retail participants get caught looking solely at top-line revenue and bottom-line Net Profit, ignoring critical accounting adjustments.',
@@ -125,9 +123,8 @@ export const MARKET_GUIDES: MarketGuide[] = [
     date: 'Sep 01, 2026',
     publishedAt: 'Sep 01, 2026',
     author: {
-      name: 'Meera Nambiar',
-      role: 'Senior Financial Strategist',
-      avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&auto=format&fit=crop&q=80'
+      name: 'BSE Nexus Intelligence Desk',
+      role: 'Corporate Actions Research',
     },
     content: {
       introduction: 'Corporate actions directly alter the share capital structure and shareholder equity. While retail investors frequently view bonus shares as "free money", institutional players focus on the strategic tax and capital allocation signals embedded in each filing.',
@@ -168,9 +165,8 @@ export const MARKET_GUIDES: MarketGuide[] = [
     date: 'Aug 26, 2026',
     publishedAt: 'Aug 26, 2026',
     author: {
-      name: 'Karan Malhotra',
-      role: 'Principal Systems Architect',
-      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80'
+      name: 'BSE Nexus Intelligence Desk',
+      role: 'Platform Research',
     },
     content: {
       introduction: 'Exchange filings in India are published as raw PDF documents—frequently scanned or formatted inconsistently. Modern traders combine optical character recognition (OCR) and lightweight LLMs to extract core operational figures in under 3 seconds.',
@@ -213,7 +209,6 @@ export const MARKET_GUIDES: MarketGuide[] = [
     author: {
       name: 'BSE Nexus Intelligence Desk',
       role: 'Regulatory & Market Research',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'
     },
     content: {
       introduction: 'Promoter buying in the secondary market is widely recognized as one of the strongest organic signals of managerial confidence. The SEBI (Prohibition of Insider Trading) Regulations, 2015 and SEBI SAST Regulations govern these disclosures.',
@@ -254,9 +249,8 @@ export const MARKET_GUIDES: MarketGuide[] = [
     date: 'Aug 10, 2026',
     publishedAt: 'Aug 10, 2026',
     author: {
-      name: 'Aditya Sen, CFA',
-      role: 'Head of Quantitative Research',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80'
+      name: 'BSE Nexus Intelligence Desk',
+      role: 'Forensic Research',
     },
     content: {
       introduction: 'Capital preservation is the first rule of successful investing. Forensic analysis of exchange filings frequently reveals governance breakdowns months before the stock experiences a catastrophic sell-off.',
@@ -297,9 +291,8 @@ export const MARKET_GUIDES: MarketGuide[] = [
     date: 'Sep 21, 2026',
     publishedAt: '2026-09-21T09:00:00Z',
     author: {
-      name: 'BSE Nexus Intelligence Team',
+      name: 'BSE Nexus Intelligence Desk',
       role: 'Equity Research & Earnings Analysis',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'
     },
     content: {
       introduction: 'Every quarter on Dalal Street, over 4,000 listed enterprises on the Bombay Stock Exchange (BSE) undergo the most consequential corporate transparency audit in global emerging markets: the quarterly financial results cycle. Understanding how Indian corporations schedule board meetings, disseminate unaudited financial statements, and comply with mandatory exchange disclosures gives market participants an unassailable edge.',
@@ -344,9 +337,8 @@ export const MARKET_GUIDES: MarketGuide[] = [
     date: 'Sep 21, 2026',
     publishedAt: '2026-09-21T09:00:00Z',
     author: {
-      name: 'BSE Nexus Intelligence Team',
+      name: 'BSE Nexus Intelligence Desk',
       role: 'Governance & Ownership Research',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80'
     },
     content: {
       introduction: 'In the Indian stock market, few regulatory disclosures provide as direct a window into fundamental conviction and corporate governance as the quarterly Shareholding Pattern filed under Regulation 31 of SEBI LODR Regulations.',

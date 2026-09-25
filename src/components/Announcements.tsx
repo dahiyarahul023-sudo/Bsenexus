@@ -5,7 +5,7 @@ import {
   FileText, ExternalLink, Search, Send, Clock, 
   Upload, Sparkles, ArrowUpRight, CheckCircle2, 
   TrendingUp, Building2, ChevronRight, ChevronDown, Info, X, RefreshCw,
-  Layers, Zap, Copy, Check, Flame, Bot,
+  Layers, Zap, Copy, Check, Flame, Bot, Share2,
   VolumeX, Moon, BarChart2,
   LayoutGrid, List, Bookmark, SlidersHorizontal, Sliders
 } from 'lucide-react';
@@ -651,6 +651,16 @@ export function Announcements({
     setTimeout(() => setCopiedSummary(false), 2000);
   };
 
+  // Shareable live-feed link (bsenexus.in/live) — one-tap copy for forwarding
+  const [feedLinkCopied, setFeedLinkCopied] = useState(false);
+  const handleShareFeedLink = () => {
+    try {
+      navigator.clipboard.writeText('https://bsenexus.in/live');
+    } catch {}
+    setFeedLinkCopied(true);
+    setTimeout(() => setFeedLinkCopied(false), 2000);
+  };
+
   const handleOpenIntel = (scripCode?: string, symbol?: string, companyName?: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     openIntelModal({ scripCode, symbol: symbol || companyName, companyName: companyName || symbol });
@@ -1136,6 +1146,15 @@ export function Announcements({
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
               </span>
             )}
+            <button
+              type="button"
+              onClick={handleShareFeedLink}
+              title={feedLinkCopied ? 'Link copied!' : 'Copy live feed link (bsenexus.in/live)'}
+              aria-label="Copy live feed link"
+              className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:text-slate-400 dark:hover:text-emerald-400 dark:hover:bg-emerald-950/50 border border-transparent hover:border-emerald-200 dark:hover:border-emerald-800 transition-colors cursor-pointer shrink-0"
+            >
+              {feedLinkCopied ? <Check className="w-3.5 h-3.5" /> : <Share2 className="w-3.5 h-3.5" />}
+            </button>
           </div>
 
           {/* Center: Search Box (clean height with no crush) */}

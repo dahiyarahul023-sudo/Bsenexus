@@ -48,6 +48,7 @@ function getAppPathRoute(): 'home' | 'pricing' | 'guides' | 'companies' | 'about
     path.startsWith('/guides/') ||
     path.startsWith('/announcement/') ||
     path.startsWith('/announcements') ||
+    path === '/live' ||
     path.startsWith('/results-calendar') ||
     path.startsWith('/watchlist') ||
     path.startsWith('/watchlists') ||
@@ -79,6 +80,7 @@ function AppContent() {
       try {
         const pathname = window.location.pathname.toLowerCase().replace(/\/+$/, '');
         if (pathname === '/announcements') return 'dashboard';
+        if (pathname === '/live') return 'dashboard';
         if (pathname === '/results-calendar') return 'results-calendar';
         if (pathname === '/watchlist' || pathname === '/watchlists') return 'watchlists';
 
@@ -286,7 +288,11 @@ function AppContent() {
     let targetPath = '/';
     switch (activeTab) {
       case 'dashboard':
-        targetPath = '/announcements';
+        // Keep /live stable as the shareable feed URL when the user is on it;
+        // otherwise the dashboard tab canonicalizes to /announcements.
+        targetPath = window.location.pathname.toLowerCase().replace(/\/+$/, '') === '/live'
+          ? '/live'
+          : '/announcements';
         break;
       case 'watchlists':
         targetPath = '/watchlist';
@@ -323,6 +329,10 @@ function AppContent() {
       try {
         const pathname = window.location.pathname.toLowerCase().replace(/\/+$/, '');
         if (pathname === '/announcements') {
+          setActiveTab('dashboard');
+          return;
+        }
+        if (pathname === '/live') {
           setActiveTab('dashboard');
           return;
         }

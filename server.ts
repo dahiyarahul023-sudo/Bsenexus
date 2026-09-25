@@ -5862,10 +5862,11 @@ async function startServer() {
     });
 
     // In development mode, allow verifying tab-specific SEO metadata in responses with proper headers
-    app.get(["/", "/announcements", "/results-calendar", "/watchlist", "/watchlists", "/companies", "/about", "/contact", "/disclaimer", "/privacy-policy", "/terms"], async (req, res, next) => {
+    app.get(["/", "/announcements", "/live", "/results-calendar", "/watchlist", "/watchlists", "/companies", "/about", "/contact", "/disclaimer", "/privacy-policy", "/terms"], async (req, res, next) => {
       let tab = req.query.tab as string | undefined;
       if (!tab) {
         if (req.path === '/announcements') tab = 'announcements';
+        else if (req.path === '/live') tab = 'announcements';
         else if (req.path === '/results-calendar') tab = 'results-calendar';
         else if (req.path === '/watchlist' || req.path === '/watchlists') tab = 'watchlists';
         else if (req.path === '/companies') tab = 'companies';
@@ -5947,6 +5948,7 @@ async function startServer() {
     const VALID_SPA_ROUTES = new Set([
       '/',
       '/announcements',
+      '/live',
       '/results-calendar',
       '/watchlist',
       '/watchlists',
@@ -5967,6 +5969,7 @@ async function startServer() {
       let tabParam = typeof req.query.tab === "string" ? req.query.tab.trim().toLowerCase() : "";
       if (!tabParam) {
         if (req.path === '/announcements') tabParam = 'announcements';
+        else if (req.path === '/live') tabParam = 'announcements';
         else if (req.path === '/results-calendar') tabParam = 'results-calendar';
         else if (req.path === '/watchlist' || req.path === '/watchlists') tabParam = 'watchlists';
         else if (req.path === '/companies') tabParam = 'companies';
