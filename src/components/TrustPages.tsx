@@ -41,7 +41,7 @@ export const TrustPage: React.FC<TrustPageProps> = ({ type, onEnterTerminal }) =
                 About BSE Nexus
               </h1>
               <p className="text-sm text-slate-400">
-                Independent real-time corporate announcements indexer for Indian capital markets.
+                Corporate announcements structured from official BSE India filings.
               </p>
             </div>
 
@@ -53,7 +53,7 @@ export const TrustPage: React.FC<TrustPageProps> = ({ type, onEnterTerminal }) =
                 <span>Who We Are & What We Do</span>
               </h2>
               <p className="text-slate-200 text-base sm:text-lg leading-relaxed font-medium">
-                BSE Nexus is an independent BSE corporate announcement aggregator run by Rahul Dahiya, contact <a href="mailto:admin@bsenexus.in" className="text-emerald-400 underline hover:text-emerald-300 font-bold">admin@bsenexus.in</a>.
+                BSE Nexus structures official BSE India corporate announcements into a searchable feed. Built and operated by Rahul Dahiya — contact <a href="mailto:admin@bsenexus.in" className="text-emerald-400 underline hover:text-emerald-300 font-bold">admin@bsenexus.in</a>.
               </p>
             </div>
 
@@ -65,7 +65,7 @@ export const TrustPage: React.FC<TrustPageProps> = ({ type, onEnterTerminal }) =
                   Every trading day, thousands of public listed companies file critical disclosures with the Bombay Stock Exchange (BSE India)—including quarterly financial results, SEBI LODR Regulation 30 corporate actions, board meeting intimations, dividend announcements, and auditor disclosures.
                 </p>
                 <p>
-                  BSE Nexus was built to make these regulatory filings instantly discoverable, transparent, and structured for equity researchers, independent investors, analysts, and market participants across India.
+                  BSE Nexus was built to make these regulatory filings easy to discover and structured for equity researchers, investors, analysts, and market participants across India.
                 </p>
               </div>
 
@@ -75,10 +75,10 @@ export const TrustPage: React.FC<TrustPageProps> = ({ type, onEnterTerminal }) =
                   <div className="p-4 rounded-xl bg-[#111522] border border-slate-800 space-y-1.5">
                     <div className="text-white font-bold text-sm flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                      <span>Sub-Minute Filing Ingestion</span>
+                      <span>Fast Filing Ingestion</span>
                     </div>
                     <p className="text-xs text-slate-400">
-                      Automated high-frequency pollers indexing BSE disclosures within seconds of release on the exchange.
+                      Automated high-frequency pollers indexing BSE disclosures within minutes of release on the exchange.
                     </p>
                   </div>
                   <div className="p-4 rounded-xl bg-[#111522] border border-slate-800 space-y-1.5">
@@ -360,14 +360,14 @@ export const TrustPage: React.FC<TrustPageProps> = ({ type, onEnterTerminal }) =
               <div className="space-y-3">
                 <h2 className="text-base font-bold text-white">3. Mandatory Verification of Source Filings</h2>
                 <p className="text-slate-400 text-xs sm:text-sm">
-                  While our automated systems strive for high precision and ultra-low latency, transmission anomalies, OCR misreadings, or upstream exchange delays may occur. Always cross-verify critical announcements, financial tables, and board resolutions directly on the official exchange website at <a href="https://www.bseindia.com" target="_blank" rel="noopener noreferrer" className="text-emerald-400 underline">bseindia.com</a>.
+                  Data is processed automatically — transmission anomalies, OCR misreadings, or upstream exchange delays may occur. Always verify critical filings on <a href="https://www.bseindia.com" target="_blank" rel="noopener noreferrer" className="text-emerald-400 underline">bseindia.com</a>.
                 </p>
               </div>
 
               <div className="space-y-3">
                 <h2 className="text-base font-bold text-white">4. Distinct Entity Notice</h2>
                 <p className="text-slate-400 text-xs sm:text-sm">
-                  BSE Nexus is an independent technology project and has no corporate, commercial, or operational connection with <strong>Nexus Select Trust</strong> (BSE Scrip Code: 543913), BSE Limited (Bombay Stock Exchange), or National Stock Exchange of India (NSE).
+                  BSE Nexus is a distinct entity with no connection to <strong>Nexus Select Trust</strong> (BSE Scrip Code: 543913), BSE Limited, or the National Stock Exchange of India (NSE).
                 </p>
               </div>
             </div>
@@ -430,7 +430,7 @@ export const TrustPage: React.FC<TrustPageProps> = ({ type, onEnterTerminal }) =
 
         {/* Quick Navigation Between Trust Pages */}
         <div className="mt-12 pt-8 border-t border-slate-800/80">
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">Trust & Legal Navigation</p>
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">Legal</p>
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <a href="/about" className={`px-3 py-1.5 rounded-lg border transition-colors ${type === 'about' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 font-bold' : 'bg-[#111522] border-slate-800 text-slate-300 hover:border-slate-700'}`}>
               About Us
@@ -473,7 +473,7 @@ export const TrustPage: React.FC<TrustPageProps> = ({ type, onEnterTerminal }) =
             </div>
           </div>
           <div className="border-t border-slate-800/80 pt-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-400">
-            <div>© {new Date().getFullYear()} BSE Nexus. Independent BSE Disclosures Aggregator. Operator: Rahul Dahiya.</div>
+            <div>© {new Date().getFullYear()} BSE Nexus. Not affiliated with BSE Limited or NSE. Built and operated by Rahul Dahiya.</div>
             <SocialIconsRow size={18} />
           </div>
         </div>
