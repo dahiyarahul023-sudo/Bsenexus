@@ -305,7 +305,7 @@ export async function getCompanyIntelligence(scripCode: string, symbol: string):
     upcomingEvent,
     quarterlyResults,
     materialTimeline: uniqueTimeline,
-    recentFilings: allStockFilings.slice(0, 40)
+    recentFilings: allStockFilings.slice(0, 100)
   };
 }
 
