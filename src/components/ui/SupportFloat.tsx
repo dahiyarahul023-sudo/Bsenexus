@@ -29,11 +29,16 @@ export function SupportModal({ isOpen, onClose, onOpenHelp }: SupportModalProps)
     if (!message.trim() || isSubmitting) return;
 
     setIsSubmitting(true);
+    // Safety net: never leave the user stuck on "sending" forever.
+    // The server now responds instantly; this only fires if something is wrong.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
     try {
       const res = await customFetch('/api/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: feedbackType, message: message.trim(), email: email.trim() }),
+        signal: controller.signal,
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) {
@@ -46,10 +51,12 @@ export function SupportModal({ isOpen, onClose, onOpenHelp }: SupportModalProps)
         duration: 4000
       });
     } catch (err: any) {
-      toast.error(err.message || 'Could not send feedback. Please try again.', {
+      const isTimeout = err?.name === 'AbortError' || /abort/i.test(err?.message || '');
+      toast.error(isTimeout ? 'Taking too long. Please check your connection and try again.' : (err.message || 'Could not send feedback. Please try again.'), {
         duration: 4000
       });
     } finally {
+      clearTimeout(timeoutId);
       setIsSubmitting(false);
     }
   };
