@@ -531,7 +531,7 @@ export function ResultsCalendar() {
 
     if (!isProOrAdmin) {
       setIsProModalOpen(true);
-      alert('🔒 1-Week Free Pro trial has ended. Upgrade to Pro (₹499/mo) for unlimited Gemini AI summaries!');
+      alert('🔒 1-Week Free Pro trial has ended. Upgrade to Pro (₹199/mo) for unlimited Gemini AI summaries!');
       return;
     }
 
@@ -595,7 +595,7 @@ export function ResultsCalendar() {
 
     if (!isProOrAdmin) {
       setIsProModalOpen(true);
-      alert('🔒 Direct Telegram Broadcasting is a Pro & Admin feature.\n\nYour 1-Week Free Pro trial has ended. Upgrade to Pro (₹499/mo) to dispatch alerts to Telegram!');
+      alert('🔒 Direct Telegram Broadcasting is a Pro & Admin feature.\n\nYour 1-Week Free Pro trial has ended. Upgrade to Pro (₹199/mo) to dispatch alerts to Telegram!');
       return;
     }
 
@@ -725,7 +725,7 @@ export function ResultsCalendar() {
 
     if (!isProOrAdmin) {
       setIsProModalOpen(true);
-      alert('🔒 Telegram Broadcasting is a Pro feature.\n\nYour 1-Week Free Pro trial has ended. Upgrade to Pro (₹499/mo) to broadcast to Telegram!');
+      alert('🔒 Telegram Broadcasting is a Pro feature.\n\nYour 1-Week Free Pro trial has ended. Upgrade to Pro (₹199/mo) to broadcast to Telegram!');
       return;
     }
 
@@ -772,7 +772,7 @@ export function ResultsCalendar() {
 
     if (!isProOrAdmin) {
       setIsProModalOpen(true);
-      alert('🔒 Telegram Broadcasting is a Pro feature.\n\nYour 1-Week Free Pro trial has ended. Upgrade to Pro (₹499/mo) to broadcast to Telegram!');
+      alert('🔒 Telegram Broadcasting is a Pro feature.\n\nYour 1-Week Free Pro trial has ended. Upgrade to Pro (₹199/mo) to broadcast to Telegram!');
       return;
     }
 
