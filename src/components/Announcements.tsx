@@ -526,7 +526,7 @@ export function Announcements({
         showToast('🔒 Google Sign-In Required: Sign in with Google to activate your 1-Week Free Pro trial to broadcast to Telegram!', 'info');
       } else {
         setIsProModalOpen(true);
-        showToast('🔒 Direct Telegram Broadcasting is a Pro feature (1-week trial ended. Upgrade to Pro for ₹499/mo).', 'info');
+        showToast('🔒 Direct Telegram Broadcasting is a Pro feature (1-week trial ended. Upgrade to Pro for ₹199/mo).', 'info');
       }
       return;
     }
@@ -581,7 +581,7 @@ export function Announcements({
     // 2. Authenticated user without active Pro trial / admin
     if (!isProOrAdmin) {
       setIsProModalOpen(true);
-      showToast('🔒 1-Week Free Pro trial has ended. Upgrade to Pro (₹499/mo) to continue generating Gemini AI summaries!', 'info');
+      showToast('🔒 1-Week Free Pro trial has ended. Upgrade to Pro (₹199/mo) to continue generating Gemini AI summaries!', 'info');
       return;
     }
 
