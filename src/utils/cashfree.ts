@@ -138,21 +138,25 @@ export function formatReceiptDate(iso: string): string {
  */
 export function buildReceiptMailto(r: PaymentReceipt, toEmail: string): string {
   const planLine = r.planLabel
-    ? `Plan: ${r.planLabel}${r.validityDays ? ` (${r.validityDays} days)` : ''}`
-    : 'Plan: Pro Monthly (30 days)';
+    ? `1x ${r.planLabel}${r.validityDays ? ` (${r.validityDays} days)` : ''}`
+    : '1x Pro Monthly (30 days)';
   const lines = [
-    'BSE Nexus — Pro Membership Receipt',
+    'BSE Nexus — Invoice',
     '--------------------------------',
-    `Amount: \u20B9${Number(r.amount).toFixed(2)} ${r.currency}`,
-    `Date: ${formatReceiptDate(r.paidAt)}`,
-    `Order: ${r.orderId}`,
-    planLine,
-    `Valid until: ${formatReceiptDate(new Date(r.validUntil).toISOString())}`,
+    `Invoice No.: ${r.orderId}`,
+    `Issued Date: ${formatReceiptDate(r.paidAt)}`,
+    `Valid Until: ${formatReceiptDate(new Date(r.validUntil).toISOString())}`,
+    'From: BSE Nexus (bsenexus.in)',
+    `To: ${toEmail.trim()}`,
     '--------------------------------',
+    `Item: ${planLine}`,
+    `Total: \u20B9${Number(r.amount).toFixed(2)} ${r.currency} (PAID via Cashfree)`,
+    '--------------------------------',
+    'Note: one-time payment, no auto-renewal.',
     'Thank you for going Pro!',
     'bsenexus.in',
   ];
-  const subject = `BSE Nexus Pro receipt — ${r.orderId}`;
+  const subject = `BSE Nexus invoice — ${r.orderId}`;
   return `mailto:${encodeURIComponent(toEmail.trim())}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join('\n'))}`;
 }
 
