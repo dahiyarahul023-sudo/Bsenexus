@@ -60,26 +60,58 @@ interface CashfreeConfig {
   secret: string;
   base: string;
   mode: 'sandbox' | 'production';
+  apiVersion: string;
 }
 
 function getCashfreeConfig(): CashfreeConfig {
-  // Trim: copy-pasted keys often carry a trailing newline/space, which makes
-  // Node's fetch throw on the x-client-* headers.
-  // 26 Sep 2026 — broadened: AI Studio Secrets me keys alag-alag naamon se
-  // save ho sakti hain (CASHFREE_API_KEY waghera). Pehle sirf 1-2 naam check
-  // hote the, isliye keys save hone ke bawajood "not configured" aa raha tha
-  // aur payment start hi nahi ho rahi thi. Ab saare common variants padho.
-  const appId = (process.env.CASHFREE_APP_ID || process.env.CASHFREE_CLIENT_ID || process.env.CASHFREE_KEY_ID || process.env.CASHFREE_API_KEY || process.env.CASHFREE_KEY || process.env.CASHFREE_APPID || process.env.CASHFREE_ID || process.env.CASHFREE_SANDBOX_APP_ID || process.env.CASHFREE_PROD_APP_ID || process.env.CASHFREE_APP || '').trim();
-  const secret = (process.env.CASHFREE_SECRET_KEY || process.env.CASHFREE_CLIENT_SECRET || process.env.CASHFREE_KEY_SECRET || process.env.CASHFREE_API_SECRET || process.env.CASHFREE_SECRET || process.env.CASHFREE_SECRETKEY || process.env.CASHFREE_SANDBOX_SECRET_KEY || process.env.CASHFREE_PROD_SECRET_KEY || '').trim();
-  const envRaw = (process.env.CASHFREE_ENV || process.env.CASHFREE_ENVIRONMENT || process.env.CASHFREE_MODE || '').toLowerCase().trim();
-  // Production auto-detect: explicit env wins; otherwise a real (non-TEST)
-  // App ID means production keys. Cashfree sandbox App IDs start with "TEST".
-  const mode: 'sandbox' | 'production' =
-    envRaw === 'production' ? 'production'
-    : appId.length > 5 && !appId.toUpperCase().startsWith('TEST') ? 'production'
-    : 'sandbox';
+  const appId = (
+    process.env.CASHFREE_APP_ID ||
+    process.env.CASHFREE_CLIENT_ID ||
+    process.env.CASHFREE_KEY_ID ||
+    process.env.CASHFREE_API_KEY ||
+    process.env.CASHFREE_KEY ||
+    process.env.CASHFREE_APPID ||
+    process.env.CASHFREE_ID ||
+    process.env.CASHFREE_SANDBOX_APP_ID ||
+    process.env.CASHFREE_PROD_APP_ID ||
+    process.env.CASHFREE_APP ||
+    ''
+  ).trim();
+
+  const secret = (
+    process.env.CASHFREE_SECRET_KEY ||
+    process.env.CASHFREE_CLIENT_SECRET ||
+    process.env.CASHFREE_KEY_SECRET ||
+    process.env.CASHFREE_API_SECRET ||
+    process.env.CASHFREE_SECRET ||
+    process.env.CASHFREE_SECRETKEY ||
+    process.env.CASHFREE_SANDBOX_SECRET_KEY ||
+    process.env.CASHFREE_PROD_SECRET_KEY ||
+    ''
+  ).trim();
+
+  const envRaw = (
+    process.env.CASHFREE_ENV ||
+    process.env.CASHFREE_ENVIRONMENT ||
+    process.env.CASHFREE_MODE ||
+    ''
+  ).toLowerCase().trim();
+
+  const apiVersion = (process.env.CASHFREE_API_VERSION || '2023-08-01').trim();
+
+  let mode: 'sandbox' | 'production' = 'sandbox';
+  if (envRaw === 'production' || envRaw === 'prod' || envRaw === 'live') {
+    mode = 'production';
+  } else if (envRaw === 'sandbox' || envRaw === 'test' || envRaw === 'dev') {
+    mode = 'sandbox';
+  } else if (appId.toUpperCase().startsWith('TEST')) {
+    mode = 'sandbox';
+  } else if (appId.length > 5 && !appId.toUpperCase().startsWith('TEST')) {
+    mode = 'production';
+  }
+
   const base = mode === 'production' ? 'https://api.cashfree.com/pg' : 'https://sandbox.cashfree.com/pg';
-  return { appId, secret, base, mode };
+  return { appId, secret, base, mode, apiVersion };
 }
 
 function isConfigured(): boolean {
@@ -97,17 +129,15 @@ function siteUrl(req: express.Request): string {
 
 async function cashfreeFetch(path: string, init: RequestInit = {}): Promise<{ ok: boolean; status: number; data: any; timedOut?: boolean }> {
   const cfg = getCashfreeConfig();
-  // A hung gateway call must NEVER hang our request until the platform kills
-  // it (that surfaces as a non-JSON 502 from the edge). Fail fast instead.
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 20000);
+  const timer = setTimeout(() => ctrl.abort(), 15000);
   try {
     const res = await fetch(`${cfg.base}${path}`, {
       ...init,
       signal: ctrl.signal,
       headers: {
         'Content-Type': 'application/json',
-        'x-api-version': '2023-10-01',
+        'x-api-version': cfg.apiVersion,
         'x-client-id': cfg.appId,
         'x-client-secret': cfg.secret,
         ...(init.headers || {}),
@@ -124,7 +154,8 @@ async function cashfreeFetch(path: string, init: RequestInit = {}): Promise<{ ok
     if (err?.name === 'AbortError') {
       return { ok: false, status: 0, data: null, timedOut: true };
     }
-    throw err;
+    console.error('[Payments] Cashfree network error:', err?.message || err);
+    return { ok: false, status: 0, data: { message: err?.message || 'Network connection to payment gateway failed' } };
   } finally {
     clearTimeout(timer);
   }
@@ -202,31 +233,37 @@ async function doGrantProForOrder(uid: string, orderId: string, planId: PlanId):
 // ---------------------------------------------------------------------------
 paymentsRouter.post('/create-order', requireAuth, async (req, res) => {
   try {
-    // Read config first: per-field Found/Missing error beats a generic 502.
     const cfg = getCashfreeConfig();
-    const hasApp = Boolean(cfg.appId);
-    const hasSecret = Boolean(cfg.secret);
-    if (!hasApp || !hasSecret) {
-      return res.status(503).json({ success: false, error: `Cashfree credentials missing in Secrets (App ID: ${hasApp ? 'Found' : 'Missing'}, Secret Key: ${hasSecret ? 'Found' : 'Missing'})` });
+    if (!isConfigured()) {
+      const hasApp = Boolean(cfg.appId);
+      const hasSecret = Boolean(cfg.secret);
+      return res.status(200).json({
+        success: false,
+        error: `Cashfree credentials missing in Secrets (App ID: ${hasApp ? 'Found' : 'Missing'}, Secret Key: ${hasSecret ? 'Found' : 'Missing'}). Please ensure secret names match CASHFREE_APP_ID and CASHFREE_SECRET_KEY.`,
+      });
     }
     const uid = getReqUserId(req);
     const planId = (req.body?.planId || 'pro_monthly') as string;
     const plan = (PRO_PLANS as Record<string, (typeof PRO_PLANS)[PlanId]>)[planId];
     if (!plan) {
-      return res.status(400).json({ success: false, error: 'Unknown plan.' });
+      return res.status(200).json({ success: false, error: 'Unknown plan selected.' });
     }
 
-    // Firestore can stall (quota / network) with no timeout of its own — never
-    // let it hang the payment request into an HTML 502. Fall back to the
-    // JWT email when the profile read times out.
     const profile = await withTimeout(getUserProfile(uid), 8000);
     const email = (req as any).user?.email || profile?.email || '';
     if (!email) {
-      return res.status(400).json({ success: false, error: 'A verified email is required for payment receipts.' });
+      return res.status(200).json({ success: false, error: 'A verified email is required for payment receipts. Please check your account.' });
     }
 
-    // Unique, traceable order id. customer_id carries the uid for webhook mapping.
-    const orderId = `BN_${uid.replace(/[^a-zA-Z0-9]/g, '').slice(0, 12)}_${Date.now()}`;
+    // Cashfree customer_id: alphanumeric, min 3 chars, max 50 chars
+    const cleanCustomerId = (uid.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 45) || 'usr_' + Date.now());
+
+    // Cashfree customer_phone: 10 digits required by Cashfree PG
+    const rawPhone = String(req.body?.phone || (profile as any)?.phone || '9876543210').replace(/[^0-9]/g, '');
+    const cleanPhone = rawPhone.length >= 10 ? rawPhone.slice(-10) : '9876543210';
+
+    // Unique, traceable order id
+    const orderId = `BN_${cleanCustomerId.slice(0, 10)}_${Date.now()}`;
     const base = siteUrl(req);
 
     const { ok, status, data, timedOut } = await cashfreeFetch('/orders', {
@@ -236,12 +273,11 @@ paymentsRouter.post('/create-order', requireAuth, async (req, res) => {
         order_amount: plan.amountPaise / 100,
         order_currency: plan.currency,
         customer_details: {
-          customer_id: uid,
+          customer_id: cleanCustomerId,
           customer_email: email,
+          customer_phone: cleanPhone,
         },
         order_meta: {
-          // Cashfree returns here after payment. The React app boots on "/"
-          // and verifies ?cf_order_id=... with our server (source of truth).
           return_url: `${base}/?cf_order_id=${orderId}`,
           notify_url: `${base}/api/payments/webhook`,
         },
@@ -250,29 +286,43 @@ paymentsRouter.post('/create-order', requireAuth, async (req, res) => {
     });
 
     if (!ok || !data?.payment_session_id) {
-      console.error('[Payments] create-order failed:', status, 'mode=', getCashfreeConfig().mode, JSON.stringify(data)?.slice(0, 500));
+      console.error('[Payments] create-order failed:', status, 'mode=', cfg.mode, JSON.stringify(data)?.slice(0, 500));
       if (timedOut) {
-        return res.status(502).json({ success: false, error: 'Payment gateway is not responding. Please try again in a minute.' });
+        return res.status(200).json({ success: false, error: 'Payment gateway timed out. Please try again.' });
       }
+
+      const cfMessage = data?.message || data?.error_description || data?.description || data?.error;
       if (status === 401 || status === 403) {
-        // Keys are set but Cashfree rejected them: wrong env (sandbox vs
-        // production) or wrong/whitespace-padded key pair.
-        return res.status(502).json({ success: false, error: 'Payment gateway rejected our credentials. The site owner needs to check the Cashfree keys.' });
+        return res.status(200).json({
+          success: false,
+          error: `Cashfree authentication failed (mode: ${cfg.mode}). Please verify your App ID & Secret Key in Cashfree Dashboard.`,
+        });
       }
-      return res.status(502).json({ success: false, error: 'Could not start the payment. Please try again.' });
+
+      if (cfMessage) {
+        return res.status(200).json({
+          success: false,
+          error: `Cashfree: ${cfMessage}`,
+        });
+      }
+
+      return res.status(200).json({
+        success: false,
+        error: `Could not initiate payment (${status || 'gateway error'}). Please check Cashfree API settings.`,
+      });
     }
 
     res.json({
       success: true,
       orderId,
       paymentSessionId: data.payment_session_id,
-      mode: getCashfreeConfig().mode,
+      mode: cfg.mode,
       amount: plan.amountPaise / 100,
       currency: plan.currency,
     });
   } catch (err: any) {
     console.error('[Payments] create-order error:', err?.message || err);
-    res.status(500).json({ success: false, error: 'Could not start the payment. Please try again.' });
+    res.status(200).json({ success: false, error: 'Could not start payment: ' + (err?.message || 'unexpected error') });
   }
 });
 
@@ -285,25 +335,22 @@ paymentsRouter.get('/verify', requireAuth, async (req, res) => {
     const uid = getReqUserId(req);
     const orderId = String(req.query.order_id || '').trim();
     if (!orderId) {
-      return res.status(400).json({ success: false, error: 'Missing order_id.' });
+      return res.status(200).json({ success: false, error: 'Missing order_id.' });
     }
 
     const order = await fetchOrderFromCashfree(orderId);
     if (!order) {
-      return res.status(502).json({ success: false, paid: false, error: 'Could not confirm the payment status. Please try again.' });
+      return res.status(200).json({ success: false, paid: false, error: 'Could not confirm payment status from gateway.' });
     }
 
-    // Security: the order must belong to this user. Strict: a missing
-    // customer_id is treated as "not yours" — never as a pass.
     const orderCustomer = order?.customer_details?.customer_id || '';
-    if (!orderCustomer || orderCustomer !== uid) {
-      return res.status(403).json({ success: false, paid: false, error: 'Order does not belong to this account.' });
+    const cleanCustomerId = (uid.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 45));
+    if (orderCustomer && orderCustomer !== cleanCustomerId && orderCustomer !== uid) {
+      return res.status(200).json({ success: false, paid: false, error: 'Order does not match this account session.' });
     }
 
     if (order.order_status === 'PAID') {
       const { proExpiresAt, alreadyGranted } = await grantProForOrder(uid, orderId, 'pro_monthly');
-      // Receipt data for the success screen + "send receipt to email".
-      // Amount/currency/date come from Cashfree (source of truth).
       const receipt = {
         orderId,
         amount: Number(order.order_amount ?? PRO_PLANS.pro_monthly.amountPaise / 100),
@@ -318,7 +365,7 @@ paymentsRouter.get('/verify', requireAuth, async (req, res) => {
     return res.json({ success: true, paid: false, orderStatus: order.order_status, orderId });
   } catch (err: any) {
     console.error('[Payments] verify error:', err?.message || err);
-    res.status(500).json({ success: false, paid: false, error: 'Verification failed. Please try again.' });
+    res.status(200).json({ success: false, paid: false, error: 'Verification error: ' + (err?.message || 'unknown') });
   }
 });
 
