@@ -641,7 +641,7 @@ export const NewsPortal: React.FC<NewsPortalProps> = ({
 
     if (!isPro && !isAdmin) {
       setIsProModalOpen(true);
-      setSendError('1-Week Free Pro trial has ended. Upgrade to Pro (₹499/mo) to broadcast to Telegram!');
+      setSendError('1-Week Free Pro trial has ended. Upgrade to Pro (₹199/mo) to broadcast to Telegram!');
       setTimeout(() => setSendError(null), 5000);
       return;
     }
@@ -695,7 +695,7 @@ export const NewsPortal: React.FC<NewsPortalProps> = ({
     // 2. Authenticated user without active Pro trial
     if (!isPro && !isAdmin) {
       setIsProModalOpen(true);
-      setSendError('1-Week Free Pro trial has ended. Upgrade to Pro (₹499/mo) for unlimited AI summaries!');
+      setSendError('1-Week Free Pro trial has ended. Upgrade to Pro (₹199/mo) for unlimited AI summaries!');
       setTimeout(() => setSendError(null), 5000);
       return;
     }
