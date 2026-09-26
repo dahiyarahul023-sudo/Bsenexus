@@ -3,6 +3,7 @@ import {
   signInWithPopup,
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword,
+  fetchSignInMethodsForEmail,
   updateProfile,
   signOut, 
   onAuthStateChanged,
@@ -647,10 +648,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (fbErr: any) {
       console.warn('Firebase email auth notice:', fbErr?.code || fbErr?.message);
       let errorMsg = 'Invalid email or password.';
-      if (fbErr?.code === 'auth/user-not-found') errorMsg = 'No account found with this email. Please Sign Up first.';
-      else if (fbErr?.code === 'auth/wrong-password' || fbErr?.code === 'auth/invalid-credential') errorMsg = 'Incorrect password. Please try again.';
-      else if (fbErr?.code === 'auth/invalid-email') errorMsg = 'Please enter a valid email address (e.g. name@domain.com).';
-      else if (fbErr?.code === 'auth/too-many-requests') errorMsg = 'Too many failed attempts. Please try again in a few minutes.';
+      const code = fbErr?.code || '';
+      if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
+        // If this email is actually linked with Google sign-in (no password provider),
+        // point the user to the right door instead of a dead-end password error.
+        // This also prevents confusion from duplicate same-email accounts.
+        try {
+          const methods = await fetchSignInMethodsForEmail(auth, trimmedEmail);
+          if (methods.includes('google.com') && !methods.includes('password')) {
+            errorMsg = 'This email uses Google sign-in. Please use "Continue with Google" instead of a password.';
+          } else if (code === 'auth/user-not-found') {
+            errorMsg = 'No account found with this email. Please Sign Up first.';
+          } else {
+            errorMsg = 'Incorrect password. Please try again.';
+          }
+        } catch {
+          if (code === 'auth/user-not-found') errorMsg = 'No account found with this email. Please Sign Up first.';
+          else errorMsg = 'Incorrect password. Please try again.';
+        }
+      }
+      else if (code === 'auth/invalid-email') errorMsg = 'Please enter a valid email address (e.g. name@domain.com).';
+      else if (code === 'auth/too-many-requests') errorMsg = 'Too many failed attempts. Please try again in a few minutes.';
       else if (fbErr?.message) errorMsg = fbErr.message;
       return { success: false, error: errorMsg };
     }
@@ -668,6 +686,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
+      // Prevent duplicate same-email accounts: if this email is already linked
+      // with Google sign-in, block password-based signup and point to Google.
+      // (Firebase project allows multiple accounts per email, so without this
+      // check the same email gets two different UIDs = two "different accounts".)
+      try {
+        const existingMethods = await fetchSignInMethodsForEmail(auth, trimmedEmail);
+        if (existingMethods.includes('google.com')) {
+          return { success: false, error: 'This email already uses Google sign-in. Please use "Continue with Google" instead of creating a password account.' };
+        }
+      } catch (methodErr) {
+        console.warn('Could not check existing sign-in methods:', (methodErr as any)?.code || methodErr);
+        // Fall through and let Firebase return its own error if any.
+      }
       const res = await createUserWithEmailAndPassword(auth, trimmedEmail, pass);
       if (res.user) {
         if (name) {
