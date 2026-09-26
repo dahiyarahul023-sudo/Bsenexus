@@ -55,6 +55,11 @@ export interface UserProfile {
   photoURL: string | null;
   tier: UserTier;
   proExpiresAt?: number | null;
+  // --- Cashfree one-time Pro payments (server is source of truth) ---
+  trialUsed?: boolean;          // 7-day free trial already consumed (client + server)
+  proPlanId?: string | null;    // e.g. 'pro_monthly'
+  lastPaymentAt?: number | null;
+  lastOrderId?: string | null;  // idempotency key for webhook/verify grants
   telegramChatId?: string | null;
   telegramUsername?: string | null;
   muteInAppNotifications?: boolean;
