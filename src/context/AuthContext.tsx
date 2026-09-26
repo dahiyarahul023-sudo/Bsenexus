@@ -15,6 +15,7 @@ import { UserProfile, UserNotificationPreferences } from '../types';
 import { customFetch } from '../api';
 import { reportSyncStatus, withRetry } from '../utils/retry';
 import { executeRecaptcha } from '../utils/recaptcha';
+import type { PaymentReceipt } from '../utils/cashfree';
 
 const ADMIN_EMAIL = 'dahiyarahul023@gmail.com';
 const STORAGE_SESSION_KEY = 'bse_nexus_auth_session';
@@ -101,6 +102,8 @@ interface AuthContextType {
   setIsProModalOpen: (open: boolean) => void;
   isCheckoutOpen: boolean;
   setIsCheckoutOpen: (open: boolean) => void;
+  receipt: PaymentReceipt | null;
+  setReceipt: (r: PaymentReceipt | null) => void;
   isAdminPinModalOpen: boolean;
   setIsAdminPinModalOpen: (open: boolean) => void;
 }
@@ -152,6 +155,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isProModalOpen, setIsProModalOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [receipt, setReceipt] = useState<PaymentReceipt | null>(null);
   const [isAdminPinModalOpen, setIsAdminPinModalOpen] = useState(false);
 
   // Helper to persist sanitized session locally for UI convenience (never stores credentials/tokens)
@@ -1202,6 +1206,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsProModalOpen,
         isCheckoutOpen,
         setIsCheckoutOpen,
+        receipt,
+        setReceipt,
         isAdminPinModalOpen,
         setIsAdminPinModalOpen
       }}

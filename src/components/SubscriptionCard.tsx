@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { Crown, CreditCard, BadgeCheck, Info } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { customFetch } from '../api';
+import { verifyProPayment } from '../utils/cashfree';
 
 interface SubStatus {
   configured: boolean;
@@ -14,6 +15,7 @@ interface SubStatus {
   proExpiresAt: number;
   plan: { id: string; label: string; amountPaise: number; currency: string; validityDays: number };
   lastPaymentAt: number | null;
+  lastOrderId: string | null;
   autoRenew: 'coming_soon';
 }
 
@@ -32,10 +34,11 @@ function fmtDate(ts: number | null): string {
 }
 
 export function SubscriptionCard() {
-  const { user, refreshProfile, setIsCheckoutOpen } = useAuth();
+  const { user, refreshProfile, setIsCheckoutOpen, setReceipt } = useAuth();
   const [status, setStatus] = useState<SubStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loadingReceipt, setLoadingReceipt] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,6 +69,19 @@ export function SubscriptionCard() {
     // Enter the dedicated checkout screen — payment happens inside it.
     setError(null);
     setIsCheckoutOpen(true);
+  };
+
+  const handleViewReceipt = async () => {
+    if (!status?.lastOrderId || loadingReceipt) return;
+    setLoadingReceipt(true);
+    // verify is idempotent per order — safe to re-call for receipt data.
+    const v = await verifyProPayment(status.lastOrderId);
+    setLoadingReceipt(false);
+    if (v.paid && v.receipt) {
+      setReceipt(v.receipt);
+    } else {
+      setError(v.error || 'Could not load the receipt.');
+    }
   };
 
   return (
@@ -100,7 +116,18 @@ export function SubscriptionCard() {
           </div>
           <div className="flex items-center justify-between">
             <span className="text-slate-500 dark:text-slate-400">Last payment</span>
-            <span className="font-semibold text-slate-900 dark:text-white">{fmtDate(status.lastPaymentAt)}</span>
+            <span className="font-semibold text-slate-900 dark:text-white">
+              {fmtDate(status.lastPaymentAt)}{' '}
+              {status.lastOrderId && (
+                <button
+                  onClick={handleViewReceipt}
+                  disabled={loadingReceipt}
+                  className="ml-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 underline underline-offset-2 hover:opacity-80 disabled:opacity-50"
+                >
+                  {loadingReceipt ? 'Loading…' : 'View receipt'}
+                </button>
+              )}
+            </span>
           </div>
           <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-[#252236]">
             <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">

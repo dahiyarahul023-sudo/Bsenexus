@@ -12,6 +12,7 @@ import Announcements from './components/Announcements';
 import { AuthModal } from './components/AuthModal';
 import { ProUpgradeModal } from './components/ProUpgradeModal';
 import { ProCheckoutView } from './components/ProCheckoutView';
+import { ProReceiptView } from './components/ProReceiptView';
 import { AdminPinModal } from './components/AdminPinModal';
 import { HomeForYou } from './components/HomeForYou';
 import { WatchlistManager } from './components/WatchlistManager';
@@ -81,7 +82,7 @@ function Dashboard({ bseHealth, telegramHealth, isRunning, handleToggle }: any) 
  * Runs on every route so a payment return always lands in the React app.
  */
 function CashfreeReturnHandler() {
-  const { user, refreshProfile } = useAuth();
+  const { user, refreshProfile, setReceipt } = useAuth();
   const { success, warning } = useToast();
   const handledRef = useRef<string | null>(null);
 
@@ -106,7 +107,12 @@ function CashfreeReturnHandler() {
       } catch { /* non-fatal */ }
       if (v.paid) {
         await refreshProfile();
-        success('Pro activated — your 30-day Pro pack is live. Welcome!');
+        // Open the receipt screen instead of a plain toast.
+        if (v.receipt) {
+          setReceipt(v.receipt);
+        } else {
+          success('Pro activated — your 30-day Pro pack is live. Welcome!');
+        }
       } else {
         warning(v.error || 'Payment not confirmed yet. If money was debited, it will reflect shortly.');
       }
@@ -785,6 +791,7 @@ export default function App() {
           <AppContent />
           <CashfreeReturnHandler />
           <ProCheckoutView />
+          <ProReceiptView />
         </ToastProvider>
       </IntelModalProvider>
     </AuthProvider>

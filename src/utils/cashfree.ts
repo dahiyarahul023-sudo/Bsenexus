@@ -65,15 +65,57 @@ export async function startProPayment(planId: string = 'pro_monthly'): Promise<S
   }
 }
 
+/** Receipt data for the payment-success screen (from our server's verify). */
+export interface PaymentReceipt {
+  orderId: string;
+  amount: number;
+  currency: string;
+  paidAt: string; // ISO date from Cashfree
+  email: string;
+  validUntil: number; // proExpiresAt timestamp
+}
+
+export function formatReceiptDate(iso: string): string {
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' });
+  } catch {
+    return iso;
+  }
+}
+
+/**
+ * Build a "send receipt by email" link. There is no server mailer in this
+ * project, so this opens the user's own mail app with the receipt prefilled,
+ * addressed to whatever email they typed. Nothing is sent without their tap.
+ */
+export function buildReceiptMailto(r: PaymentReceipt, toEmail: string): string {
+  const lines = [
+    'BSE Nexus — Pro Membership Receipt',
+    '--------------------------------',
+    `Amount: \u20B9${Number(r.amount).toFixed(2)} ${r.currency}`,
+    `Date: ${formatReceiptDate(r.paidAt)}`,
+    `Order: ${r.orderId}`,
+    'Plan: Pro Monthly (30 days)',
+    `Valid until: ${formatReceiptDate(new Date(r.validUntil).toISOString())}`,
+    '--------------------------------',
+    'Thank you for going Pro!',
+    'bsenexus.in',
+  ];
+  const subject = `BSE Nexus Pro receipt — ${r.orderId}`;
+  return `mailto:${encodeURIComponent(toEmail.trim())}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join('\n'))}`;
+}
+
 /** After the Cashfree redirect, confirm the payment with OUR server. */
-export async function verifyProPayment(orderId: string): Promise<{ paid: boolean; proExpiresAt?: number; error?: string }> {
+export async function verifyProPayment(orderId: string): Promise<{ paid: boolean; proExpiresAt?: number; receipt?: PaymentReceipt; error?: string }> {
   try {
     const res = await customFetch(`/api/payments/verify?order_id=${encodeURIComponent(orderId)}`);
     const data = await res.json().catch(() => null);
     if (!res.ok || !data?.success) {
       return { paid: false, error: data?.error || 'Verification failed. Please try again.' };
     }
-    return { paid: Boolean(data.paid), proExpiresAt: data.proExpiresAt };
+    return { paid: Boolean(data.paid), proExpiresAt: data.proExpiresAt, receipt: data.receipt || undefined };
   } catch {
     return { paid: false, error: 'Verification failed. Please try again.' };
   }

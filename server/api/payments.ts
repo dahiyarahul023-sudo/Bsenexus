@@ -273,7 +273,17 @@ paymentsRouter.get('/verify', requireAuth, async (req, res) => {
 
     if (order.order_status === 'PAID') {
       const { proExpiresAt, alreadyGranted } = await grantProForOrder(uid, orderId, 'pro_monthly');
-      return res.json({ success: true, paid: true, alreadyGranted, proExpiresAt, orderId });
+      // Receipt data for the success screen + "send receipt to email".
+      // Amount/currency/date come from Cashfree (source of truth).
+      const receipt = {
+        orderId,
+        amount: Number(order.order_amount ?? PRO_PLANS.pro_monthly.amountPaise / 100),
+        currency: String(order.order_currency || PRO_PLANS.pro_monthly.currency),
+        paidAt: String(order.created_at || new Date().toISOString()),
+        email: String(order?.customer_details?.customer_email || ''),
+        validUntil: proExpiresAt,
+      };
+      return res.json({ success: true, paid: true, alreadyGranted, proExpiresAt, orderId, receipt });
     }
 
     return res.json({ success: true, paid: false, orderStatus: order.order_status, orderId });
@@ -299,6 +309,7 @@ paymentsRouter.get('/status', requireAuth, async (req, res) => {
       proExpiresAt,
       plan: PRO_PLANS.pro_monthly,
       lastPaymentAt: (profile as any)?.lastPaymentAt || null,
+      lastOrderId: (profile as any)?.lastOrderId || null,
       // Auto-renew needs RBI e-mandate approval — not available yet.
       autoRenew: 'coming_soon' as const,
     });
