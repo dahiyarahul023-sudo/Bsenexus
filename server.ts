@@ -5596,13 +5596,13 @@ interface TabSeoMeta {
 
 const TAB_SEO_CONFIG: Record<string, TabSeoMeta> = {
   default: {
-    title: "BSE Nexus — Real-Time BSE Corporate Announcements & Disclosures",
-    description: "Track latest BSE corporate announcements, board meeting outcomes, financial results, and regulatory filings in real time on BSE Nexus.",
+    title: "BSE Nexus — BSE Corporate Announcements & Disclosures",
+    description: "Track latest BSE corporate announcements, board meeting outcomes, financial results, and regulatory filings on BSE Nexus.",
     canonical: "https://bsenexus.in/",
   },
   announcements: {
     title: "Live BSE Announcements & Corporate Filings | BSE Nexus",
-    description: "Track live BSE corporate announcements, board meetings, financial disclosures, and regulatory filings in real time with AI-powered financial summaries on BSE Nexus.",
+    description: "Track BSE corporate announcements, board meetings, financial disclosures, and regulatory filings with AI-powered financial summaries on BSE Nexus.",
     canonical: "https://bsenexus.in/announcements",
   },
   "results-calendar": {
@@ -5612,7 +5612,7 @@ const TAB_SEO_CONFIG: Record<string, TabSeoMeta> = {
   },
   watchlists: {
     title: "Custom Stock Watchlists & Telegram Alerts | BSE Nexus",
-    description: "Create custom BSE equity watchlists, monitor priority disclosures, and receive instant real-time Telegram alerts for company announcements on BSE Nexus.",
+    description: "Create custom BSE equity watchlists, monitor priority disclosures, and receive Telegram alerts for company announcements on BSE Nexus.",
     canonical: "https://bsenexus.in/watchlist",
   },
   guides: {
@@ -5622,7 +5622,7 @@ const TAB_SEO_CONFIG: Record<string, TabSeoMeta> = {
   },
   pricing: {
     title: "Pricing & Plans — 100% Free Launch Access | BSE Nexus",
-    description: "Explore BSE Nexus transparent pricing. 100% Free access to Community and Pro intelligence features during launch: real-time BSE filings, Gemini AI summaries, and Telegram alerts on BSE Nexus.",
+    description: "Explore BSE Nexus transparent pricing. 100% Free access to Community and Pro intelligence features during launch: latest BSE filings, Gemini AI summaries, and Telegram alerts on BSE Nexus.",
     canonical: "https://bsenexus.in/pricing",
   },
   companies: {
