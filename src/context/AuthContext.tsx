@@ -94,6 +94,7 @@ interface AuthContextType {
   updateTelegramChatId: (chatId: string, username?: string) => Promise<boolean>;
   updateTelegramPreferences: (options: UpdateTelegramOptions) => Promise<boolean>;
   upgradeToPro: (plan?: string) => Promise<boolean>;
+  refreshProfile: () => Promise<void>;
   isAuthModalOpen: boolean;
   setIsAuthModalOpen: (open: boolean) => void;
   isProModalOpen: boolean;
@@ -1107,10 +1108,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ...profile,
       tier: 'pro',
       proExpiresAt: expiry,
-      maxWatchlistStocks: 9999
+      maxWatchlistStocks: 9999,
+      trialUsed: true
     };
     setProfile(updatedProfile);
     saveLocalSession(user, updatedProfile);
+    // Remember trial consumption locally so the paywall can offer "Buy Pro" instead of a second trial
+    try {
+      const trialUid = (user as any)?.uid || profile.uid;
+      if (trialUid) localStorage.setItem(`bse_trial_used_${trialUid}`, '1');
+    } catch { /* non-fatal */ }
 
     try {
       await customFetch('/api/users/profile', {
@@ -1125,6 +1132,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setIsProModalOpen(false);
     return true;
+  };
+
+  /** Re-sync the profile from the server (e.g. after a Cashfree payment grant). */
+  const refreshProfile = async () => {
+    if (user) {
+      await syncUserProfile(user);
+    }
   };
 
   const isOwner = Boolean(
@@ -1178,6 +1192,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updateTelegramChatId,
         updateTelegramPreferences,
         upgradeToPro,
+        refreshProfile,
         isAuthModalOpen,
         setIsAuthModalOpen,
         isProModalOpen,
