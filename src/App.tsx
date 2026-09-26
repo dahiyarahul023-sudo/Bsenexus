@@ -85,6 +85,9 @@ function CashfreeReturnHandler() {
   const { user, refreshProfile, setReceipt } = useAuth();
   const { success, warning } = useToast();
   const handledRef = useRef<string | null>(null);
+  // While our server confirms the payment with Cashfree, show a processing
+  // overlay so the screen never sits blank before the invoice appears.
+  const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -98,6 +101,7 @@ function CashfreeReturnHandler() {
     if (!user) return;
     handledRef.current = orderId;
     (async () => {
+      setVerifying(true);
       const v = await verifyProPayment(orderId as string);
       clearPendingOrderId();
       try {
@@ -105,9 +109,10 @@ function CashfreeReturnHandler() {
         url.searchParams.delete('cf_order_id');
         window.history.replaceState({}, '', url.pathname + url.search + url.hash);
       } catch { /* non-fatal */ }
+      setVerifying(false);
       if (v.paid) {
         await refreshProfile();
-        // Open the receipt screen instead of a plain toast.
+        // Open the invoice screen instead of a plain toast.
         if (v.receipt) {
           setReceipt(v.receipt);
         } else {
@@ -120,7 +125,23 @@ function CashfreeReturnHandler() {
     })();
   }, [user]);
 
-  return null;
+  if (!verifying) return null;
+  return (
+    <div
+      className="fixed inset-0 z-[96] bg-[#0B0B14]/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-150"
+      role="status"
+      aria-live="polite"
+      aria-label="Confirming payment"
+    >
+      <div className="w-full max-w-[320px] rounded-[28px] bg-white shadow-2xl p-8 flex flex-col items-center text-center animate-in zoom-in-95 duration-200">
+        <span className="w-12 h-12 rounded-full border-4 border-slate-200 border-t-slate-950 animate-spin" aria-hidden="true" />
+        <h2 className="mt-5 text-[16px] font-black text-slate-900">Confirming your payment…</h2>
+        <p className="mt-2 text-[12px] font-medium text-slate-500 leading-relaxed">
+          We're verifying it with Cashfree and preparing your invoice. One moment.
+        </p>
+      </div>
+    </div>
+  );
 }
 
 function AppContent() {

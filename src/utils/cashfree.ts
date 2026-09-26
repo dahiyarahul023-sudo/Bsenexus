@@ -119,6 +119,7 @@ export interface PaymentReceipt {
   planId?: string;
   planLabel?: string; // e.g. "Pro Yearly"
   validityDays?: number; // e.g. 365
+  paymentMethod?: string; // e.g. "UPI", "Visa Credit Card" (display-only, no PII)
 }
 
 export function formatReceiptDate(iso: string): string {
@@ -151,6 +152,7 @@ export function buildReceiptMailto(r: PaymentReceipt, toEmail: string): string {
     '--------------------------------',
     `Item: ${planLine}`,
     `Total: \u20B9${Number(r.amount).toFixed(2)} ${r.currency} (PAID via Cashfree)`,
+    ...(r.paymentMethod ? [`Paid via: ${r.paymentMethod}`] : []),
     '--------------------------------',
     'Note: one-time payment, no auto-renewal.',
     'Thank you for going Pro!',

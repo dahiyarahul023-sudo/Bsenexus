@@ -102,6 +102,34 @@ export function planIdFromOrderId(orderId: string): PlanId {
   return pid && (PRO_PLANS as Record<string, unknown>)[pid] ? pid : 'pro_monthly';
 }
 
+/**
+ * Best-effort human label for the instrument that paid
+ * (e.g. "UPI", "Visa Credit Card", "HDFC Netbanking").
+ * Display-only — never includes PII like card numbers or UPI ids.
+ */
+function describePaymentMethod(p: any): string {
+  try {
+    const pm = p?.payment_method || {};
+    if (pm.upi) return 'UPI';
+    const card = pm.card || {};
+    if (card && (card.card_network || card.card_type)) {
+      const net = String(card.card_network || '').trim();
+      const t = String(card.card_type || '').toLowerCase();
+      const kind = t.includes('credit') ? 'Credit Card' : t.includes('debit') ? 'Debit Card' : 'Card';
+      return net ? `${net} ${kind}` : kind;
+    }
+    const nb = pm.netbanking || {};
+    if (nb && Object.keys(nb).length) {
+      const bank = String(nb.netbanking_bank_name || '').trim();
+      return bank ? `${bank} Netbanking` : 'Netbanking';
+    }
+    if (pm.wallet) return 'Wallet';
+    if (pm.emi) return 'EMI';
+    if (pm.paylater) return 'Pay Later';
+  } catch { /* ignore */ }
+  return '';
+}
+
 interface CashfreeConfig {
   appId: string;
   secret: string;
@@ -409,6 +437,17 @@ paymentsRouter.get('/verify', requireAuth, async (req, res) => {
         return res.status(200).json({ success: false, paid: false, error: 'Payment amount does not match the selected plan.' });
       }
       const { proExpiresAt, alreadyGranted } = await grantProForOrder(uid, orderId, planId);
+      // Best-effort: which instrument paid (UPI / card / netbanking) for the
+      // invoice. Display-only, never PII — and never fails the verify.
+      let paymentMethod = '';
+      try {
+        const payRes = await cashfreeFetch(`/orders/${encodeURIComponent(orderId)}/payments`);
+        const list = Array.isArray(payRes?.data) ? payRes.data : [];
+        const okPay =
+          list.find((p: any) => String(p?.payment_status || '').toUpperCase() === 'SUCCESS') ||
+          list[0];
+        paymentMethod = describePaymentMethod(okPay);
+      } catch { /* ignore — receipt works without it */ }
       const receipt = {
         orderId,
         amount: paidAmount,
@@ -419,6 +458,7 @@ paymentsRouter.get('/verify', requireAuth, async (req, res) => {
         planId: plan.id,
         planLabel: plan.label,
         validityDays: plan.validityDays,
+        paymentMethod,
       };
       return res.json({ success: true, paid: true, alreadyGranted, proExpiresAt, orderId, receipt });
     }

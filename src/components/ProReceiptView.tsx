@@ -4,15 +4,81 @@
  * Shown right after Cashfree returns and our server confirms PAID, and also
  * on demand from Settings ("View receipt") for the last payment.
  * Clean, detailed invoice style: Invoice No., Issued / Valid-Until dates,
- * From / To blocks, an itemised table and a TOTAL row — like a real bill.
- * "Send receipt" opens the user's own mail app with the invoice prefilled
- * to whatever email they type — nothing is sent without their tap
- * (this project has no server mailer).
+ * From / To blocks, an itemised table (with the instrument that paid),
+ * a big TOTAL row, a scannable Code-128 barcode of the invoice number and
+ * an animated PAID stamp. "Send receipt" opens the user's own mail app with
+ * the invoice prefilled to whatever email they type — nothing is sent
+ * without their tap (this project has no server mailer).
  */
 import React, { useState, useEffect } from 'react';
 import { X, CheckCircle2, Mail } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { buildReceiptMailto, formatReceiptDate, type PaymentReceipt } from '../utils/cashfree';
+
+/* ------------------------------------------------------------------ */
+/* Code 128 (subset B) barcode — renders the invoice number as an SVG. */
+/* Patterns from the ISO/IEC 15417 table (cf. Wikipedia "Code 128").   */
+/* ------------------------------------------------------------------ */
+const CODE128: string[] = [
+  '212222', '222122', '222221', '121223', '121322', '131222', '122213', '122312',
+  '132212', '221213', '221312', '231212', '112232', '122132', '122231', '113222',
+  '123122', '123221', '223211', '221132', '221231', '213212', '223112', '312131',
+  '311222', '321122', '321221', '312212', '322112', '322211', '212123', '212321',
+  '232121', '111323', '131123', '131321', '112313', '132113', '132311', '211313',
+  '231113', '231311', '112133', '112331', '132131', '113123', '113321', '133121',
+  '313121', '211331', '231131', '213113', '213311', '213131', '311123', '311321',
+  '331121', '312113', '312311', '332111', '314111', '221411', '431111', '111224',
+  '111422', '121124', '121421', '141122', '141221', '112214', '112412', '122114',
+  '122411', '142112', '142211', '241211', '221114', '413111', '241112', '134111',
+  '111242', '121142', '121241', '114212', '124112', '124211', '411212', '421112',
+  '421211', '212141', '214121', '412121', '111143', '111341', '131141', '114113',
+  '114311', '411113', '411311', '113141', '114131', '311141', '411131', '211412',
+  '211214', '211232', '2331112',
+];
+
+function Code128Barcode({ value, height = 46 }: { value: string; height?: number }) {
+  const clean = (value || '')
+    .split('')
+    .filter((c) => {
+      const n = c.charCodeAt(0);
+      return n >= 32 && n <= 126;
+    })
+    .join('');
+  if (!clean) return null;
+  const vals = clean.split('').map((c) => c.charCodeAt(0) - 32);
+  const checksum = (104 + vals.reduce((s, v, i) => s + (i + 1) * v, 0)) % 103;
+  const codes = [104, ...vals, checksum, 106];
+  const unit = 2;
+  let x = 12; // quiet zone
+  const bars: React.ReactNode[] = [];
+  codes.forEach((c, ci) => {
+    const pat = CODE128[c];
+    for (let i = 0; i < pat.length; i++) {
+      const w = Number(pat[i]) * unit;
+      if (i % 2 === 0) {
+        bars.push(<rect key={`${ci}-${i}`} x={x} y={0} width={w} height={height} fill="#0f172a" />);
+      }
+      x += w;
+    }
+  });
+  const width = x + 12;
+  return (
+    <div className="flex flex-col items-center">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="w-full max-w-[250px] h-auto"
+        role="img"
+        aria-label={`Barcode for invoice ${clean}`}
+      >
+        <rect x={0} y={0} width={width} height={height} fill="#ffffff" />
+        {bars}
+      </svg>
+      <p className="mt-1.5 text-[10px] font-mono font-semibold tracking-[0.18em] text-slate-500">
+        {clean}
+      </p>
+    </div>
+  );
+}
 
 function InvoicePaper({ r, toEmail }: { r: PaymentReceipt; toEmail: string }) {
   const planText = r.planLabel
@@ -21,7 +87,24 @@ function InvoicePaper({ r, toEmail }: { r: PaymentReceipt; toEmail: string }) {
   const amount = `₹${Number(r.amount).toFixed(2)}`;
 
   return (
-    <div className="bg-white rounded-3xl px-6 py-6 text-slate-900 shadow-2xl">
+    <div className="relative bg-white rounded-3xl px-6 py-6 text-slate-900 shadow-2xl overflow-hidden">
+      <style>{`
+        @keyframes stamp-in {
+          0% { opacity: 0; transform: rotate(-10deg) scale(2.4); }
+          55% { opacity: 1; transform: rotate(-10deg) scale(0.9); }
+          78% { transform: rotate(-10deg) scale(1.05); }
+          100% { opacity: 1; transform: rotate(-10deg) scale(1); }
+        }
+        .paid-stamp { animation: stamp-in 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.15) 0.35s both; }
+      `}</style>
+
+      {/* PAID rubber stamp */}
+      <div className="paid-stamp pointer-events-none absolute top-5 right-5 select-none" aria-hidden="true">
+        <div className="border-[3px] border-double border-emerald-700/90 rounded-md px-3 py-1 bg-emerald-50/40">
+          <span className="text-[22px] font-black tracking-[0.22em] text-emerald-700/90">PAID</span>
+        </div>
+      </div>
+
       {/* Title */}
       <h3 className="text-[22px] font-black tracking-tight">Invoice</h3>
       <div className="mt-3 border-t border-slate-200" />
@@ -77,8 +160,8 @@ function InvoicePaper({ r, toEmail }: { r: PaymentReceipt; toEmail: string }) {
           <span className="font-bold text-slate-900">{amount}</span>
         </div>
         <div className="grid grid-cols-[1fr_auto] gap-x-4 px-4 py-2.5 border-t border-slate-100 text-[11px] font-medium text-slate-400">
-          <span>Paid via Cashfree · {r.currency}</span>
-          <span className="text-right font-bold text-emerald-600">PAID</span>
+          <span>Paid via Cashfree</span>
+          <span className="text-right font-bold text-slate-700">{r.paymentMethod || r.currency}</span>
         </div>
       </div>
 
@@ -88,11 +171,12 @@ function InvoicePaper({ r, toEmail }: { r: PaymentReceipt; toEmail: string }) {
         <span className="text-[24px] font-black tracking-tight text-slate-900">{amount}</span>
       </div>
 
-      <div className="mt-4 border-t border-slate-200" />
-      <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
-        Note: one-time payment, no auto-renewal. Your Pro stays active until the valid-until
-        date above. <span className="font-semibold text-slate-600">Thank you for going Pro.</span>
-      </p>
+      <div className="mt-5 border-t border-slate-200" />
+
+      {/* Barcode */}
+      <div className="mt-4">
+        <Code128Barcode value={r.orderId} />
+      </div>
     </div>
   );
 }
