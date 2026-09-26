@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { IntelModalProvider } from './context/IntelModalContext';
-import { ToastProvider } from './context/ToastContext';
+import { ToastProvider, useToast } from './context/ToastContext';
 import { customFetch } from './api';
+import { verifyProPayment, clearPendingOrderId } from './utils/cashfree';
 import { useVisibilityInterval } from './hooks/useVisibilityInterval';
 
 import { LandingPage } from './components/LandingPage';
@@ -23,7 +24,6 @@ import { SeoStudio } from './components/seo/SeoStudio';
 import { useScrollRestoration } from './hooks/useScrollRestoration';
 import { ScrollRestoredPill } from './components/ui/ScrollRestoredPill';
 import { saveScrollPosition } from './utils/scrollState';
-import { PricingPage } from './components/PricingPage';
 import { GuidesPage } from './components/GuidesPage';
 import { CompaniesPage } from './components/CompaniesPage';
 import { TrustPage } from './components/TrustPages';
@@ -71,6 +71,48 @@ function Dashboard({ bseHealth, telegramHealth, isRunning, handleToggle }: any) 
       />
     </div>
   );
+}
+
+/**
+ * Handles the return from Cashfree checkout: /?cf_order_id=...
+ * Verifies the payment with OUR server (source of truth — never trusts the
+ * redirect alone), refreshes the profile, and shows the result.
+ * Runs on every route so a payment return always lands in the React app.
+ */
+function CashfreeReturnHandler() {
+  const { user, refreshProfile } = useAuth();
+  const { success, warning } = useToast();
+  const handledRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    let orderId: string | null = null;
+    try {
+      orderId = new URLSearchParams(window.location.search).get('cf_order_id');
+    } catch { return; }
+    if (!orderId || handledRef.current === orderId) return;
+    // The order was created by a logged-in uid; wait until that session is
+    // back before verifying (the uid in the JWT must match the order owner).
+    if (!user) return;
+    handledRef.current = orderId;
+    (async () => {
+      const v = await verifyProPayment(orderId as string);
+      clearPendingOrderId();
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('cf_order_id');
+        window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+      } catch { /* non-fatal */ }
+      if (v.paid) {
+        await refreshProfile();
+        success('Pro activated — your 30-day Pro pack is live. Welcome!');
+      } else {
+        warning(v.error || 'Payment not confirmed yet. If money was debited, it will reflect shortly.');
+      }
+    })();
+  }, [user]);
+
+  return null;
 }
 
 function AppContent() {
@@ -485,29 +527,6 @@ function AppContent() {
   };
 
   // Render dedicated standalone routes with direct navigation, refresh, and SEO support
-  if (currentRoute === 'pricing') {
-    return (
-      <>
-        <PricingPage
-          onEnterTerminal={(tab) => {
-            window.history.pushState({}, '', tab ? `/?tab=${tab}` : '/');
-            setCurrentRoute('home');
-            if (tab) setActiveTab(tab);
-            if (!user) setIsAuthModalOpen(true);
-          }}
-          onOpenProModal={() => {
-            if (!user) {
-              setIsAuthModalOpen(true);
-            } else {
-              setIsProModalOpen(true);
-            }
-          }}
-        />
-        {isAuthModalOpen && <AuthModal />}
-        {isProModalOpen && <ProUpgradeModal />}
-      </>
-    );
-  }
 
   if (currentRoute === 'guides') {
     return (
@@ -763,6 +782,7 @@ export default function App() {
       <IntelModalProvider>
         <ToastProvider>
           <AppContent />
+          <CashfreeReturnHandler />
         </ToastProvider>
       </IntelModalProvider>
     </AuthProvider>

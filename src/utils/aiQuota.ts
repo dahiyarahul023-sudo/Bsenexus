@@ -164,7 +164,7 @@ export function getAiQuotaStatus(
     remaining: 0,
     canGenerate: false,
     allowed: false,
-    message: 'Your 1-Week Free Pro trial has ended. Upgrade to Pro (₹499/mo) for unlimited AI summaries.'
+    message: 'Your 1-Week Free Pro trial has ended. Upgrade to Pro (₹199/mo) for unlimited AI summaries.'
   };
 }
 

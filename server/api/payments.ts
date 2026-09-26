@@ -107,8 +107,33 @@ async function fetchOrderFromCashfree(orderId: string): Promise<any | null> {
 /**
  * Grant (or extend) Pro on the user's server-side profile.
  * Idempotent per order: the same order_id never grants twice.
+ *
+ * The per-order in-memory lock serializes concurrent grants for the same
+ * order (e.g. return-URL verify racing the Cashfree webhook) so a single
+ * payment can never extend Pro twice on one instance.
  */
-async function grantProForOrder(uid: string, orderId: string, planId: PlanId): Promise<{ proExpiresAt: number; alreadyGranted: boolean }> {
+const grantLocks = new Map<string, Promise<{ proExpiresAt: number; alreadyGranted: boolean }>>();
+
+async function grantProForOrder(
+  uid: string,
+  orderId: string,
+  planId: PlanId,
+): Promise<{ proExpiresAt: number; alreadyGranted: boolean }> {
+  const inFlight = grantLocks.get(orderId);
+  if (inFlight) {
+    const r = await inFlight;
+    return { proExpiresAt: r.proExpiresAt, alreadyGranted: true };
+  }
+  const p = doGrantProForOrder(uid, orderId, planId);
+  grantLocks.set(orderId, p);
+  try {
+    return await p;
+  } finally {
+    grantLocks.delete(orderId);
+  }
+}
+
+async function doGrantProForOrder(uid: string, orderId: string, planId: PlanId): Promise<{ proExpiresAt: number; alreadyGranted: boolean }> {
   const plan = PRO_PLANS[planId];
   const now = Date.now();
   const existing = await getUserProfile(uid);
@@ -170,7 +195,9 @@ paymentsRouter.post('/create-order', requireAuth, async (req, res) => {
           customer_email: email,
         },
         order_meta: {
-          return_url: `${base}/pricing?cf_order_id=${orderId}`,
+          // Cashfree returns here after payment. The React app boots on "/"
+          // and verifies ?cf_order_id=... with our server (source of truth).
+          return_url: `${base}/?cf_order_id=${orderId}`,
           notify_url: `${base}/api/payments/webhook`,
         },
         order_note: `${plan.label} — BSE Nexus`,
@@ -213,9 +240,10 @@ paymentsRouter.get('/verify', requireAuth, async (req, res) => {
       return res.status(502).json({ success: false, paid: false, error: 'Could not confirm the payment status. Please try again.' });
     }
 
-    // Security: the order must belong to this user.
+    // Security: the order must belong to this user. Strict: a missing
+    // customer_id is treated as "not yours" — never as a pass.
     const orderCustomer = order?.customer_details?.customer_id || '';
-    if (orderCustomer && orderCustomer !== uid) {
+    if (!orderCustomer || orderCustomer !== uid) {
       return res.status(403).json({ success: false, paid: false, error: 'Order does not belong to this account.' });
     }
 
@@ -299,12 +327,17 @@ paymentsRouter.post('/webhook', async (req, res) => {
     }
 
     // Only act on successful payments, and always re-confirm with Cashfree.
+    // The uid comes ONLY from the re-fetched order (source of truth) —
+    // never from the webhook payload — and is sanitized like every auth uid.
     if (eventType === 'PAYMENT_SUCCESS_WEBHOOK' && paymentStatus === 'SUCCESS') {
       const order = await fetchOrderFromCashfree(orderId);
-      const uid: string = order?.customer_details?.customer_id || payload?.data?.customer_details?.customer_id || '';
-      if (order?.order_status === 'PAID' && uid) {
+      const rawUid: string = order?.customer_details?.customer_id || '';
+      if (order?.order_status === 'PAID' && rawUid) {
+        const uid = sanitizeUserId(rawUid);
         const { alreadyGranted } = await grantProForOrder(uid, orderId, 'pro_monthly');
         console.log(`[Payments] webhook granted Pro: uid=${uid} order=${orderId} already=${alreadyGranted}`);
+      } else {
+        console.warn('[Payments] webhook skipped: order not PAID or no customer_id', orderId);
       }
     }
 

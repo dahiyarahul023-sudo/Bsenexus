@@ -34,8 +34,8 @@ export interface StartPaymentResult {
 
 /**
  * Create a Cashfree order on our server, then open the Cashfree checkout.
- * On completion Cashfree redirects back to /pricing?cf_order_id=... where
- * PricingPage verifies the payment with our server (source of truth).
+ * On completion Cashfree redirects back to /?cf_order_id=... where the
+ * app verifies the payment with our server (source of truth).
  */
 export async function startProPayment(planId: string = 'pro_monthly'): Promise<StartPaymentResult> {
   try {
@@ -57,7 +57,7 @@ export async function startProPayment(planId: string = 'pro_monthly'): Promise<S
     const cf = Cashfree({ mode: data.mode === 'production' ? 'production' : 'sandbox' });
     await cf.checkout({
       paymentSessionId: data.paymentSessionId,
-      redirectTarget: '_self', // Cashfree returns to /pricing?cf_order_id=...
+      redirectTarget: '_self', // Cashfree returns to /?cf_order_id=...
     });
     return { ok: true };
   } catch (err: any) {

@@ -1801,9 +1801,9 @@ ${jsonLd}
 }
 
 export function renderPricingPage(): string {
-  const pageTitle = "Pricing & Plans — 100% Free Launch Access | BSE Nexus";
+  const pageTitle = "Pricing & Plans — Pro at ₹199/mo | BSE Nexus";
   const canonicalUrl = "https://bsenexus.in/pricing";
-  const description = "Explore BSE Nexus transparent pricing. 100% Free access to Community and Pro intelligence features during launch: real-time BSE filings, Gemini AI summaries, and Telegram alerts.";
+  const description = "BSE Nexus Pro at ₹199/month: 1st week free, no card required. Then a one-time ₹199 payment for 30 days via Cashfree. Official BSE filing intelligence, AI summaries, Telegram alerts.";
 
   const jsonLd = JSON.stringify({
     "@context": "https://schema.org",
@@ -1831,13 +1831,13 @@ export function renderPricingPage(): string {
           },
           {
             "@type": "Offer",
-            "name": "Pro Intelligence (Early Access Launch)",
-            "price": "0",
+            "name": "Pro Intelligence",
+            "price": "199",
             "priceCurrency": "INR",
             "priceValidUntil": "2027-12-31",
             "availability": "https://schema.org/InStock",
             "url": canonicalUrl,
-            "description": "100% Free early access launch offer for priority Gemini AI analysis, unlimited watchlists, and Telegram channel broadcasts."
+            "description": "1st week free (no card required), then ₹199 for 30 days via one-time Cashfree payment. Priority AI analysis, unlimited watchlists, and Telegram broadcasts."
           }
         ]
       },
@@ -2213,7 +2213,7 @@ ${jsonLd}
 
       <!-- Pro Intelligence Tier -->
       <div class="plan-card pro">
-        <div class="card-banner">100% Free Launch Offer</div>
+        <div class="card-banner">Launch Offer &middot; 60% Off</div>
         <div>
           <div class="plan-header">
             <h2 class="plan-name">Pro Intelligence</h2>
@@ -2222,8 +2222,8 @@ ${jsonLd}
 
           <div class="price-row">
             <span class="price-strike">₹499</span>
-            <span class="price-val highlight">₹0</span>
-            <span class="price-period">/ 1-week free trial, then ₹499/mo</span>
+            <span class="price-val highlight">₹199</span>
+            <span class="price-period">/mo &middot; 1st week free, then ₹199/mo</span>
           </div>
 
           <ul class="feature-list">
@@ -2259,7 +2259,7 @@ ${jsonLd}
         </div>
 
         <a href="https://bsenexus.in/?tab=announcements&action=upgrade" class="card-btn btn-pri">
-          Claim Free Pro Access — ₹0
+          Start 1-Week Free Trial — Then ₹199/mo
         </a>
       </div>
     </div>
@@ -2267,8 +2267,8 @@ ${jsonLd}
     <h2 class="section-title">Zero-Risk Guarantee &amp; Operational Trust</h2>
     <div class="guarantees-grid">
       <div class="guarantee-card">
-        <h3>No Credit Card Required</h3>
-        <p>Start tracking BSE corporate announcements immediately with zero financial credentials on file.</p>
+        <h3>No Card Needed for Trial</h3>
+        <p>Start your 1-week free Pro trial with Google sign-in — zero financial credentials on file until you choose to pay.</p>
       </div>
       <div class="guarantee-card">
         <h3>BSE &amp; SEBI Compliant</h3>
@@ -2276,19 +2276,19 @@ ${jsonLd}
       </div>
       <div class="guarantee-card">
         <h3>7-Day Money-Back Policy</h3>
-        <p>Should you ever subscribe to any paid plan in the future, you are covered by our 7-day refund guarantee.</p>
+        <p>Paid Pro packs are covered by our 7-day refund guarantee — if Pro is not for you, you get your ₹199 back.</p>
       </div>
     </div>
 
     <h2 class="section-title">Frequently Asked Questions About Pricing</h2>
     <div class="faq-list">
       <article class="faq-item">
-        <h3>Why is Pro Intelligence ₹0 right now?</h3>
-        <p>We are offering 100% free Pro access during our early access launch to build Dalal Street's most responsive disclosure intelligence network. Early users receive institutional features at zero cost.</p>
+        <h3>How does the free trial work?</h3>
+        <p>You get 1 week of Pro free with Google sign-in — no card required. After the trial, Pro continues at ₹199 for 30 days via a one-time Cashfree payment.</p>
       </article>
       <article class="faq-item">
-        <h3>Will I be automatically billed when the launch offer ends?</h3>
-        <p>No. We do not require or collect credit cards or debit cards for free access. There are zero unexpected charges or automatic debits.</p>
+        <h3>Will I be automatically billed?</h3>
+        <p>No. Every Pro payment is a one-time charge via Cashfree — there is no auto-debit. Automatic renewal is coming soon; until then you renew manually before expiry.</p>
       </article>
       <article class="faq-item">
         <h3>Can I connect Telegram alerts for my group or channel?</h3>
