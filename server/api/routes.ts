@@ -78,6 +78,7 @@ import {
   deleteApprovedBugRule
 } from "../database/diagnosticsDao.js";
 import { seoRouter } from "./seoRoutes.js";
+import { paymentsRouter } from "./payments.js";
 import { pageRenderCache, staticGuideCache, apiResponseCache } from "../utils/renderCache.js";
 import { getMarketGuides, getMarketGuideBySlug } from "../services/marketGuidesService.js";
 
@@ -85,6 +86,9 @@ export const apiRouter = express.Router();
 
 // Mount Super SEO Suite (11 Verified Skills Engine)
 apiRouter.use("/seo", seoRouter);
+
+// Cashfree one-time Pro payments (create-order / verify / webhook / status)
+apiRouter.use("/payments", paymentsRouter);
 
 // Educational Market Guides API (Fail-safe, cached)
 apiRouter.get("/market-guides", (_req, res) => {
