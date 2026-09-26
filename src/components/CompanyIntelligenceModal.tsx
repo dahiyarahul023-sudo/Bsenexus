@@ -128,7 +128,7 @@ export function CompanyIntelligenceModal({
 
     if (!isProOrAdmin) {
       setIsProModalOpen(true);
-      showToast('🔒 1-Week Free Pro trial has ended. Upgrade to Pro (₹499/mo) for unlimited Gemini AI 360° Analysis!', 'info');
+      showToast('🔒 1-Week Free Pro trial has ended. Upgrade to Pro (₹199/mo) for unlimited Gemini AI 360° Analysis!', 'info');
       return;
     }
 
@@ -153,7 +153,7 @@ export function CompanyIntelligenceModal({
 
       if (res.status === 403 || data?.proRequired) {
         setIsProModalOpen(true);
-        showToast(data?.error || '🔒 1-Week Free Pro trial has ended. Upgrade to Pro (₹499/mo) to continue using Gemini AI.', 'info');
+        showToast(data?.error || '🔒 1-Week Free Pro trial has ended. Upgrade to Pro (₹199/mo) to continue using Gemini AI.', 'info');
         return;
       }
 
