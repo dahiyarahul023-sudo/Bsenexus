@@ -1,27 +1,53 @@
-import React, { useEffect } from 'react';
-import { 
-  CheckCircle2, 
-  Sparkles, 
-  Zap, 
-  ArrowRight, 
-  ShieldCheck, 
-  CreditCard, 
-  Clock, 
+import React, { useEffect, useState } from 'react';
+import {
+  CheckCircle2,
+  Sparkles,
+  Zap,
+  ArrowRight,
+  ShieldCheck,
+  CreditCard,
+  Clock,
   HelpCircle,
   TrendingUp,
   ChevronRight
 } from 'lucide-react';
 import { SocialIconsRow } from './ui/SocialLinks';
+import { useAuth } from '../context/AuthContext';
+import { startProPayment, verifyProPayment, getPendingOrderId, clearPendingOrderId, hasUsedTrial } from '../utils/cashfree';
 
 interface PricingPageProps {
   onEnterTerminal: (tab?: string) => void;
   onOpenProModal: () => void;
 }
 
-export const PricingPage: React.FC<PricingPageProps> = ({ 
-  onEnterTerminal, 
-  onOpenProModal 
+export const PricingPage: React.FC<PricingPageProps> = ({
+  onEnterTerminal,
+  onOpenProModal
 }) => {
+  const { user, profile, isPro, refreshProfile } = useAuth();
+  const [paying, setPaying] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [payError, setPayError] = useState<string | null>(null);
+  const [paySuccess, setPaySuccess] = useState(false);
+
+  const trialUsed = hasUsedTrial((user as any)?.uid || profile?.uid);
+
+  const handleBuyPro = async () => {
+    if (!user) {
+      // Let the auth modal handle sign-in first; payment needs an account.
+      onOpenProModal();
+      return;
+    }
+    setPaying(true);
+    setPayError(null);
+    const res = await startProPayment('pro_monthly');
+    if (!res.ok) {
+      setPayError(res.error || 'Could not start the payment. Please try again.');
+      setPaying(false);
+    }
+    // On success Cashfree takes over the page (_self redirect); no reset needed.
+  };
+
   useEffect(() => {
     document.title = 'Pricing & Plans — 100% Free Launch Access | BSE Nexus';
     const metaDesc = document.querySelector('meta[name="description"]');
@@ -36,6 +62,32 @@ export const PricingPage: React.FC<PricingPageProps> = ({
     }
     canonical.setAttribute('href', 'https://bsenexus.in/pricing');
     window.scrollTo({ top: 0, behavior: 'instant' });
+  }, []);
+
+  // Handle return from Cashfree checkout: ?cf_order_id=... → verify with OUR server.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const orderId = params.get('cf_order_id');
+    if (!orderId) return;
+    let cancelled = false;
+    (async () => {
+      setVerifying(true);
+      const v = await verifyProPayment(orderId);
+      clearPendingOrderId();
+      if (cancelled) return;
+      if (v.paid) {
+        await refreshProfile();
+        if (!cancelled) setPaySuccess(true);
+      } else if (!cancelled) {
+        setPayError(v.error || 'Payment not confirmed yet. If money was debited, it will reflect shortly.');
+      }
+      if (!cancelled) {
+        setVerifying(false);
+        window.history.replaceState({}, '', '/pricing');
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -209,14 +261,61 @@ export const PricingPage: React.FC<PricingPageProps> = ({
                 </ul>
               </div>
 
-              <div className="pt-8">
-                <button
-                  onClick={onOpenProModal}
-                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-black rounded-xl shadow-lg shadow-emerald-600/25 transition-all cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <Zap className="w-4 h-4 fill-white" />
-                  <span>Claim 1-Week Free Trial — ₹0</span>
-                </button>
+              <div className="pt-8 space-y-3">
+                {paySuccess && (
+                  <div className="w-full py-3.5 bg-emerald-600 text-white text-xs font-black rounded-xl flex items-center justify-center gap-2">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Payment Successful — Pro Activated!</span>
+                  </div>
+                )}
+                {payError && (
+                  <div className="w-full py-3 px-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-[11px] font-semibold rounded-xl">
+                    {payError}
+                  </div>
+                )}
+                {verifying ? (
+                  <button disabled className="w-full py-3.5 bg-slate-200 dark:bg-slate-800 text-slate-500 text-xs font-black rounded-xl flex items-center justify-center gap-2 cursor-wait">
+                    <Clock className="w-4 h-4 animate-spin" />
+                    <span>Confirming your payment…</span>
+                  </button>
+                ) : isPro && !paySuccess ? (
+                  <button
+                    onClick={() => onEnterTerminal('dashboard')}
+                    className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-black rounded-xl shadow-lg shadow-emerald-600/25 transition-all cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Pro Active — Open Terminal</span>
+                  </button>
+                ) : trialUsed ? (
+                  <>
+                    <button
+                      onClick={handleBuyPro}
+                      disabled={paying}
+                      className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-black rounded-xl shadow-lg shadow-emerald-600/25 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60"
+                    >
+                      <CreditCard className="w-4 h-4" />
+                      <span>{paying ? 'Opening secure checkout…' : 'Buy Pro — ₹199/mo'}</span>
+                    </button>
+                    <p className="text-[10px] text-slate-400 text-center">One-time payment for 30 days · Auto-renew coming soon</p>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={onOpenProModal}
+                      className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-black rounded-xl shadow-lg shadow-emerald-600/25 transition-all cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <Zap className="w-4 h-4 fill-white" />
+                      <span>Claim 1-Week Free Trial — ₹0</span>
+                    </button>
+                    <button
+                      onClick={handleBuyPro}
+                      disabled={paying}
+                      className="w-full py-2.5 text-emerald-700 dark:text-emerald-300 text-[11px] font-bold rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors cursor-pointer disabled:opacity-60"
+                    >
+                      {paying ? 'Opening secure checkout…' : 'Skip trial — buy Pro directly at ₹199/mo'}
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>
