@@ -50,9 +50,11 @@ interface CashfreeConfig {
 }
 
 function getCashfreeConfig(): CashfreeConfig {
-  const appId = process.env.CASHFREE_APP_ID || '';
-  const secret = process.env.CASHFREE_SECRET_KEY || '';
-  const env = (process.env.CASHFREE_ENV || 'sandbox').toLowerCase();
+  // Trim: copy-pasted keys often carry a trailing newline/space, which makes
+  // Node's fetch throw on the x-client-* headers.
+  const appId = (process.env.CASHFREE_APP_ID || '').trim();
+  const secret = (process.env.CASHFREE_SECRET_KEY || '').trim();
+  const env = (process.env.CASHFREE_ENV || 'sandbox').toLowerCase().trim();
   const mode: 'sandbox' | 'production' = env === 'production' ? 'production' : 'sandbox';
   const base = mode === 'production' ? 'https://api.cashfree.com/pg' : 'https://sandbox.cashfree.com/pg';
   return { appId, secret, base, mode };
@@ -71,25 +73,39 @@ function siteUrl(req: express.Request): string {
   return `${proto}://${host}`;
 }
 
-async function cashfreeFetch(path: string, init: RequestInit = {}): Promise<{ ok: boolean; status: number; data: any }> {
+async function cashfreeFetch(path: string, init: RequestInit = {}): Promise<{ ok: boolean; status: number; data: any; timedOut?: boolean }> {
   const cfg = getCashfreeConfig();
-  const res = await fetch(`${cfg.base}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-version': '2023-10-01',
-      'x-client-id': cfg.appId,
-      'x-client-secret': cfg.secret,
-      ...(init.headers || {}),
-    },
-  });
-  let data: any = null;
+  // A hung gateway call must NEVER hang our request until the platform kills
+  // it (that surfaces as a non-JSON 502 from the edge). Fail fast instead.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 20000);
   try {
-    data = await res.json();
-  } catch {
-    data = null;
+    const res = await fetch(`${cfg.base}${path}`, {
+      ...init,
+      signal: ctrl.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-version': '2023-10-01',
+        'x-client-id': cfg.appId,
+        'x-client-secret': cfg.secret,
+        ...(init.headers || {}),
+      },
+    });
+    let data: any = null;
+    try {
+      data = await res.json();
+    } catch {
+      data = null;
+    }
+    return { ok: res.ok, status: res.status, data };
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      return { ok: false, status: 0, data: null, timedOut: true };
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
   }
-  return { ok: res.ok, status: res.status, data };
 }
 
 /** Fetch the authoritative order state from Cashfree. Never trust client callbacks. */
@@ -184,7 +200,7 @@ paymentsRouter.post('/create-order', requireAuth, async (req, res) => {
     const orderId = `BN_${uid.replace(/[^a-zA-Z0-9]/g, '').slice(0, 12)}_${Date.now()}`;
     const base = siteUrl(req);
 
-    const { ok, status, data } = await cashfreeFetch('/orders', {
+    const { ok, status, data, timedOut } = await cashfreeFetch('/orders', {
       method: 'POST',
       body: JSON.stringify({
         order_id: orderId,
@@ -205,7 +221,15 @@ paymentsRouter.post('/create-order', requireAuth, async (req, res) => {
     });
 
     if (!ok || !data?.payment_session_id) {
-      console.error('[Payments] create-order failed:', status, JSON.stringify(data)?.slice(0, 500));
+      console.error('[Payments] create-order failed:', status, 'mode=', getCashfreeConfig().mode, JSON.stringify(data)?.slice(0, 500));
+      if (timedOut) {
+        return res.status(502).json({ success: false, error: 'Payment gateway is not responding. Please try again in a minute.' });
+      }
+      if (status === 401 || status === 403) {
+        // Keys are set but Cashfree rejected them: wrong env (sandbox vs
+        // production) or wrong/whitespace-padded key pair.
+        return res.status(502).json({ success: false, error: 'Payment gateway rejected our credentials. The site owner needs to check the Cashfree keys.' });
+      }
       return res.status(502).json({ success: false, error: 'Could not start the payment. Please try again.' });
     }
 
