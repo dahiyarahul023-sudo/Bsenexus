@@ -6,6 +6,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { ActionButton } from './ui/ActionButton';
+import { startProPayment, hasUsedTrial } from '../utils/cashfree';
 
 export function ProUpgradeModal() {
   const { 
@@ -32,8 +33,25 @@ export function ProUpgradeModal() {
 
   const [isActivating, setIsActivating] = useState(false);
   const [activatedSuccess, setActivatedSuccess] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState<string | null>(null);
 
   if (!isProModalOpen) return null;
+
+  // Trial already consumed → offer direct purchase instead of a second trial.
+  const trialUsed = hasUsedTrial((user as any)?.uid || profile?.uid);
+  const showPayMode = Boolean(user && !user.isAnonymous && trialUsed);
+
+  const handleBuyPro = async () => {
+    setPaying(true);
+    setPayError(null);
+    const res = await startProPayment('pro_monthly');
+    if (!res.ok) {
+      setPayError(res.error || 'Could not start the payment. Please try again.');
+      setPaying(false);
+    }
+    // On success Cashfree takes over (_self redirect to /pricing?cf_order_id=...).
+  };
 
   const handleActivate = async () => {
     if (!user || user.isAnonymous) {
@@ -88,19 +106,22 @@ export function ProUpgradeModal() {
 
           <div className="mt-4 relative z-10">
             <h2 id="pro-upgrade-title" className="text-2xl font-black tracking-tight">
-              1-Week Free Pro Intelligence
+              {showPayMode ? 'Continue with Pro Intelligence' : '1-Week Free Pro Intelligence'}
             </h2>
             <p className="text-xs text-white/80 mt-1">
-              Sign in with your genuine Google account to activate 1 week (7 days) of Free Pro access: Gemini AI summaries, Telegram alerts, and custom filtering.
+              {showPayMode
+                ? 'Your free trial has ended. Keep unlimited watchlists, Gemini AI summaries, Telegram alerts and custom filtering.'
+                : 'Sign in with your genuine Google account to activate 1 week (7 days) of Free Pro access: Gemini AI summaries, Telegram alerts, and custom filtering.'}
             </p>
           </div>
 
           {/* Pricing Tag */}
           <div className="mt-5 inline-flex items-baseline gap-2 bg-black/20 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/20">
             <span className="text-base line-through text-white/60">₹499/mo</span>
-            <span className="text-3xl font-black text-white">₹0</span>
+            <span className="text-3xl font-black text-white">{showPayMode ? '₹199' : '₹0'}</span>
+            {!showPayMode && <span className="text-[11px] text-white/60 font-semibold">/mo</span>}
             <span className="text-[11px] bg-emerald-400 text-slate-950 font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
-              1 Week Free with Google
+              {showPayMode ? 'Launch Offer · 60% Off' : '1 Week Free with Google'}
             </span>
           </div>
         </div>
@@ -147,7 +168,30 @@ export function ProUpgradeModal() {
 
           {/* Action button */}
           <div className="pt-2">
-            {activatedSuccess ? (
+            {payError && (
+              <div className="mb-3 py-2.5 px-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-[11px] font-semibold rounded-xl">
+                {payError}
+              </div>
+            )}
+            {showPayMode ? (
+              <>
+                <ActionButton
+                  onClick={handleBuyPro}
+                  isLoading={paying}
+                  loadingText="Opening secure checkout..."
+                  variant="emerald"
+                  size="lg"
+                  icon={<Sparkles size={16} />}
+                  className="w-full font-black text-sm"
+                >
+                  <span>Pay ₹199/mo — Activate Pro (30 days)</span>
+                  <ArrowRight size={15} className="ml-1" />
+                </ActionButton>
+                <p className="text-[10px] text-slate-400 text-center mt-2">
+                  One-time secure payment via Cashfree · Auto-renew coming soon
+                </p>
+              </>
+            ) : activatedSuccess ? (
               <div className="w-full py-3 bg-emerald-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md animate-in zoom-in-95">
                 <Check size={16} />
                 <span>1-Week Free Pro Activated!</span>
