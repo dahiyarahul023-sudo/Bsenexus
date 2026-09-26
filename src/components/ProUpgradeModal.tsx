@@ -169,7 +169,7 @@ export function ProUpgradeModal() {
             
             <div className="text-left text-[10px] text-slate-400 dark:text-slate-500 mt-3 p-2.5 rounded-xl bg-slate-50/80 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/80 space-y-1">
               <p className="text-slate-600 dark:text-slate-300 font-medium leading-relaxed">
-                <span className="font-bold text-slate-900 dark:text-white">Free trial:</span> No card required upfront &bull; Cancel anytime in Settings.
+                <span className="font-bold text-slate-900 dark:text-white">Free trial:</span> No card required upfront &bull; After the free week, Pro continues at just ₹199/mo (launch offer) &bull; Cancel anytime in Settings.
               </p>
               <p className="text-[9px] text-slate-400/80 leading-relaxed">
                 7-day free trial &bull; Cancel anytime in Settings.
