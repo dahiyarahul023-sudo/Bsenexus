@@ -161,10 +161,10 @@ export function MarketClock({ className }: { className?: string }) {
     if (!canBroadcast) {
       if (!user && !profile) {
         setIsAuthModalOpen(true);
-        alert('🔒 Holiday Telegram Broadcasting is reserved for Pro & Admin users.\n\nSign In to activate your 1-Week Free Pro Trial or Upgrade to Pro (₹499/mo)!');
+        alert('🔒 Holiday Telegram Broadcasting is reserved for Pro & Admin users.\n\nSign In to activate your 1-Week Free Pro Trial or Upgrade to Pro (₹199/mo)!');
       } else {
         setIsProModalOpen(true);
-        alert('🔒 Market Holiday Telegram Broadcast is a Pro & Admin feature (₹499/mo).\n\nUpgrade to Pro to broadcast official exchange circulars and trading schedules to your Telegram channel!');
+        alert('🔒 Market Holiday Telegram Broadcast is a Pro & Admin feature (₹199/mo).\n\nUpgrade to Pro to broadcast official exchange circulars and trading schedules to your Telegram channel!');
       }
       return;
     }
