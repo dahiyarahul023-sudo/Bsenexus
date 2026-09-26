@@ -24,6 +24,19 @@ function getReqUserId(req: express.Request): string {
   return 'guest';
 }
 
+/**
+ * Race a promise against a timeout. A stalled Firestore read must never
+ * leave the client hanging until Cloudflare returns an HTML 502 — the
+ * caller gets null and can fall back / respond with controlled JSON.
+ */
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), ms);
+  });
+  return Promise.race([p, timeout]).finally(() => clearTimeout(timer));
+}
+
 export const paymentsRouter = express.Router();
 
 // ---------------------------------------------------------------------------
@@ -190,7 +203,10 @@ paymentsRouter.post('/create-order', requireAuth, async (req, res) => {
       return res.status(400).json({ success: false, error: 'Unknown plan.' });
     }
 
-    const profile = await getUserProfile(uid);
+    // Firestore can stall (quota / network) with no timeout of its own — never
+    // let it hang the payment request into an HTML 502. Fall back to the
+    // JWT email when the profile read times out.
+    const profile = await withTimeout(getUserProfile(uid), 8000);
     const email = (req as any).user?.email || profile?.email || '';
     if (!email) {
       return res.status(400).json({ success: false, error: 'A verified email is required for payment receipts.' });
