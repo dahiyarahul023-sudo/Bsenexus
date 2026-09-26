@@ -70,7 +70,7 @@ export function HelpModal({ isOpen, onClose, onOpenSettings }: HelpModalProps) {
       setChatMessages(prev => [
         ...prev,
         { role: 'user', text: q },
-        { role: 'model', text: '🔒 **Pro Upgrade Required**: Your 1-Week Free Pro trial has ended. Please upgrade to Pro (₹499/mo) to continue asking the AI Assistant.' }
+        { role: 'model', text: '🔒 **Pro Upgrade Required**: Your 1-Week Free Pro trial has ended. Please upgrade to Pro (₹199/mo) to continue asking the AI Assistant.' }
       ]);
       setInputQuestion('');
       setIsProModalOpen(true);
@@ -101,7 +101,7 @@ export function HelpModal({ isOpen, onClose, onOpenSettings }: HelpModalProps) {
       }
       if (res.status === 403 || data?.proRequired) {
         setIsProModalOpen(true);
-        setChatMessages([...nextHistory, { role: 'model', text: data.error || '🔒 Your 1-Week Free Pro trial has ended. Please upgrade to Pro (₹499/mo).' }]);
+        setChatMessages([...nextHistory, { role: 'model', text: data.error || '🔒 Your 1-Week Free Pro trial has ended. Please upgrade to Pro (₹199/mo).' }]);
         return;
       }
       if (data.success && data.answer) {
