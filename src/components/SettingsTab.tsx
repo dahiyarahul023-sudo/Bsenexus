@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { TermsModal, LegalTabType } from './TermsModal';
 import { SecurityAuditModal } from './SecurityAuditModal';
+import { SubscriptionCard } from './SubscriptionCard';
 import { useAuth } from '../context/AuthContext';
 import { customFetch } from '../api';
 import { useDeveloperMode } from '../utils/developerMode';
@@ -46,6 +47,7 @@ const SETTINGS_REGISTRY = [
   { id: 'filter', title: 'High impact filter', description: 'Highlight material price-sensitive disclosures (SEBI LODR 30)', category: 'Preferences', keywords: ['filter', 'materiality', 'high impact', 'sebi', 'lodr', 'price-sensitive'] },
   { id: 'profile', title: 'Profile & Display name', description: 'Investor identity, name, and public @username handle', category: 'Account & Identity', keywords: ['profile', 'display name', 'username', 'handle', 'account', 'identity'] },
   { id: 'telegram', title: 'Telegram Alert Delivery', description: 'Instant push notifications for watchlist disclosures', category: 'Account & Identity', keywords: ['telegram', 'chat id', 'push', 'notifications', 'phone', 'bot', 'mobile'] },
+  { id: 'subscription', title: 'Subscription & Billing', description: 'Pro plan status, renewal and payment (auto-renew coming soon)', category: 'Account & Identity', keywords: ['subscription', 'billing', 'pro', 'payment', 'renew', 'plan', 'cashfree', 'auto-renew'] },
   { id: 'export-csv', title: 'Export to CSV', description: 'Download tracked tickers and priorities in spreadsheet format', category: 'Watchlist & Data', keywords: ['export', 'csv', 'excel', 'spreadsheet', 'download', 'watchlist'] },
   { id: 'export-json', title: 'Export backup (JSON)', description: 'Full structured backup for porting or syncing', category: 'Watchlist & Data', keywords: ['export', 'json', 'backup', 'data', 'port', 'sync'] },
   { id: 'security-audit', title: '20-Point Launch Security & Pen-Test', description: 'IDOR defense, API key hardening, SQLi and red-team test harness', category: 'Advanced Engine', keywords: ['security', 'audit', 'pen-test', 'penetration', 'hardened', 'keys', 'idor'] },
@@ -1282,6 +1284,18 @@ export function SettingsTab({
             )}
 
           </div>
+        </div>
+      )}
+
+      {/* SUBSCRIPTION & BILLING (Cashfree one-time Pro payments; auto-renew = Coming soon) */}
+      {isMatch('subscription') && (
+        <div className="space-y-2 select-none">
+          <div className="px-1">
+            <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              Subscription &amp; Billing
+            </h3>
+          </div>
+          <SubscriptionCard />
         </div>
       )}
 
