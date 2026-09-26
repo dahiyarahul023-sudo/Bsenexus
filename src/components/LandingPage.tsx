@@ -366,7 +366,7 @@ export function LandingPage({
                 className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400 min-h-[32px] px-1.5 py-1 whitespace-nowrap select-none"
               >
                 <span>Pricing</span>
-                <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-mono">₹499/mo</span>
+                <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-mono">₹199/mo</span>
               </button>
               <button 
                 onClick={() => scrollToSection('market-guides')} 
@@ -524,7 +524,7 @@ export function LandingPage({
                   className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:bg-slate-100 dark:hover:bg-[#1C1A27] transition-colors text-left"
                 >
                   <span>Pricing</span>
-                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-mono">₹499/mo</span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-mono">₹199/mo</span>
                 </button>
 
                 <button
@@ -2230,7 +2230,7 @@ export function LandingPage({
                 </div>
                 <div className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200">
                   <CheckCircle2 className="w-4 h-4 text-blue-500 shrink-0" />
-                  <span>Pro Plan: Unlimited Telegram Channel Broadcasts (₹499/mo after 1-week free trial)</span>
+                  <span>Pro Plan: Unlimited Telegram Channel Broadcasts (₹199/mo after 1-week free trial)</span>
                 </div>
               </div>
 
@@ -2350,14 +2350,15 @@ export function LandingPage({
                   </div>
                 </div>
 
-                <div className="flex items-baseline gap-2">
+                <div className="flex items-baseline gap-2 flex-wrap">
                   <span className="text-xl line-through text-slate-400 font-mono">₹499</span>
-                  <span className="text-4xl font-black text-emerald-600 dark:text-emerald-400 font-mono">₹0</span>
-                  <span className="text-xs text-slate-500 font-semibold">/ 1st week (then ₹499/mo)</span>
+                  <span className="text-4xl font-black text-emerald-600 dark:text-emerald-400 font-mono">₹199</span>
+                  <span className="text-xs text-slate-500 font-semibold">/month</span>
                   <span className="text-[10px] text-emerald-700 dark:text-emerald-300 font-bold ml-1 bg-emerald-100 dark:bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-800">
-                    1 Week Free Trial
+                    Launch Offer · 60% Off
                   </span>
                 </div>
+                <p className="-mt-4 text-[11px] text-slate-500 dark:text-slate-400">1st week free — no card required. Then ₹199/mo, cancel anytime.</p>
 
                 <ul className="space-y-3 text-xs text-slate-600 dark:text-slate-300">
                   <li className="flex items-center gap-2.5 font-semibold text-slate-900 dark:text-slate-100">
@@ -2410,7 +2411,7 @@ export function LandingPage({
               <div className="grid grid-cols-12 px-6 py-3 font-semibold text-slate-500 dark:text-slate-400 bg-slate-50/50 dark:bg-[#171622]">
                 <div className="col-span-6 sm:col-span-7">Capability</div>
                 <div className="col-span-3 sm:col-span-2 text-center">Free (₹0)</div>
-                <div className="col-span-3 text-center text-emerald-600 dark:text-emerald-400 font-bold">Pro (₹499/mo)</div>
+                <div className="col-span-3 text-center text-emerald-600 dark:text-emerald-400 font-bold">Pro (₹199/mo)</div>
               </div>
 
               {[
