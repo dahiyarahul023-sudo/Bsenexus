@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   X, Building2, TrendingUp, TrendingDown, Calendar, Sparkles, 
   ExternalLink, Clock, Shield, BarChart3, FileText, Download, 
@@ -254,6 +254,55 @@ export function CompanyIntelligenceModal({
   } : null);
 
   const hasAnyHistory = quarterlyResults.length > 0 || timelineEvents.length > 0 || recentFilings.length > 0;
+
+  // Filing Facts — bite-sized, data-derived stats from official BSE filings only.
+  // Every fact is computed from the company's loaded data; nothing is hardcoded.
+  const filingFacts = useMemo(() => {
+    const facts: { value: string; label: string; icon: any }[] = [];
+    const now = Date.now();
+    const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
+
+    // 1. Filing pace — only when the loaded 25 filings fully cover the last 30 days,
+    //    so the count is never an undercount from the per-stock cap.
+    const oldestLoaded = recentFilings.length ? (recentFilings[recentFilings.length - 1]?.timestamp || 0) : 0;
+    const fullCoverage = recentFilings.length < 25 || oldestLoaded <= thirtyDaysAgo;
+    const paceCount = recentFilings.filter((f: any) => (f.timestamp || 0) >= thirtyDaysAgo).length;
+    if (fullCoverage && paceCount > 0) {
+      facts.push({ value: String(paceCount), label: 'filings in the last 30 days', icon: FileText });
+    }
+
+    // 2. Most frequent disclosure type (full timeline history, not capped).
+    const typeLabels: Record<string, string> = {
+      DIVIDEND: 'Dividends', BONUS: 'Bonuses', SPLIT: 'Stock splits', BUYBACK: 'Buybacks',
+      ORDER_WIN: 'Order wins', FINANCIAL_RESULT: 'Result filings', BOARD_MEETING: 'Board meetings',
+      GOVERNANCE: 'Governance updates', FUND_RAISE: 'Fund raises', GENERAL: 'Disclosures'
+    };
+    const typeCounts: Record<string, number> = {};
+    timelineEvents.forEach((ev: any) => { if (ev.eventType) typeCounts[ev.eventType] = (typeCounts[ev.eventType] || 0) + 1; });
+    const topType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0];
+    if (topType && topType[1] >= 2) {
+      facts.push({ value: typeLabels[topType[0]] || topType[0], label: `most frequent disclosure · ${topType[1]} tracked`, icon: Layers });
+    }
+
+    // 3. Shareholder rewards (dividends, bonuses, splits, buybacks).
+    const rewards = timelineEvents.filter((ev: any) => ['DIVIDEND', 'BONUS', 'SPLIT', 'BUYBACK'].includes(ev.eventType)).length;
+    if (rewards > 0) {
+      facts.push({ value: String(rewards), label: 'dividends, bonuses & buybacks tracked', icon: Coins });
+    }
+
+    // 4. High-impact disclosures.
+    const highImpact = timelineEvents.filter((ev: any) => ev.isHighImpact).length;
+    if (highImpact > 0) {
+      facts.push({ value: String(highImpact), label: 'high-impact disclosures', icon: Zap });
+    }
+
+    // 5. Results history depth.
+    if (quarterlyResults.length >= 2) {
+      facts.push({ value: String(quarterlyResults.length), label: 'quarters of results history', icon: BarChart3 });
+    }
+
+    return facts.slice(0, 5);
+  }, [recentFilings, timelineEvents, quarterlyResults]);
 
   return (
     <div 
@@ -524,6 +573,40 @@ export function CompanyIntelligenceModal({
                               </a>
                             </div>
                           )}
+                        </div>
+                      )}
+
+                      {/* Filing Facts — bite-sized stats from official BSE filings */}
+                      {filingFacts.length > 0 && (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                              <Sparkles size={13} className="text-amber-500" />
+                              Filing Facts
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-medium">
+                              from official BSE filings
+                            </span>
+                          </div>
+                          <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-0.5 -mx-0.5 px-0.5">
+                            {filingFacts.map((fact, fIdx) => {
+                              const FactIcon = fact.icon;
+                              return (
+                                <div
+                                  key={fIdx}
+                                  className="shrink-0 w-[148px] p-3 bg-gradient-to-br from-amber-50 to-orange-50/60 dark:from-amber-950/30 dark:to-orange-950/20 border border-amber-200/70 dark:border-amber-800/40 rounded-xl space-y-1.5"
+                                >
+                                  <FactIcon size={15} className="text-amber-600 dark:text-amber-400" />
+                                  <div className="text-[17px] font-black text-slate-900 dark:text-white leading-tight">
+                                    {fact.value}
+                                  </div>
+                                  <div className="text-[10px] leading-snug text-slate-600 dark:text-slate-400 font-medium">
+                                    {fact.label}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       )}
 
