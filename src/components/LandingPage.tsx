@@ -273,7 +273,11 @@ export function LandingPage({
 
   const scrollToSection = (id: string) => {
     setIsMobileNavOpen(false);
-    scrollToElementWithOffset(id, 88, 'smooth');
+    // Wait for the mobile menu to close and the body scroll lock to release
+    // before smooth-scrolling. Scrolling while the lock is still applied does
+    // nothing (overflow:hidden), and the lock's position-restore on release
+    // would cancel the scroll — the menu tap then appears to "go nowhere".
+    window.setTimeout(() => scrollToElementWithOffset(id, 88, 'smooth'), 120);
   };
 
   return (
