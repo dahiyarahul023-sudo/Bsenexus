@@ -6,12 +6,13 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { ActionButton } from './ui/ActionButton';
-import { startProPayment, hasUsedTrial } from '../utils/cashfree';
+import { hasUsedTrial } from '../utils/cashfree';
 
 export function ProUpgradeModal() {
   const { 
     isProModalOpen, 
-    setIsProModalOpen, 
+    setIsProModalOpen,
+    setIsCheckoutOpen,
     profile, 
     user,
     setIsAuthModalOpen, 
@@ -33,8 +34,6 @@ export function ProUpgradeModal() {
 
   const [isActivating, setIsActivating] = useState(false);
   const [activatedSuccess, setActivatedSuccess] = useState(false);
-  const [paying, setPaying] = useState(false);
-  const [payError, setPayError] = useState<string | null>(null);
 
   if (!isProModalOpen) return null;
 
@@ -42,15 +41,10 @@ export function ProUpgradeModal() {
   const trialUsed = hasUsedTrial((user as any)?.uid || profile?.uid);
   const showPayMode = Boolean(user && !user.isAnonymous && trialUsed);
 
-  const handleBuyPro = async () => {
-    setPaying(true);
-    setPayError(null);
-    const res = await startProPayment('pro_monthly');
-    if (!res.ok) {
-      setPayError(res.error || 'Could not start the payment. Please try again.');
-      setPaying(false);
-    }
-    // On success Cashfree takes over (_self redirect to /pricing?cf_order_id=...).
+  const handleBuyPro = () => {
+    // Enter the dedicated checkout screen — payment happens inside it.
+    setIsProModalOpen(false);
+    setIsCheckoutOpen(true);
   };
 
   const handleActivate = async () => {
@@ -168,27 +162,20 @@ export function ProUpgradeModal() {
 
           {/* Action button */}
           <div className="pt-2">
-            {payError && (
-              <div className="mb-3 py-2.5 px-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-[11px] font-semibold rounded-xl">
-                {payError}
-              </div>
-            )}
             {showPayMode ? (
               <>
                 <ActionButton
                   onClick={handleBuyPro}
-                  isLoading={paying}
-                  loadingText="Opening secure checkout..."
                   variant="emerald"
                   size="lg"
                   icon={<Sparkles size={16} />}
                   className="w-full font-black text-sm"
                 >
-                  <span>Pay ₹199/mo — Activate Pro (30 days)</span>
+                  <span>Continue to Secure Checkout</span>
                   <ArrowRight size={15} className="ml-1" />
                 </ActionButton>
                 <p className="text-[10px] text-slate-400 text-center mt-2">
-                  One-time secure payment via Cashfree · Auto-renew coming soon
+                  ₹199 for 30 days · One-time payment via Cashfree
                 </p>
               </>
             ) : activatedSuccess ? (

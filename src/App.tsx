@@ -11,6 +11,7 @@ import { Layout } from './components/Layout';
 import Announcements from './components/Announcements';
 import { AuthModal } from './components/AuthModal';
 import { ProUpgradeModal } from './components/ProUpgradeModal';
+import { ProCheckoutView } from './components/ProCheckoutView';
 import { AdminPinModal } from './components/AdminPinModal';
 import { HomeForYou } from './components/HomeForYou';
 import { WatchlistManager } from './components/WatchlistManager';
@@ -783,6 +784,7 @@ export default function App() {
         <ToastProvider>
           <AppContent />
           <CashfreeReturnHandler />
+          <ProCheckoutView />
         </ToastProvider>
       </IntelModalProvider>
     </AuthProvider>

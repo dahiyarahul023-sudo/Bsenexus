@@ -99,6 +99,8 @@ interface AuthContextType {
   setIsAuthModalOpen: (open: boolean) => void;
   isProModalOpen: boolean;
   setIsProModalOpen: (open: boolean) => void;
+  isCheckoutOpen: boolean;
+  setIsCheckoutOpen: (open: boolean) => void;
   isAdminPinModalOpen: boolean;
   setIsAdminPinModalOpen: (open: boolean) => void;
 }
@@ -149,6 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [adminUnlocked, setAdminUnlocked] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isProModalOpen, setIsProModalOpen] = useState(false);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isAdminPinModalOpen, setIsAdminPinModalOpen] = useState(false);
 
   // Helper to persist sanitized session locally for UI convenience (never stores credentials/tokens)
@@ -1197,6 +1200,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsAuthModalOpen,
         isProModalOpen,
         setIsProModalOpen,
+        isCheckoutOpen,
+        setIsCheckoutOpen,
         isAdminPinModalOpen,
         setIsAdminPinModalOpen
       }}

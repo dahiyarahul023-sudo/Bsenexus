@@ -7,7 +7,6 @@ import React, { useEffect, useState } from 'react';
 import { Crown, CreditCard, BadgeCheck, Info } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { customFetch } from '../api';
-import { startProPayment } from '../utils/cashfree';
 
 interface SubStatus {
   configured: boolean;
@@ -33,10 +32,9 @@ function fmtDate(ts: number | null): string {
 }
 
 export function SubscriptionCard() {
-  const { user, refreshProfile } = useAuth();
+  const { user, refreshProfile, setIsCheckoutOpen } = useAuth();
   const [status, setStatus] = useState<SubStatus | null>(null);
   const [loading, setLoading] = useState(true);
-  const [paying, setPaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -60,19 +58,14 @@ export function SubscriptionCard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handlePay = async () => {
+  const handlePay = () => {
     if (!user) {
       setError('Please sign in first.');
       return;
     }
-    setPaying(true);
+    // Enter the dedicated checkout screen — payment happens inside it.
     setError(null);
-    const r = await startProPayment('pro_monthly');
-    if (!r.ok) {
-      setError(r.error || 'Could not start the payment. Please try again.');
-      setPaying(false);
-    }
-    // On success Cashfree takes over (_self redirect to /pricing?cf_order_id=...).
+    setIsCheckoutOpen(true);
   };
 
   return (
@@ -117,7 +110,7 @@ export function SubscriptionCard() {
           </div>
           <p className="text-[10px] text-slate-400 dark:text-slate-500 flex items-start gap-1">
             <Info className="w-3 h-3 mt-0.5 shrink-0" />
-            <span>Automatic renewal needs RBI approval — for now, renew manually before expiry.</span>
+            <span>Auto-renew coming soon — renew manually for now.</span>
           </p>
         </div>
       )}
@@ -131,18 +124,16 @@ export function SubscriptionCard() {
       {!loading && (
         <button
           onClick={handlePay}
-          disabled={paying || !status?.configured}
+          disabled={!status?.configured}
           className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-black rounded-xl shadow-lg shadow-emerald-600/25 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60"
         >
           <CreditCard className="w-4 h-4" />
           <span>
-            {paying
-              ? 'Opening secure checkout…'
-              : !status?.configured
-                ? 'Payments coming online…'
-                : status?.isPro
-                  ? 'Renew Pro — ₹199/mo'
-                  : 'Upgrade to Pro — ₹199/mo'}
+            {!status?.configured
+              ? 'Payments coming online…'
+              : status?.isPro
+                ? 'Renew Pro — ₹199/mo'
+                : 'Upgrade to Pro — ₹199/mo'}
           </span>
         </button>
       )}
