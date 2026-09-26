@@ -171,14 +171,15 @@ export const PricingPage: React.FC<PricingPageProps> = ({
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">For serious traders, research desks & Telegram channels</p>
                 </div>
 
-                <div className="flex items-baseline gap-2">
+                <div className="flex items-baseline gap-2 flex-wrap">
                   <span className="text-xl line-through text-slate-400 font-mono">₹499</span>
-                  <span className="text-4xl sm:text-5xl font-black text-emerald-600 dark:text-emerald-400 font-mono">₹0</span>
-                  <span className="text-xs text-slate-500 font-semibold">/ 1st week (then ₹499/mo)</span>
+                  <span className="text-4xl sm:text-5xl font-black text-emerald-600 dark:text-emerald-400 font-mono">₹199</span>
+                  <span className="text-xs text-slate-500 font-semibold">/month</span>
                   <span className="text-[10px] text-emerald-700 dark:text-emerald-300 font-bold ml-1 bg-emerald-100 dark:bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-800">
-                    1 Week Free Trial
+                    Launch Offer · 60% Off
                   </span>
                 </div>
+                <p className="-mt-4 text-[11px] text-slate-500 dark:text-slate-400">1st week free — no card required. Then ₹199/mo, cancel anytime.</p>
 
                 <ul className="space-y-3.5 text-xs text-slate-600 dark:text-slate-300">
                   <li className="flex items-center gap-2.5 font-semibold text-slate-900 dark:text-slate-100">
@@ -263,7 +264,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({
                   How does the 1-Week Free Trial work?
                 </h3>
                 <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                  Sign in with your genuine Google account to activate 1 week (7 days) of Free Pro access with full features (unlimited watchlists, AI summaries, Telegram alerts) at ₹0. After the 7-day trial, Pro is available for ₹499/month.
+                  Sign in with your genuine Google account to activate 1 week (7 days) of Free Pro access with full features (unlimited watchlists, AI summaries, Telegram alerts) at ₹0. After the 7-day trial, Pro is available for ₹199/month.
                 </p>
               </div>
 
