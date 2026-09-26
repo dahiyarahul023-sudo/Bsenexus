@@ -2250,7 +2250,7 @@ ${jsonLd}
             <p class="plan-desc">For active traders &amp; investors</p>
           </div>
           <div class="price-row">
-            <span class="price-strike">₹499</span>
+            <span class="price-strike"><del aria-label="Regular price ₹499">₹499</del></span>
             <span class="price-val highlight">₹199</span>
             <span class="price-period">/ 30 days &middot; 60% launch offer</span>
           </div>

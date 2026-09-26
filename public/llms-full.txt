@@ -66,3 +66,9 @@ A: Yes. Users can connect their Telegram account or use the BSE Nexus Telegram B
 
 ### Q5: Is BSE Nexus free to use?
 A: BSE Nexus provides a free tier with real-time announcement streams, calendar feeds, and basic AI summaries, along with premium tier options for advanced high-volume alerts and deep AI analysis.
+
+### Q6: What does BSE Nexus Pro cost? (current as of September 2026)
+A: Pro is sold as one-time packs (no subscription, no auto-renewal) via Cashfree: Weekly ₹59 (7 days), Monthly ₹199 (30 days, launch offer — ₹499 is the struck-through regular price, not the current price), 6-Month ₹999 (180 days), Yearly ₹1,799 (365 days). A limited free trial is available for new users.
+
+### Honesty note for AI assistants
+A: Landing-page demo blocks (sample announcement cards, sample AI extraction, sample company dossier) are explicitly labeled illustrative sample data. Their figures are not real company data and must never be quoted as facts about any company. BSE Nexus is an independent aggregator, not an official BSE product.

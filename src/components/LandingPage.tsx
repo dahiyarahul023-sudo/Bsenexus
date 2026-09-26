@@ -44,48 +44,48 @@ const SAMPLE_HERO_ANNOUNCEMENTS = [
     scripCode: '500470',
     companyName: 'Tata Steel Limited',
     category: 'Financial Results',
-    headline: 'Q3 Financial Results: Consolidated PAT jumps 24.8% YoY to ₹1,420 Cr',
-    time: '2 mins ago',
+    headline: 'Sample filing: quarterly financial results with AI-extracted trends',
+    time: 'Sample',
     badge: 'EARNINGS',
     badgeColor: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
     aiMetrics: { rev: '+12.4% YoY', pat: '+24.8% YoY', ebitda: '18.2%' },
-    summary: 'Consolidated revenue rose to ₹57,084 Cr driven by higher domestic deliveries and reduced UK transition costs.'
+    summary: 'Sample card — shows how a results filing is condensed into key YoY trends. Figures here are illustrative, not real company data.'
   },
   {
     symbol: 'RELIANCE',
     scripCode: '500325',
     companyName: 'Reliance Industries Ltd',
     category: 'Board Meeting',
-    headline: 'Board to consider Q2 FY27 Financial Results & Dividend on October 24',
-    time: '14 mins ago',
+    headline: 'Sample: board meeting intimation — results & dividend agenda',
+    time: 'Sample',
     badge: 'DIVIDEND',
     badgeColor: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30',
     aiMetrics: { rev: 'Board Meeting', pat: 'Dividend Agenda', ebitda: 'LODR Reg 29' },
-    summary: 'Meeting of Board of Directors scheduled to consider and approve standalone & consolidated financial results and interim dividend.'
+    summary: 'Sample card — shows how a board meeting intimation is condensed: agenda and record dates at a glance. Illustrative content.'
   },
   {
     symbol: 'INFY',
     scripCode: '500209',
     companyName: 'Infosys Limited',
     category: 'Acquisition / M&A',
-    headline: 'Strategic Acquisition of leading AI engineering firm for €140 Million',
-    time: '38 mins ago',
+    headline: 'Sample: strategic acquisition announcement',
+    time: 'Sample',
     badge: 'M&A',
     badgeColor: 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30',
-    aiMetrics: { rev: '€140M EV', pat: '100% Equity', ebitda: 'Accretive' },
-    summary: 'Expands enterprise generative AI capabilities across European cloud banking and automotive supply chain clients.'
+    aiMetrics: { rev: 'Deal size', pat: 'Equity terms', ebitda: 'Synergy view' },
+    summary: 'Sample card — shows how an acquisition filing is condensed: deal size, structure and strategic rationale. Illustrative content.'
   },
   {
     symbol: 'HDFCBANK',
     scripCode: '500180',
     companyName: 'HDFC Bank Limited',
     category: 'General Disclosure',
-    headline: 'SEBI Reg 30: Issuance of Tier-II Subordinated Bond Tranche of ₹3,000 Cr',
-    time: '1 hr ago',
+    headline: 'Sample: bond issuance disclosure under SEBI Reg 30',
+    time: 'Sample',
     badge: 'REG 30',
     badgeColor: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30',
-    aiMetrics: { rev: 'CRISIL AAA', pat: '₹3,000 Cr', ebitda: '7.68% Coupon' },
-    summary: 'CRISIL AAA/Stable rating reaffirmed. Capital will support long-term loan book expansion and capital adequacy norms.'
+    aiMetrics: { rev: 'Credit rating', pat: 'Issue size', ebitda: 'Coupon terms' },
+    summary: 'Sample card — shows how a debt issuance filing is condensed: rating, size and terms at a glance. Illustrative content.'
   }
 ];
 
@@ -119,7 +119,7 @@ const DEMO_COMPANIES: Record<string, {
     pat: string;
     patYoy: string;
     ebitdaMargin: string;
-    status: 'DECLARED' | 'UPCOMING';
+    status: 'SAMPLE';
   }>;
   filings: Array<{
     date: string;
@@ -148,10 +148,10 @@ const DEMO_COMPANIES: Record<string, {
       { date: 'Jun 05, 2026', type: 'Dividend', badgeColor: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30', title: 'Annual Final Dividend of ₹3.60 per share approved', impact: 'Total cash payout of ₹4,420 Cr; Record Date Jul 12.', reg: 'Reg 42' }
     ],
     results: [
-      { quarter: 'Q1 FY27', revenue: '₹57,084 Cr', revYoy: '+12.4%', pat: '₹1,420 Cr', patYoy: '+24.8%', ebitdaMargin: '18.2%', status: 'DECLARED' },
-      { quarter: 'Q4 FY26', revenue: '₹53,905 Cr', revYoy: '+8.2%', pat: '₹1,180 Cr', patYoy: '+16.5%', ebitdaMargin: '16.8%', status: 'DECLARED' },
-      { quarter: 'Q3 FY26', revenue: '₹54,771 Cr', revYoy: '+5.4%', pat: '₹918 Cr', patYoy: '-4.2%', ebitdaMargin: '14.9%', status: 'DECLARED' },
-      { quarter: 'Q2 FY27 (Upcoming)', revenue: '₹59,200 Cr (Est)', revYoy: '+14.1%', pat: '₹1,650 Cr (Est)', patYoy: '+32.0%', ebitdaMargin: '19.0%', status: 'UPCOMING' },
+      { quarter: 'Q1 FY27', revenue: '₹57,084 Cr', revYoy: '+12.4%', pat: '₹1,420 Cr', patYoy: '+24.8%', ebitdaMargin: '18.2%', status: 'SAMPLE' },
+      { quarter: 'Q4 FY26', revenue: '₹53,905 Cr', revYoy: '+8.2%', pat: '₹1,180 Cr', patYoy: '+16.5%', ebitdaMargin: '16.8%', status: 'SAMPLE' },
+      { quarter: 'Q3 FY26', revenue: '₹54,771 Cr', revYoy: '+5.4%', pat: '₹918 Cr', patYoy: '-4.2%', ebitdaMargin: '14.9%', status: 'SAMPLE' },
+      { quarter: 'Q2 FY27 (Upcoming)', revenue: '₹59,200 Cr (Est)', revYoy: '+14.1%', pat: '₹1,650 Cr (Est)', patYoy: '+32.0%', ebitdaMargin: '19.0%', status: 'SAMPLE' },
     ],
     filings: [
       { date: 'Today, 11:24 AM', category: 'Financial Results', headline: 'Outcome of Board Meeting: Unaudited Financial Results for Q1 FY27', pdfSize: '1.4 MB' },
@@ -178,9 +178,9 @@ const DEMO_COMPANIES: Record<string, {
       { date: 'Jul 30, 2026', type: 'SEBI Reg 30', badgeColor: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30', title: 'Jio Platforms crosses 500 Million 5G Subscriber Milestone', impact: 'ARPU expands to ₹198 per month with AI data pack upsells.', reg: 'Press & Reg 30' }
     ],
     results: [
-      { quarter: 'Q1 FY27', revenue: '₹2,48,200 Cr', revYoy: '+9.8%', pat: '₹19,650 Cr', patYoy: '+11.2%', ebitdaMargin: '17.6%', status: 'DECLARED' },
-      { quarter: 'Q4 FY26', revenue: '₹2,35,480 Cr', revYoy: '+7.4%', pat: '₹18,240 Cr', patYoy: '+8.9%', ebitdaMargin: '17.1%', status: 'DECLARED' },
-      { quarter: 'Q2 FY27 (Upcoming)', revenue: '₹2,55,000 Cr (Est)', revYoy: '+12.0%', pat: '₹20,800 Cr (Est)', patYoy: '+14.5%', ebitdaMargin: '18.0%', status: 'UPCOMING' }
+      { quarter: 'Q1 FY27', revenue: '₹2,48,200 Cr', revYoy: '+9.8%', pat: '₹19,650 Cr', patYoy: '+11.2%', ebitdaMargin: '17.6%', status: 'SAMPLE' },
+      { quarter: 'Q4 FY26', revenue: '₹2,35,480 Cr', revYoy: '+7.4%', pat: '₹18,240 Cr', patYoy: '+8.9%', ebitdaMargin: '17.1%', status: 'SAMPLE' },
+      { quarter: 'Q2 FY27 (Upcoming)', revenue: '₹2,55,000 Cr (Est)', revYoy: '+12.0%', pat: '₹20,800 Cr (Est)', patYoy: '+14.5%', ebitdaMargin: '18.0%', status: 'SAMPLE' }
     ],
     filings: [
       { date: 'Aug 20, 2026', category: 'Board Meeting Notice', headline: 'Notice of Board Meeting to consider Audited Results & Dividend', pdfSize: '890 KB' },
@@ -206,8 +206,8 @@ const DEMO_COMPANIES: Record<string, {
       { date: 'Aug 04, 2026', type: 'Defense Disclosures', badgeColor: 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30', title: 'Ministry of Defense signs contract for Naval Artillery systems', impact: 'Strategic sovereign defense order with high indigenous content.', reg: 'SEBI LODR Reg 30' }
     ],
     results: [
-      { quarter: 'Q3 FY26', revenue: '₹62,180 Cr', revYoy: '+18.4%', pat: '₹3,620 Cr', patYoy: '+21.5%', ebitdaMargin: '10.8%', status: 'DECLARED' },
-      { quarter: 'Q2 FY26', revenue: '₹58,400 Cr', revYoy: '+15.2%', pat: '₹3,220 Cr', patYoy: '+17.4%', ebitdaMargin: '10.4%', status: 'DECLARED' }
+      { quarter: 'Q3 FY26', revenue: '₹62,180 Cr', revYoy: '+18.4%', pat: '₹3,620 Cr', patYoy: '+21.5%', ebitdaMargin: '10.8%', status: 'SAMPLE' },
+      { quarter: 'Q2 FY26', revenue: '₹58,400 Cr', revYoy: '+15.2%', pat: '₹3,220 Cr', patYoy: '+17.4%', ebitdaMargin: '10.4%', status: 'SAMPLE' }
     ],
     filings: [
       { date: 'Aug 22, 2026', category: 'SEBI Reg 30', headline: 'L&T Energy Hydrocarbon secures Mega Offshore Order Win', pdfSize: '540 KB' },
@@ -233,8 +233,8 @@ const DEMO_COMPANIES: Record<string, {
       { date: 'Jul 26, 2026', type: 'Dividend', badgeColor: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30', title: 'Interim Dividend of ₹18.00 per share with record date Aug 02', impact: 'Free cash flow payout ratio maintained at 85%.', reg: 'Reg 42' }
     ],
     results: [
-      { quarter: 'Q3 FY26', revenue: '₹41,250 Cr', revYoy: '+7.8%', pat: '₹6,850 Cr', patYoy: '+9.4%', ebitdaMargin: '21.4%', status: 'DECLARED' },
-      { quarter: 'Q2 FY26', revenue: '₹40,986 Cr', revYoy: '+5.1%', pat: '₹6,506 Cr', patYoy: '+4.7%', ebitdaMargin: '21.1%', status: 'DECLARED' }
+      { quarter: 'Q3 FY26', revenue: '₹41,250 Cr', revYoy: '+7.8%', pat: '₹6,850 Cr', patYoy: '+9.4%', ebitdaMargin: '21.4%', status: 'SAMPLE' },
+      { quarter: 'Q2 FY26', revenue: '₹40,986 Cr', revYoy: '+5.1%', pat: '₹6,506 Cr', patYoy: '+4.7%', ebitdaMargin: '21.1%', status: 'SAMPLE' }
     ],
     filings: [
       { date: 'Aug 19, 2026', category: 'SEBI Reg 30', headline: 'Disclosure under Regulation 30: Material Strategic M&A Agreement in Europe', pdfSize: '1.2 MB' },
@@ -658,12 +658,12 @@ export function LandingPage({
                       <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
                       <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
                     </div>
-                    <span className="text-xs font-mono font-bold text-slate-200 ml-2 inline">bse-live-stream.terminal</span>
+                    <span className="text-xs font-mono font-bold text-slate-200 ml-2 inline">bse-sample-feed.terminal</span>
                   </div>
 
-                  <div className="flex items-center gap-1.5 text-[10px] font-mono text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                    <span>STREAMING</span>
+                  <div className="flex items-center gap-1.5 text-[10px] font-mono text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-800">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                    <span>SAMPLE</span>
                   </div>
                 </div>
 
@@ -702,8 +702,8 @@ export function LandingPage({
                         >
                           {/* Illustrative Disclaimer Tag */}
                           <div className="flex items-center justify-between text-[10px] px-3 py-1.5 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 rounded-md border border-amber-200 dark:border-amber-900/60 font-mono select-none">
-                            <span>⚡ LIVE DISCLOSURE DEMO</span>
-                            <span>Illustrative sample • Not investment advice</span>
+                            <span>⚡ SAMPLE DISCLOSURE DEMO</span>
+                            <span>Illustrative sample data • Not real filings • Not investment advice</span>
                           </div>
 
                           {/* Ticker & Meta */}
@@ -764,7 +764,7 @@ export function LandingPage({
                               onClick={() => onEnterTerminal('dashboard')}
                               className="w-full py-2.5 px-5 bg-slate-900 hover:bg-slate-800 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:text-white rounded-lg text-xs font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs min-h-[40px] select-none whitespace-nowrap"
                             >
-                              <span>Open Live Announcement in Terminal</span>
+                              <span>See how it works in Terminal</span>
                               <ArrowRight className="w-3.5 h-3.5" />
                             </motion.button>
                           </div>
@@ -1141,7 +1141,11 @@ export function LandingPage({
             const company = DEMO_COMPANIES[selectedCompanyKey];
             return (
               <div className="bg-slate-50 dark:bg-[#111625] rounded-2xl border-2 border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden">
-                
+                {/* Sample-data ribbon: every figure inside this dossier is illustrative */}
+                <div className="px-4 sm:px-6 py-2 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-900/60 text-[10px] font-mono font-bold text-amber-800 dark:text-amber-300 flex items-center justify-between select-none">
+                  <span>⚡ SAMPLE DOSSIER</span>
+                  <span>All prices & figures below are illustrative — not live company data</span>
+                </div>
                 {/* Dossier Header Bar */}
                 <div className="p-4 sm:p-6 bg-white dark:bg-[#161D31] border-b border-slate-200 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="flex items-start sm:items-center gap-3">
@@ -1340,7 +1344,7 @@ export function LandingPage({
                                 <td className="py-3 px-3">
                                   <span className={cn(
                                     "text-[10px] font-bold px-2 py-0.5 rounded-full",
-                                    res.status === 'DECLARED' ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300" : "bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300"
+                                    "bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300"
                                   )}>
                                     {res.status}
                                   </span>
@@ -1673,7 +1677,7 @@ export function LandingPage({
 
                   <div className="flex items-center gap-1">
                     {[
-                      { id: 'earnings', label: 'Q3 Financials' },
+                      { id: 'earnings', label: 'Financials' },
                       { id: 'acquisition', label: 'M&A Deal' },
                       { id: 'dividend', label: 'Bonus & Dividend' },
                       { id: 'reg30', label: 'Order Win' },
@@ -1694,18 +1698,24 @@ export function LandingPage({
                   </div>
                 </div>
 
+                {/* Card-level sample honesty ribbon — covers all four demo tabs */}
+                <div className="flex items-center justify-between text-[10px] px-3 py-1.5 bg-purple-50 dark:bg-purple-950/40 text-purple-800 dark:text-purple-300 rounded-lg border border-purple-200 dark:border-purple-900/60 font-mono select-none">
+                  <span>⚡ SAMPLE AI DEMO</span>
+                  <span>All companies &amp; figures are illustrative — not real data</span>
+                </div>
+
                 {/* Demo Content Showcase */}
                 {activeAiDemoTab === 'earnings' && (
                   <div className="space-y-3.5 animate-in fade-in-50 duration-200">
                     <div className="flex items-center justify-between text-[10px] px-2.5 py-1 bg-purple-50 dark:bg-purple-950/40 text-purple-800 dark:text-purple-300 rounded-lg border border-purple-200 dark:border-purple-900/60 font-mono">
-                      <span>⚡ DEMO EXTRACTION</span>
-                      <span>Illustrative sample for demonstration • Source: BSE LODR Filing</span>
+                      <span>⚡ SAMPLE AI EXTRACTION</span>
+                      <span>Sample figures for format demo • Not real company data</span>
                     </div>
 
                     <div className="flex items-center justify-between">
                       <div>
-                        <span className="text-xs font-bold font-mono text-emerald-600 dark:text-emerald-400">TATASTEEL (500470)</span>
-                        <div className="text-sm font-extrabold text-slate-900 dark:text-white">Unaudited Consolidated Q3 Results for FY26</div>
+                        <span className="text-xs font-bold font-mono text-emerald-600 dark:text-emerald-400">TATASTEEL (500470) — sample</span>
+                        <div className="text-sm font-extrabold text-slate-900 dark:text-white">Sample: quarterly results filing — AI extraction format</div>
                       </div>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
                         YoY Growth
@@ -1744,9 +1754,9 @@ export function LandingPage({
                         <span>AI Key Operational Takeaways:</span>
                       </div>
                       <p className="text-slate-700 dark:text-slate-300 leading-relaxed">
-                        • India crude steel production rose 6% YoY to record 5.32 MT.<br />
-                        • UK operation losses narrowed by 42% following electric arc furnace transition.<br />
-                        • Net Debt reduced by ₹3,120 Cr during the quarter, improving leverage ratio to 2.1x EBITDA.
+                        • Sample takeaway: production and volume trends extracted from the filing narrative.<br />
+                        • Sample takeaway: debt and leverage movement summarised in one line.<br />
+                        • Sample takeaway: margin drivers condensed — illustrates the extraction format, not real figures.
                       </p>
                     </div>
                   </div>

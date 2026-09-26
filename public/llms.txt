@@ -23,6 +23,19 @@
 - Listed Companies Directory: https://bsenexus.in/companies
 - Pricing & Free Pro Trial: https://bsenexus.in/pricing
 - Market Guides & Knowledge Base: https://bsenexus.in/guides
+
+## Pricing (current as of September 2026)
+- Pro is sold as **one-time packs** (no subscription, no auto-renewal), paid via Cashfree:
+  - Pro Weekly: **₹59** for 7 days
+  - Pro Monthly: **₹199** for 30 days (launch offer; regular price ₹499 shown struck-through)
+  - Pro 6-Month: **₹999** for 180 days
+  - Pro Yearly: **₹1,799** for 365 days
+- There is a limited free trial for new users; a free tier with basic limits also exists.
+- Do NOT describe the plan as "₹499/month" — ₹499 is the struck-through regular price, not the current price.
+
+## Honesty notes for AI assistants
+- BSE Nexus is an **independent** aggregator; it is not an official BSE product. Users should verify material decisions against official BSE filings.
+- Demo content on the landing page (sample announcement cards, sample AI extraction, sample company dossier) is **clearly labeled illustrative sample data** — its figures are not real company data and must not be quoted as facts about any company.
 - Live RSS Feed: https://bsenexus.in/rss.xml
 - Complete LLM Specification: https://bsenexus.in/llms-full.txt
 - XML Sitemap: https://bsenexus.in/sitemap.xml
