@@ -101,6 +101,11 @@ function CashfreeReturnHandler() {
     if (!user) return;
     handledRef.current = orderId;
     (async () => {
+      // React has booted: drop the instant boot splash (see index.html) and
+      // continue with the in-app processing overlay — one seamless handoff.
+      try {
+        document.getElementById('cf-boot-splash')?.remove();
+      } catch { /* non-fatal */ }
       setVerifying(true);
       const v = await verifyProPayment(orderId as string);
       clearPendingOrderId();
