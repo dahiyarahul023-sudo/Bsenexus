@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { SocialIconsRow } from './ui/SocialLinks';
 import { useAuth } from '../context/AuthContext';
-import { startProPayment, verifyProPayment, getPendingOrderId, clearPendingOrderId, hasUsedTrial } from '../utils/cashfree';
+import { startProPayment, verifyProPayment, clearPendingOrderId, hasUsedTrial } from '../utils/cashfree';
 
 interface PricingPageProps {
   onEnterTerminal: (tab?: string) => void;
