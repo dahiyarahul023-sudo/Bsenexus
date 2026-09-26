@@ -65,10 +65,19 @@ interface CashfreeConfig {
 function getCashfreeConfig(): CashfreeConfig {
   // Trim: copy-pasted keys often carry a trailing newline/space, which makes
   // Node's fetch throw on the x-client-* headers.
-  const appId = (process.env.CASHFREE_APP_ID || '').trim();
-  const secret = (process.env.CASHFREE_SECRET_KEY || '').trim();
-  const env = (process.env.CASHFREE_ENV || 'sandbox').toLowerCase().trim();
-  const mode: 'sandbox' | 'production' = env === 'production' ? 'production' : 'sandbox';
+  // 26 Sep 2026 — broadened: AI Studio Secrets me keys alag-alag naamon se
+  // save ho sakti hain (CASHFREE_API_KEY waghera). Pehle sirf 1-2 naam check
+  // hote the, isliye keys save hone ke bawajood "not configured" aa raha tha
+  // aur payment start hi nahi ho rahi thi. Ab saare common variants padho.
+  const appId = (process.env.CASHFREE_APP_ID || process.env.CASHFREE_CLIENT_ID || process.env.CASHFREE_KEY_ID || process.env.CASHFREE_API_KEY || process.env.CASHFREE_KEY || process.env.CASHFREE_APPID || process.env.CASHFREE_ID || process.env.CASHFREE_SANDBOX_APP_ID || process.env.CASHFREE_PROD_APP_ID || process.env.CASHFREE_APP || '').trim();
+  const secret = (process.env.CASHFREE_SECRET_KEY || process.env.CASHFREE_CLIENT_SECRET || process.env.CASHFREE_KEY_SECRET || process.env.CASHFREE_API_SECRET || process.env.CASHFREE_SECRET || process.env.CASHFREE_SECRETKEY || process.env.CASHFREE_SANDBOX_SECRET_KEY || process.env.CASHFREE_PROD_SECRET_KEY || '').trim();
+  const envRaw = (process.env.CASHFREE_ENV || process.env.CASHFREE_ENVIRONMENT || process.env.CASHFREE_MODE || '').toLowerCase().trim();
+  // Production auto-detect: explicit env wins; otherwise a real (non-TEST)
+  // App ID means production keys. Cashfree sandbox App IDs start with "TEST".
+  const mode: 'sandbox' | 'production' =
+    envRaw === 'production' ? 'production'
+    : appId.length > 5 && !appId.toUpperCase().startsWith('TEST') ? 'production'
+    : 'sandbox';
   const base = mode === 'production' ? 'https://api.cashfree.com/pg' : 'https://sandbox.cashfree.com/pg';
   return { appId, secret, base, mode };
 }
@@ -193,8 +202,12 @@ async function doGrantProForOrder(uid: string, orderId: string, planId: PlanId):
 // ---------------------------------------------------------------------------
 paymentsRouter.post('/create-order', requireAuth, async (req, res) => {
   try {
-    if (!isConfigured()) {
-      return res.status(503).json({ success: false, error: 'Payments are not configured yet. Please try again later.' });
+    // Read config first: per-field Found/Missing error beats a generic 502.
+    const cfg = getCashfreeConfig();
+    const hasApp = Boolean(cfg.appId);
+    const hasSecret = Boolean(cfg.secret);
+    if (!hasApp || !hasSecret) {
+      return res.status(503).json({ success: false, error: `Cashfree credentials missing in Secrets (App ID: ${hasApp ? 'Found' : 'Missing'}, Secret Key: ${hasSecret ? 'Found' : 'Missing'})` });
     }
     const uid = getReqUserId(req);
     const planId = (req.body?.planId || 'pro_monthly') as string;
