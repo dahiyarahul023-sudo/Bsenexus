@@ -626,6 +626,36 @@ function renderCompanyPage(data: any, symbol: string, scripCode: string): string
     description = description.slice(0, 152).trim() + '...';
   }
 
+  // FAQ — query-matched, data-driven Q&A (AI-search playbook: answer the exact
+  // questions ChatGPT/Google AI Overviews search for, using the company's live
+  // filing data). One source renders both the visible HTML and the JSON-LD
+  // FAQPage so schema and page content always stay in sync.
+  const safeHeadline = latestAnnouncementText.replace(/`/g, "'").replace(/\$\{/g, '$ {');
+  const latestFilingDate = latestFiling
+    ? (latestFiling.bseTime || (latestFiling.timestamp ? new Date(latestFiling.timestamp).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }) : ''))
+    : '';
+  const meetingWhen = upcomingEvent?.countdownDays === 0 ? 'today'
+    : upcomingEvent?.countdownDays === 1 ? 'tomorrow'
+    : (typeof upcomingEvent?.countdownDays === 'number' ? `in ${upcomingEvent.countdownDays} days` : '');
+  const faqItems: Array<{ q: string; a: string }> = [
+    {
+      q: `What is the latest BSE announcement by ${companyName}?`,
+      a: safeHeadline
+        ? `The latest BSE disclosure by ${companyName} (${symbol})${latestFilingDate ? `, filed on ${latestFilingDate},` : ''} is: "${safeHeadline}". BSE Nexus tracks every official filing for ${companyName} with AI-powered summaries on its announcements feed.`
+        : `${companyName} (${symbol}) disclosures are tracked on BSE Nexus, which structures every official BSE filing with AI-powered summaries.`
+    },
+    {
+      q: `When is ${companyName}'s next board meeting?`,
+      a: upcomingEvent
+        ? `${companyName} has a board meeting scheduled for ${upcomingEvent.meetingDate || 'an announced date'}${meetingWhen ? ` (${meetingWhen})` : ''}${upcomingEvent.purpose ? ` to consider: ${upcomingEvent.purpose}` : ''}.`
+        : `No upcoming board meeting is currently tracked for ${companyName}. Companies disclose meeting intimations under SEBI LODR, and scheduled dates appear on the BSE Nexus Results Calendar.`
+    },
+    {
+      q: `When does ${companyName} declare quarterly results?`,
+      a: `Under SEBI (LODR) Regulation 33, listed companies submit quarterly unaudited results within 45 days of the quarter ending, and annual audited figures within 60 days.${quarterlyResults.length > 0 ? ` ${companyName}'s recent results history is tabulated above.` : ''} Track scheduled board meetings on the BSE Nexus Results Calendar.`
+    }
+  ];
+
   // Schema.org multi-graph: Corporation, BreadcrumbList, FAQPage
   const jsonLd = JSON.stringify({
     "@context": "https://schema.org",
@@ -669,24 +699,14 @@ function renderCompanyPage(data: any, symbol: string, scripCode: string): string
       {
         "@type": "FAQPage",
         "@id": `${canonicalUrl}#faq`,
-        "mainEntity": [
-          {
-            "@type": "Question",
-            "name": `Where can I track latest BSE announcements for ${companyName}?`,
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": `You can track real-time regulatory filings, board meeting outcomes, and quarterly reports for ${companyName} (${symbol} / ${scripCode || ''}) live on BSE Nexus with instant Telegram notifications and AI summaries.`
-            }
-          },
-          {
-            "@type": "Question",
-            "name": `When does ${companyName} announce quarterly financial results?`,
-            "acceptedAnswer": {
-              "@type": "Answer",
-              "text": `${companyName} submits quarterly results to BSE in accordance with Regulation 33 of SEBI LODR. Scheduled board meetings, declaration dates, and YoY/QoQ financial comparisons are tracked on the BSE Nexus Earnings Calendar.`
-            }
+        "mainEntity": faqItems.map(item => ({
+          "@type": "Question",
+          "name": item.q,
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": item.a
           }
-        ]
+        }))
       }
     ]
   }, null, 2);
@@ -1320,14 +1340,11 @@ ${jsonLd}
 
       <section class="section faq-sec">
         <h2 class="section-label">Frequently Asked Questions about ${escapeHtmlText(companyName)} BSE Disclosures</h2>
+        ${faqItems.map(item => `
         <div class="faq-item">
-          <h3 class="faq-q">Where can I track live BSE announcements for ${escapeHtmlText(companyName)}?</h3>
-          <p class="faq-a">You can monitor live corporate announcements, board meeting outcomes, and investor disclosures for ${escapeHtmlText(companyName)} (${escapeHtmlText(scripCode || symbol)}) directly on the BSE Nexus terminal with real-time 15-second polling and AI-powered summaries.</p>
-        </div>
-        <div class="faq-item">
-          <h3 class="faq-q">When does ${escapeHtmlText(companyName)} submit quarterly financial statements?</h3>
-          <p class="faq-a">Under SEBI (LODR) Regulation 33, listed companies submit quarterly un-audited results within 45 days of the quarter ending, and annual audited figures within 60 days. Track scheduled board meetings on the BSE Nexus Results Calendar.</p>
-        </div>
+          <h3 class="faq-q">${escapeHtmlText(item.q)}</h3>
+          <p class="faq-a">${escapeHtmlText(item.a)}</p>
+        </div>`).join('\n')}
       </section>
 
       <div class="bottom-cta">
