@@ -34,7 +34,7 @@ function fmtDate(ts: number | null): string {
 }
 
 export function SubscriptionCard() {
-  const { user, refreshProfile, setIsCheckoutOpen, setReceipt } = useAuth();
+  const { user, refreshProfile, openCheckout, setReceipt } = useAuth();
   const [status, setStatus] = useState<SubStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +68,7 @@ export function SubscriptionCard() {
     }
     // Enter the dedicated checkout screen — payment happens inside it.
     setError(null);
-    setIsCheckoutOpen(true);
+    openCheckout();
   };
 
   const handleViewReceipt = async () => {

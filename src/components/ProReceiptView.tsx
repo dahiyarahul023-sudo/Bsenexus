@@ -13,6 +13,9 @@ import { useAuth } from '../context/AuthContext';
 import { buildReceiptMailto, formatReceiptDate, type PaymentReceipt } from '../utils/cashfree';
 
 function ReceiptPaper({ r }: { r: PaymentReceipt }) {
+  const planText = r.planLabel
+    ? `1× ${r.planLabel}${r.validityDays ? ` (${r.validityDays} days)` : ''}`
+    : '1× Pro Monthly (30 days)';
   return (
     <div className="bg-white rounded-2xl px-5 py-5 text-slate-900 shadow-inner">
       <p className="text-[11px] font-black tracking-[0.18em] text-slate-500">BSE NEXUS</p>
@@ -25,7 +28,7 @@ function ReceiptPaper({ r }: { r: PaymentReceipt }) {
       <div className="my-3 border-t border-dashed border-slate-200" />
 
       <div className="flex items-center justify-between text-[12px]">
-        <span className="font-medium text-slate-600">1× Pro Monthly (30 days)</span>
+        <span className="font-medium text-slate-600">{planText}</span>
         <span className="font-bold">₹{Number(r.amount).toFixed(2)}</span>
       </div>
       <div className="flex items-center justify-between text-[12px] mt-1.5">

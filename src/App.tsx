@@ -3,7 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { IntelModalProvider } from './context/IntelModalContext';
 import { ToastProvider, useToast } from './context/ToastContext';
 import { customFetch } from './api';
-import { verifyProPayment, clearPendingOrderId } from './utils/cashfree';
+import { verifyProPayment, clearPendingOrderId, getPlanDisplayFromOrderId, isValidPlanId } from './utils/cashfree';
 import { useVisibilityInterval } from './hooks/useVisibilityInterval';
 
 import { LandingPage } from './components/LandingPage';
@@ -111,7 +111,8 @@ function CashfreeReturnHandler() {
         if (v.receipt) {
           setReceipt(v.receipt);
         } else {
-          success('Pro activated — your 30-day Pro pack is live. Welcome!');
+          const planLabel = getPlanDisplayFromOrderId(orderId).label;
+          success(`${planLabel} activated — welcome!`);
         }
       } else {
         warning(v.error || 'Payment not confirmed yet. If money was debited, it will reflect shortly.');
@@ -190,7 +191,7 @@ function AppContent() {
   const [health, setHealth] = useState({ bse: { status: 'stable', latency: 85 }, telegram: { status: 'connected', latency: 120 } });
   
   const { user, profile, authLoading, isAdmin, adminUnlocked, logout, 
-    setIsAuthModalOpen, setIsProModalOpen,
+    setIsAuthModalOpen, setIsProModalOpen, setCheckoutPlanId,
     isAuthModalOpen, isProModalOpen, isAdminPinModalOpen 
   } = useAuth();
   const [serverAuth, setServerAuth] = useState<{ isAuthenticated: boolean; hasPin: boolean } | null>(null);
@@ -287,6 +288,9 @@ function AppContent() {
       const queryParam = searchParams.get('q') || searchParams.get('stock') || searchParams.get('scrip') || '';
 
       if (actionParam === 'upgrade' || actionParam === 'trial' || actionParam === 'pro') {
+        // /pricing deep links pass ?plan=pro_yearly etc. — preselect it in checkout.
+        const planParam = searchParams.get('plan');
+        if (isValidPlanId(planParam)) setCheckoutPlanId(planParam as string);
         setIsProModalOpen(true);
       }
 

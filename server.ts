@@ -1801,9 +1801,16 @@ ${jsonLd}
 }
 
 export function renderPricingPage(): string {
-  const pageTitle = "Pricing & Plans — Pro at ₹199/mo | BSE Nexus";
+  const pageTitle = "Pricing — Pro Plans from ₹59 | BSE Nexus";
   const canonicalUrl = "https://bsenexus.in/pricing";
-  const description = "BSE Nexus Pro at ₹199/month: 1st week free, no card required. Then a one-time ₹199 payment for 30 days via Cashfree. Official BSE filing intelligence, AI summaries, Telegram alerts.";
+  const description = "BSE Nexus Pro plans: Weekly ₹59, Monthly ₹199, 6-Month ₹999, Yearly ₹1,799. One-time payments via Cashfree — no auto-renewal. 1st week free, no card required. Free vs Pro comparison.";
+
+  const proOffers = [
+    { name: "Pro Weekly", price: "59", desc: "7 days of Pro via one-time Cashfree payment." },
+    { name: "Pro Monthly", price: "199", desc: "30 days of Pro via one-time Cashfree payment. Launch offer (was ₹499)." },
+    { name: "Pro 6-Month", price: "999", desc: "180 days of Pro via one-time Cashfree payment. Save ₹195 vs monthly." },
+    { name: "Pro Yearly", price: "1799", desc: "365 days of Pro via one-time Cashfree payment. Save ₹589 vs monthly." },
+  ];
 
   const jsonLd = JSON.stringify({
     "@context": "https://schema.org",
@@ -1827,18 +1834,18 @@ export function renderPricingPage(): string {
             "priceValidUntil": "2027-12-31",
             "availability": "https://schema.org/InStock",
             "url": canonicalUrl,
-            "description": "Forever free access to real-time BSE filings, standard Gemini AI summaries, and custom watchlists."
+            "description": "Forever-free access to BSE filings, standard Gemini AI summaries, and custom watchlists."
           },
-          {
+          ...proOffers.map((o) => ({
             "@type": "Offer",
-            "name": "Pro Intelligence",
-            "price": "199",
+            "name": o.name,
+            "price": o.price,
             "priceCurrency": "INR",
             "priceValidUntil": "2027-12-31",
             "availability": "https://schema.org/InStock",
             "url": canonicalUrl,
-            "description": "1st week free (no card required), then ₹199 for 30 days via one-time Cashfree payment. Priority AI analysis, unlimited watchlists, and Telegram broadcasts."
-          }
+            "description": o.desc,
+          })),
         ]
       },
       {
@@ -1975,10 +1982,57 @@ ${jsonLd}
     }
     .plans-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 24px;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
       margin-bottom: 48px;
     }
+    .compare-wrap {
+      overflow-x: auto;
+      margin-bottom: 48px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: var(--card-bg);
+    }
+    table.compare {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 560px;
+      font-size: 0.875rem;
+    }
+    table.compare th, table.compare td {
+      padding: 14px 18px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    table.compare thead th {
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.8125rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      background: #F8FAFC;
+    }
+    table.compare thead th:last-child, table.compare td:last-child {
+      color: var(--brand);
+      font-weight: 700;
+    }
+    table.compare tbody tr:last-child th, table.compare tbody tr:last-child td { border-bottom: none; }
+    .tick { color: #059669; font-weight: 800; }
+    .dash { color: #CBD5E1; font-weight: 800; }
+    .free-strip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 22px 26px;
+      margin-bottom: 48px;
+    }
+    .free-strip h3 { font-family: 'Outfit', sans-serif; font-size: 1.05rem; color: var(--brand); margin-bottom: 4px; }
+    .free-strip p { font-size: 0.875rem; color: var(--muted); }
     .plan-card {
       background: var(--card-bg);
       border: 1px solid var(--border);
@@ -2134,6 +2188,9 @@ ${jsonLd}
       font-size: 0.8125rem;
       color: var(--muted);
     }
+    @media (max-width: 1024px) {
+      .plans-grid { grid-template-columns: 1fr 1fr; }
+    }
     @media (max-width: 768px) {
       .plans-grid { grid-template-columns: 1fr; }
       .guarantees-grid { grid-template-columns: 1fr; }
@@ -2159,145 +2216,159 @@ ${jsonLd}
 
   <main class="container">
     <div class="hero">
-      <span class="badge">LAUNCH SPECIAL &middot; 100% FREE ACCESS</span>
-      <h1>Transparent Pricing — 100% Free During Early Access Launch</h1>
-      <p class="subtitle">Institutional speed, real-time BSE announcements, and neural Gemini AI financial breakdowns accessible to every Indian equity investor. No credit card required.</p>
+      <span class="badge">ONE-TIME PAYMENTS &middot; NO AUTO-RENEWAL</span>
+      <h1>Simple Pro Pricing — Pick the Pack That Fits You</h1>
+      <p class="subtitle">Official BSE filing intelligence, Gemini AI summaries, unlimited watchlists and Telegram alerts. Pay once for 7, 30, 180 or 365 days via Cashfree — UPI, cards &amp; netbanking accepted.</p>
     </div>
 
     <div class="plans-grid">
-      <!-- Community Free Tier -->
+      <!-- Pro Weekly -->
       <div class="plan-card">
         <div>
           <div class="plan-header">
-            <h2 class="plan-name">Community Free</h2>
-            <p class="plan-desc">For retail traders &amp; individual investors</p>
+            <h2 class="plan-name">Pro Weekly</h2>
+            <p class="plan-desc">Try Pro for a week</p>
           </div>
-
           <div class="price-row">
-            <span class="price-val">₹0</span>
-            <span class="price-period">/ month (Forever Free)</span>
+            <span class="price-val">₹59</span>
+            <span class="price-period">/ 7 days</span>
           </div>
-
           <ul class="feature-list">
-            <li class="feature-item">
-              <span class="check-icon">&#10003;</span>
-              <span>Real-time BSE Announcements (15s polling cycle)</span>
-            </li>
-            <li class="feature-item">
-              <span class="check-icon">&#10003;</span>
-              <span>Full coverage across all 5,000+ BSE Equities</span>
-            </li>
-            <li class="feature-item">
-              <span class="check-icon">&#10003;</span>
-              <span>Standard Gemini AI Financial Summaries</span>
-            </li>
-            <li class="feature-item">
-              <span class="check-icon">&#10003;</span>
-              <span>Custom Ticker Watchlists</span>
-            </li>
-            <li class="feature-item">
-              <span class="check-icon">&#10003;</span>
-              <span>Personal Telegram Alert connection</span>
-            </li>
-            <li class="feature-item">
-              <span class="check-icon">&#10003;</span>
-              <span>Board Meeting &amp; Earnings Calendar</span>
-            </li>
+            <li class="feature-item"><span class="check-icon">&#10003;</span><span>Everything in Pro, for 7 days</span></li>
+            <li class="feature-item"><span class="check-icon">&#10003;</span><span>One-time payment, no commitment</span></li>
           </ul>
         </div>
-
-        <a href="https://bsenexus.in/?tab=announcements" class="card-btn btn-sec">
-          Launch Terminal (Free)
-        </a>
+        <a href="https://bsenexus.in/?action=upgrade&amp;plan=pro_weekly" class="card-btn btn-sec">Choose Weekly</a>
       </div>
 
-      <!-- Pro Intelligence Tier -->
+      <!-- Pro Monthly -->
       <div class="plan-card pro">
-        <div class="card-banner">Launch Offer &middot; 60% Off</div>
+        <div class="card-banner">Most Popular</div>
         <div>
           <div class="plan-header">
-            <h2 class="plan-name">Pro Intelligence</h2>
-            <p class="plan-desc">For serious traders, research desks &amp; Telegram channels</p>
+            <h2 class="plan-name">Pro Monthly</h2>
+            <p class="plan-desc">For active traders &amp; investors</p>
           </div>
-
           <div class="price-row">
             <span class="price-strike">₹499</span>
             <span class="price-val highlight">₹199</span>
-            <span class="price-period">/mo &middot; 1st week free, then ₹199/mo</span>
+            <span class="price-period">/ 30 days &middot; 60% launch offer</span>
           </div>
-
           <ul class="feature-list">
-            <li class="feature-item">
-              <span class="check-icon">&#10003;</span>
-              <strong>Everything in Free, plus:</strong>
-            </li>
-            <li class="feature-item">
-              <span class="check-icon">&#10003;</span>
-              <span>Unlimited Watchlists &amp; Priority Ticker Groups</span>
-            </li>
-            <li class="feature-item">
-              <span class="check-icon">&#10003;</span>
-              <span>Broadcast to Personal &amp; Channel Telegram</span>
-            </li>
-            <li class="feature-item">
-              <span class="check-icon">&#10003;</span>
-              <span>Unlimited High-Priority Gemini AI Financial Extraction</span>
-            </li>
-            <li class="feature-item">
-              <span class="check-icon">&#10003;</span>
-              <span>Filter &amp; Mute Routine Administrative Filings</span>
-            </li>
-            <li class="feature-item">
-              <span class="check-icon">&#10003;</span>
-              <span>Export Watchlists &amp; Financial Summaries (CSV / JSON)</span>
-            </li>
-            <li class="feature-item">
-              <span class="check-icon">&#10003;</span>
-              <span>1-Week (7-Day) Google Sign-in Free Pro Trial</span>
-            </li>
+            <li class="feature-item"><span class="check-icon">&#10003;</span><span>Everything in Pro, for 30 days</span></li>
+            <li class="feature-item"><span class="check-icon">&#10003;</span><span>One-time payment via Cashfree</span></li>
           </ul>
         </div>
+        <a href="https://bsenexus.in/?action=upgrade&amp;plan=pro_monthly" class="card-btn btn-pri">Choose Monthly</a>
+      </div>
 
-        <a href="https://bsenexus.in/?tab=announcements&action=upgrade" class="card-btn btn-pri">
-          Start 1-Week Free Trial — Then ₹199/mo
-        </a>
+      <!-- Pro 6-Month -->
+      <div class="plan-card">
+        <div>
+          <div class="plan-header">
+            <h2 class="plan-name">Pro 6-Month</h2>
+            <p class="plan-desc">For serious market watchers</p>
+          </div>
+          <div class="price-row">
+            <span class="price-val">₹999</span>
+            <span class="price-period">/ 180 days &middot; save ₹195 vs monthly</span>
+          </div>
+          <ul class="feature-list">
+            <li class="feature-item"><span class="check-icon">&#10003;</span><span>Everything in Pro, for 180 days</span></li>
+            <li class="feature-item"><span class="check-icon">&#10003;</span><span>Set and forget for half a year</span></li>
+          </ul>
+        </div>
+        <a href="https://bsenexus.in/?action=upgrade&amp;plan=pro_halfyearly" class="card-btn btn-sec">Choose 6-Month</a>
+      </div>
+
+      <!-- Pro Yearly -->
+      <div class="plan-card">
+        <div>
+          <div class="plan-header">
+            <h2 class="plan-name">Pro Yearly</h2>
+            <p class="plan-desc">Best value for research desks</p>
+          </div>
+          <div class="price-row">
+            <span class="price-val">₹1,799</span>
+            <span class="price-period">/ 365 days &middot; save ₹589 vs monthly</span>
+          </div>
+          <ul class="feature-list">
+            <li class="feature-item"><span class="check-icon">&#10003;</span><span>Everything in Pro, for 365 days</span></li>
+            <li class="feature-item"><span class="check-icon">&#10003;</span><span>Lowest effective monthly cost</span></li>
+          </ul>
+        </div>
+        <a href="https://bsenexus.in/?action=upgrade&amp;plan=pro_yearly" class="card-btn btn-sec">Choose Yearly</a>
       </div>
     </div>
 
-    <h2 class="section-title">Zero-Risk Guarantee &amp; Operational Trust</h2>
+    <h2 class="section-title">Free vs Pro — What's Included</h2>
+    <div class="compare-wrap">
+      <table class="compare">
+        <thead>
+          <tr><th>Feature</th><th>Free</th><th>Pro</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>BSE corporate filings feed</td><td><span class="tick">&#10003;</span></td><td><span class="tick">&#10003;</span></td></tr>
+          <tr><td>Watchlists</td><td>1 watchlist</td><td>Unlimited watchlists</td></tr>
+          <tr><td>Gemini AI filing summaries</td><td>1-week free trial</td><td>100 / day</td></tr>
+          <tr><td>Telegram alerts</td><td><span class="dash">&mdash;</span></td><td>Instant broadcast to chats &amp; channels</td></tr>
+          <tr><td>Board meeting &amp; results calendar</td><td><span class="tick">&#10003;</span></td><td><span class="tick">&#10003;</span></td></tr>
+          <tr><td>Export summaries &amp; watchlists (CSV / JSON)</td><td><span class="dash">&mdash;</span></td><td><span class="tick">&#10003;</span></td></tr>
+          <tr><td>Price</td><td>₹0 forever</td><td>From ₹59 (one-time)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="free-strip">
+      <div>
+        <h3>Not ready for Pro yet?</h3>
+        <p>Start free with Google sign-in — your 1-week Pro trial is included, no card required.</p>
+      </div>
+      <a href="https://bsenexus.in/?tab=announcements" class="card-btn btn-sec" style="max-width: 240px;">Launch Terminal (Free)</a>
+    </div>
+
+    <h2 class="section-title">Straightforward, No Surprises</h2>
     <div class="guarantees-grid">
       <div class="guarantee-card">
         <h3>No Card Needed for Trial</h3>
         <p>Start your 1-week free Pro trial with Google sign-in — zero financial credentials on file until you choose to pay.</p>
       </div>
       <div class="guarantee-card">
-        <h3>BSE &amp; SEBI Compliant</h3>
-        <p>Exchange feeds parsed according strictly to SEBI LODR Regulation 30 &amp; 33 disclosure frameworks.</p>
+        <h3>One-Time Payments Only</h3>
+        <p>Every Pro pack is a single charge via Cashfree. No auto-debit, no hidden renewals — you renew manually when your pack ends. Auto-renewal is coming soon.</p>
       </div>
       <div class="guarantee-card">
-        <h3>7-Day Money-Back Policy</h3>
-        <p>Paid Pro packs are covered by our 7-day refund guarantee — if Pro is not for you, you get your ₹199 back.</p>
+        <h3>Secured by Cashfree</h3>
+        <p>Payments are processed over Cashfree's PCI-DSS compliant gateway. We never see or store your card or bank details.</p>
       </div>
     </div>
 
     <h2 class="section-title">Frequently Asked Questions About Pricing</h2>
     <div class="faq-list">
       <article class="faq-item">
+        <h3>How do the Pro plans work?</h3>
+        <p>Pick a pack — Weekly (7 days), Monthly (30 days), 6-Month (180 days) or Yearly (365 days) — and pay once via Cashfree (UPI, cards, netbanking). Pro activates the moment your payment is verified.</p>
+      </article>
+      <article class="faq-item">
+        <h3>Will I be automatically charged again?</h3>
+        <p>No. Every payment is one-time; there is no auto-debit. When your pack expires you simply buy a new one. Automatic renewal needs RBI e-mandate approval and is coming soon.</p>
+      </article>
+      <article class="faq-item">
+        <h3>What happens when my Pro pack expires?</h3>
+        <p>You fall back to the Free tier automatically — your watchlists and data stay intact. Renew any time by buying a new pack; if you renew early, the new validity extends from your current expiry date.</p>
+      </article>
+      <article class="faq-item">
+        <h3>Can I switch plans later?</h3>
+        <p>Yes. Just buy the pack you want next — its days get added on top of any remaining Pro time you have.</p>
+      </article>
+      <article class="faq-item">
         <h3>How does the free trial work?</h3>
-        <p>You get 1 week of Pro free with Google sign-in — no card required. After the trial, Pro continues at ₹199 for 30 days via a one-time Cashfree payment.</p>
-      </article>
-      <article class="faq-item">
-        <h3>Will I be automatically billed?</h3>
-        <p>No. Every Pro payment is a one-time charge via Cashfree — there is no auto-debit. Automatic renewal is coming soon; until then you renew manually before expiry.</p>
-      </article>
-      <article class="faq-item">
-        <h3>Can I connect Telegram alerts for my group or channel?</h3>
-        <p>Yes. With Pro intelligence, you can link your Telegram bot token and broadcast real-time corporate filing highlights directly to personal chats or public research channels.</p>
+        <p>You get 1 week of Pro free with Google sign-in — no card required. After the trial, pick any paid pack to continue.</p>
       </article>
     </div>
 
     <footer>
-      <div>&copy; ${new Date().getFullYear()} BSE Nexus &middot; Real-time BSE corporate announcements intelligence, algorithmic feeds, and transparent pricing.</div>
+      <div>&copy; ${new Date().getFullYear()} BSE Nexus &middot; BSE corporate announcements intelligence and transparent pricing.</div>
       <div style="margin-top: 10px;">
         <a href="https://bsenexus.in/">Home</a> &middot;
         <a href="https://bsenexus.in/about">About</a> &middot;

@@ -12,7 +12,8 @@ export function ProUpgradeModal() {
   const { 
     isProModalOpen, 
     setIsProModalOpen,
-    setIsCheckoutOpen,
+    checkoutPlanId,
+    openCheckout,
     profile, 
     user,
     setIsAuthModalOpen, 
@@ -43,8 +44,9 @@ export function ProUpgradeModal() {
 
   const handleBuyPro = () => {
     // Enter the dedicated checkout screen — payment happens inside it.
+    // Keeps the plan preselected from the /pricing deep link, if any.
     setIsProModalOpen(false);
-    setIsCheckoutOpen(true);
+    openCheckout(checkoutPlanId);
   };
 
   const handleActivate = async () => {
@@ -175,7 +177,7 @@ export function ProUpgradeModal() {
                   <ArrowRight size={15} className="ml-1" />
                 </ActionButton>
                 <p className="text-[10px] text-slate-400 text-center mt-2">
-                  ₹199 for 30 days · One-time payment via Cashfree
+                  Plans from ₹59 · Choose in checkout · One-time payment via Cashfree
                 </p>
               </>
             ) : activatedSuccess ? (

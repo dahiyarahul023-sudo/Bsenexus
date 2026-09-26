@@ -102,6 +102,10 @@ interface AuthContextType {
   setIsProModalOpen: (open: boolean) => void;
   isCheckoutOpen: boolean;
   setIsCheckoutOpen: (open: boolean) => void;
+  checkoutPlanId: string;
+  setCheckoutPlanId: (planId: string) => void;
+  /** Open the checkout with a preselected plan (defaults to Pro Monthly). */
+  openCheckout: (planId?: string) => void;
   receipt: PaymentReceipt | null;
   setReceipt: (r: PaymentReceipt | null) => void;
   isAdminPinModalOpen: boolean;
@@ -155,6 +159,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isProModalOpen, setIsProModalOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [checkoutPlanId, setCheckoutPlanId] = useState<string>('pro_monthly');
+  const openCheckout = (planId: string = 'pro_monthly') => {
+    setCheckoutPlanId(planId);
+    setIsCheckoutOpen(true);
+  };
   const [receipt, setReceipt] = useState<PaymentReceipt | null>(null);
   const [isAdminPinModalOpen, setIsAdminPinModalOpen] = useState(false);
 
@@ -1206,6 +1215,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsProModalOpen,
         isCheckoutOpen,
         setIsCheckoutOpen,
+        checkoutPlanId,
+        setCheckoutPlanId,
+        openCheckout,
         receipt,
         setReceipt,
         isAdminPinModalOpen,

@@ -7,7 +7,8 @@
  * - Source of truth = Cashfree Orders API (verify endpoint + webhook both re-fetch
  *   the order from Cashfree before granting Pro). Frontend callbacks are never trusted.
  * - Auto-renew / subscriptions are NOT built yet (needs RBI e-mandate approval) —
- *   the UI marks them "Coming soon". This module only sells 30-day one-time packs.
+ *   the UI marks them "Coming soon". This module only sells one-time packs
+ *   (7 / 30 / 180 / 365 days).
  */
 import express from 'express';
 import crypto from 'crypto';
@@ -44,6 +45,13 @@ export const paymentsRouter = express.Router();
 // amountPaise is in the smallest currency unit. validityDays = Pro duration.
 // ---------------------------------------------------------------------------
 export const PRO_PLANS = {
+  pro_weekly: {
+    id: 'pro_weekly',
+    label: 'Pro Weekly',
+    amountPaise: 5900, // ₹59
+    currency: 'INR',
+    validityDays: 7,
+  },
   pro_monthly: {
     id: 'pro_monthly',
     label: 'Pro Monthly',
@@ -51,9 +59,48 @@ export const PRO_PLANS = {
     currency: 'INR',
     validityDays: 30,
   },
+  pro_halfyearly: {
+    id: 'pro_halfyearly',
+    label: 'Pro 6-Month',
+    amountPaise: 99900, // ₹999
+    currency: 'INR',
+    validityDays: 180,
+  },
+  pro_yearly: {
+    id: 'pro_yearly',
+    label: 'Pro Yearly',
+    amountPaise: 179900, // ₹1,799
+    currency: 'INR',
+    validityDays: 365,
+  },
 } as const;
 
 export type PlanId = keyof typeof PRO_PLANS;
+
+/**
+ * The selected plan is encoded in the order id (BN_<code>_...) so that
+ * verify and the webhook can grant the correct validity WITHOUT trusting
+ * any client-supplied plan. Orders created before plan codes existed
+ * (BN_<cust>_<ts>) fall back to pro_monthly.
+ */
+const PLAN_CODES: Record<PlanId, string> = {
+  pro_weekly: 'W',
+  pro_monthly: 'M',
+  pro_halfyearly: 'H',
+  pro_yearly: 'Y',
+};
+const CODE_TO_PLAN: Record<string, PlanId> = {
+  W: 'pro_weekly',
+  M: 'pro_monthly',
+  H: 'pro_halfyearly',
+  Y: 'pro_yearly',
+};
+
+export function planIdFromOrderId(orderId: string): PlanId {
+  const m = /^BN_([WMHY])_/.exec(orderId || '');
+  const pid = m ? CODE_TO_PLAN[m[1]] : undefined;
+  return pid && (PRO_PLANS as Record<string, unknown>)[pid] ? pid : 'pro_monthly';
+}
 
 interface CashfreeConfig {
   appId: string;
@@ -262,8 +309,9 @@ paymentsRouter.post('/create-order', requireAuth, async (req, res) => {
     const rawPhone = String(req.body?.phone || (profile as any)?.phone || '9876543210').replace(/[^0-9]/g, '');
     const cleanPhone = rawPhone.length >= 10 ? rawPhone.slice(-10) : '9876543210';
 
-    // Unique, traceable order id
-    const orderId = `BN_${cleanCustomerId.slice(0, 10)}_${Date.now()}`;
+    // Unique, traceable order id — the plan code lets verify/webhook
+    // grant the right validity without trusting the client.
+    const orderId = `BN_${PLAN_CODES[plan.id as PlanId]}_${cleanCustomerId.slice(0, 10)}_${Date.now()}`;
     const base = siteUrl(req);
 
     const { ok, status, data, timedOut } = await cashfreeFetch('/orders', {
@@ -350,14 +398,27 @@ paymentsRouter.get('/verify', requireAuth, async (req, res) => {
     }
 
     if (order.order_status === 'PAID') {
-      const { proExpiresAt, alreadyGranted } = await grantProForOrder(uid, orderId, 'pro_monthly');
+      // The plan comes from the order id WE generated (never the client).
+      // The paid amount + currency must match that plan exactly, else fail closed.
+      const planId = planIdFromOrderId(orderId);
+      const plan = PRO_PLANS[planId];
+      const paidAmount = Number(order.order_amount);
+      const paidCurrency = String(order.order_currency || '');
+      if (paidAmount !== plan.amountPaise / 100 || paidCurrency !== plan.currency) {
+        console.warn('[Payments] verify amount mismatch:', orderId, paidAmount, paidCurrency, 'expected', plan.id);
+        return res.status(200).json({ success: false, paid: false, error: 'Payment amount does not match the selected plan.' });
+      }
+      const { proExpiresAt, alreadyGranted } = await grantProForOrder(uid, orderId, planId);
       const receipt = {
         orderId,
-        amount: Number(order.order_amount ?? PRO_PLANS.pro_monthly.amountPaise / 100),
-        currency: String(order.order_currency || PRO_PLANS.pro_monthly.currency),
+        amount: paidAmount,
+        currency: paidCurrency,
         paidAt: String(order.created_at || new Date().toISOString()),
         email: String(order?.customer_details?.customer_email || ''),
         validUntil: proExpiresAt,
+        planId: plan.id,
+        planLabel: plan.label,
+        validityDays: plan.validityDays,
       };
       return res.json({ success: true, paid: true, alreadyGranted, proExpiresAt, orderId, receipt });
     }
@@ -384,6 +445,7 @@ paymentsRouter.get('/status', requireAuth, async (req, res) => {
       isPro: (profile?.tier === 'pro' || (profile as any)?.isAdmin) && proExpiresAt > now,
       proExpiresAt,
       plan: PRO_PLANS.pro_monthly,
+      plans: Object.values(PRO_PLANS),
       lastPaymentAt: (profile as any)?.lastPaymentAt || null,
       lastOrderId: (profile as any)?.lastOrderId || null,
       // Auto-renew needs RBI e-mandate approval — not available yet.
@@ -443,12 +505,16 @@ paymentsRouter.post('/webhook', async (req, res) => {
     if (eventType === 'PAYMENT_SUCCESS_WEBHOOK' && paymentStatus === 'SUCCESS') {
       const order = await fetchOrderFromCashfree(orderId);
       const rawUid: string = order?.customer_details?.customer_id || '';
-      if (order?.order_status === 'PAID' && rawUid) {
+      const planId = planIdFromOrderId(orderId);
+      const plan = PRO_PLANS[planId];
+      const amountOk = Number(order?.order_amount) === plan.amountPaise / 100;
+      const currencyOk = String(order?.order_currency || '') === plan.currency;
+      if (order?.order_status === 'PAID' && rawUid && amountOk && currencyOk) {
         const uid = sanitizeUserId(rawUid);
-        const { alreadyGranted } = await grantProForOrder(uid, orderId, 'pro_monthly');
-        console.log(`[Payments] webhook granted Pro: uid=${uid} order=${orderId} already=${alreadyGranted}`);
+        const { alreadyGranted } = await grantProForOrder(uid, orderId, planId);
+        console.log(`[Payments] webhook granted Pro: uid=${uid} order=${orderId} plan=${planId} already=${alreadyGranted}`);
       } else {
-        console.warn('[Payments] webhook skipped: order not PAID or no customer_id', orderId);
+        console.warn('[Payments] webhook skipped: order not PAID / amount mismatch / no customer_id', orderId);
       }
     }
 
