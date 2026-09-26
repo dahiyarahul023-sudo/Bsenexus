@@ -304,6 +304,34 @@ export function CompanyIntelligenceModal({
     return facts.slice(0, 5);
   }, [recentFilings, timelineEvents, quarterlyResults]);
 
+  // Disclosure Trend — 12-week filing activity chart (reel-style "all time high"
+  // concept, built from the company's official BSE filings — nothing external).
+  const activityTrend = useMemo(() => {
+    const WEEK = 7 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    const buckets: number[] = new Array(12).fill(0);
+    let inWindow = 0;
+    recentFilings.forEach((f: any) => {
+      const ts = f.timestamp || 0;
+      if (!ts) return;
+      const age = now - ts;
+      if (age < 0 || age >= 12 * WEEK) return;
+      const idx = 11 - Math.floor(age / WEEK);
+      buckets[idx] += 1;
+      inWindow += 1;
+    });
+    if (inWindow < 2) return null;
+    const max = Math.max(...buckets);
+    const latest = buckets[11];
+    let callout: string | null = null;
+    if (latest > 0 && latest > Math.max(...buckets.slice(0, 11))) {
+      callout = 'Filing activity hit a 12-week high';
+    } else if (buckets.slice(8).every(b => b === 0)) {
+      callout = 'Quietest spell in 12 weeks';
+    }
+    return { buckets, max, callout };
+  }, [recentFilings]);
+
   return (
     <div 
       className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in duration-150 overscroll-contain"
@@ -606,6 +634,45 @@ export function CompanyIntelligenceModal({
                                 </div>
                               );
                             })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Disclosure Trend — 12-week filing activity */}
+                      {activityTrend && (
+                        <div className="p-3.5 bg-white dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/60 rounded-xl space-y-2.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                              <TrendingUp size={13} className="text-emerald-500" />
+                              Disclosure Trend
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-medium">
+                              last 12 weeks · official BSE filings
+                            </span>
+                          </div>
+                          {activityTrend.callout && (
+                            <div className="text-[15px] font-black text-slate-900 dark:text-white leading-snug">
+                              {activityTrend.callout}
+                            </div>
+                          )}
+                          <div>
+                            <div className="flex items-end gap-1 h-16">
+                              {activityTrend.buckets.map((count, bIdx) => (
+                                <div key={bIdx} className="flex-1 flex flex-col justify-end h-full" title={`${count} filing${count === 1 ? '' : 's'}`}>
+                                  <div
+                                    className={cn(
+                                      'w-full rounded-sm',
+                                      bIdx === 11 ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'
+                                    )}
+                                    style={{ height: `${Math.max(5, (count / activityTrend.max) * 100)}%` }}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                            <div className="flex justify-between text-[9px] text-slate-400 font-mono pt-1">
+                              <span>12 wks ago</span>
+                              <span>now</span>
+                            </div>
                           </div>
                         </div>
                       )}
