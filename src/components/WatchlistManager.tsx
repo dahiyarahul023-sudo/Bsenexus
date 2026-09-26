@@ -702,7 +702,7 @@ export function WatchlistManager() {
         alert('🔒 Google Sign-In Required: Sign in with Google to activate your 1-Week Free Pro trial to broadcast to Telegram!');
       } else {
         setIsProModalOpen(true);
-        alert('🔒 Direct Telegram Broadcasting is a Pro feature.\n\nYour 1-Week Free Pro trial has ended. Upgrade to Pro (₹499/mo) to dispatch instant alerts to Telegram!');
+        alert('🔒 Direct Telegram Broadcasting is a Pro feature.\n\nYour 1-Week Free Pro trial has ended. Upgrade to Pro (₹199/mo) to dispatch instant alerts to Telegram!');
       }
       return;
     }
@@ -749,7 +749,7 @@ export function WatchlistManager() {
 
     if (!isProOrAdmin) {
       setIsProModalOpen(true);
-      alert('🔒 1-Week Free Pro trial has ended. Upgrade to Pro (₹499/mo) for unlimited Gemini AI summaries!');
+      alert('🔒 1-Week Free Pro trial has ended. Upgrade to Pro (₹199/mo) for unlimited Gemini AI summaries!');
       return;
     }
 
@@ -919,10 +919,10 @@ export function WatchlistManager() {
     if (!isProOrAdmin && watchlists.length >= 1) {
       if (!user && !profile) {
         setIsAuthModalOpen(true);
-        alert('🔒 Creating multiple watchlists is a Pro feature.\n\nSign In to activate your 1-Week Free Pro Trial or Upgrade to Pro (₹499/mo)!');
+        alert('🔒 Creating multiple watchlists is a Pro feature.\n\nSign In to activate your 1-Week Free Pro Trial or Upgrade to Pro (₹199/mo)!');
       } else {
         setIsProModalOpen(true);
-        alert('🔒 Free accounts are limited to 1 Watchlist.\n\nUpgrade to Pro (₹499/mo) to create unlimited custom watchlists, priority buckets, and industry sectors!');
+        alert('🔒 Free accounts are limited to 1 Watchlist.\n\nUpgrade to Pro (₹199/mo) to create unlimited custom watchlists, priority buckets, and industry sectors!');
       }
       return;
     }
