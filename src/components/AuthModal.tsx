@@ -33,7 +33,7 @@ export function AuthModal({ onSuccess }: { onSuccess?: () => void }) {
       aria-labelledby="auth-modal-title"
     >
       <div 
-        className="w-full max-w-[820px] my-auto transition-all flex flex-col justify-center"
+        className="w-full max-w-[540px] my-auto transition-all flex flex-col justify-center"
         onClick={(e) => e.stopPropagation()}
       >
         <ModernAuthCard 
