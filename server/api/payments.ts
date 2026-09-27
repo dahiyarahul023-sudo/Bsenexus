@@ -283,11 +283,13 @@ async function doGrantProForOrder(uid: string, orderId: string, planId: PlanId):
   const existing = await getUserProfile(uid);
 
   if (existing?.lastOrderId === orderId && existing?.tier === 'pro') {
+    console.log(`[Payments] grant skipped (already granted): uid=${uid} order=${orderId} proExpiresAt=${existing.proExpiresAt || now}`);
     return { proExpiresAt: existing.proExpiresAt || now, alreadyGranted: true };
   }
 
   const base = Math.max(now, existing?.proExpiresAt || 0);
   const proExpiresAt = base + plan.validityDays * 24 * 60 * 60 * 1000;
+  console.log(`[Payments] grant: uid=${uid} order=${orderId} plan=${planId} validityDays=${plan.validityDays} existingProExpiresAt=${existing?.proExpiresAt || 0} base=${base} newProExpiresAt=${proExpiresAt} validUntil=${new Date(proExpiresAt).toISOString()}`);
 
   await saveUserProfile(uid, {
     tier: 'pro',
