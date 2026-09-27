@@ -2315,15 +2315,7 @@ export function LandingPage({
                   </li>
                   <li className="flex items-center gap-2.5">
                     <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span>Standard Gemini AI Financial Summaries</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span>Custom Ticker Watchlists</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span>Personal Telegram Alert connection</span>
+                    <span>One one-time AI filing summary demo</span>
                   </li>
                   <li className="flex items-center gap-2.5">
                     <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
@@ -2427,9 +2419,9 @@ export function LandingPage({
               {[
                 { feature: 'BSE India disclosure ingestion', free: 'Included', pro: 'Included (Priority Server)' },
                 { feature: 'Coverage across 5,000+ Listed Scrips', free: 'Full 5,000+', pro: 'Full 5,000+' },
-                { feature: 'AI filing summaries', free: 'Standard', pro: 'High-Priority Instant' },
-                { feature: 'Watchlist Capacity', free: 'Up to 2 Lists', pro: 'Unlimited Lists' },
-                { feature: 'Telegram Notifications', free: '1 Personal Chat', pro: 'Unlimited Channels & Groups' },
+                { feature: 'AI filing summaries', free: '1 one-time demo', pro: 'High-Priority Instant' },
+                { feature: 'Watchlist Capacity', free: '—', pro: 'Unlimited Lists' },
+                { feature: 'Telegram Notifications', free: '—', pro: 'Unlimited Channels & Groups' },
                 { feature: 'Routine Administrative Filter', free: 'Basic', pro: 'Advanced Smart Mute' },
                 { feature: 'Earnings & Board Meeting Calendar', free: 'Included', pro: 'Included + Docket Export' },
                 { feature: 'Data Export (Watchlists, CSV)', free: '—', pro: 'Included' },
