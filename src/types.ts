@@ -42,6 +42,7 @@ export interface UserNotificationPreferences {
   telegramAlertsEnabled?: boolean;
   telegramAiSummaryEnabled?: boolean;
   telegramAlertScope?: AlertScopeFilter;
+  aiSummaryLang?: 'hinglish' | 'english';
   alertPriority: AlertPriorityFilter;
   alertScope: AlertScopeFilter;
   alertCategory: AlertCategoryFilter;

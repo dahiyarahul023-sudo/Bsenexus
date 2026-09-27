@@ -552,14 +552,17 @@ export async function markAnnouncementSent(newsId: string, telegramMessageId?: n
   queueAnnouncementWrite(newsId, { is_sent: 1, ...(telegramMessageId ? { telegram_msg_id: telegramMessageId } : {}) }, true);
 }
 
-export async function updateAnnouncementSummary(newsId: string, aiSummary: string) {
+export type SummaryVariant = 'hinglish' | 'english';
+
+export async function updateAnnouncementSummary(newsId: string, aiSummary: string, variant: SummaryVariant = 'hinglish') {
+  const field = variant === 'english' ? 'aiSummaryEn' : 'aiSummary';
   const inMem = announcementsMemoryCache.find(a => a.id === newsId);
   if (inMem) {
-    inMem.aiSummary = aiSummary;
+    (inMem as any)[field] = aiSummary;
     scheduleLocalDiskSave();
   }
 
-  queueAnnouncementWrite(newsId, { aiSummary }, true);
+  queueAnnouncementWrite(newsId, { [field]: aiSummary }, true);
   pageRenderCache.invalidate(`ann:${newsId}`);
 }
 
@@ -574,6 +577,7 @@ export interface AnnouncementInput {
   priority?: string;
   is_sent?: number;
   aiSummary?: string;
+  aiSummaryEn?: string;
   scrip_cd?: string;
   isWatchlist?: boolean;
 }

@@ -1,8 +1,10 @@
 import { GoogleGenAI } from "@google/genai";
 import { sendReplyToTelegram } from "./telegram.js";
 import { addLog } from "../database/logDao.js";
-import { updateAnnouncementSummary, getAnnouncementById } from "../database/announcementDao.js";
+import { updateAnnouncementSummary, getAnnouncementById, getRecentAnnouncements } from "../database/announcementDao.js";
 import { geminiCircuitBreaker } from "../utils/circuitBreaker.js";
+import { getAllWatchlists, extractSymbol, extractPriority } from "../database/watchlistDao.js";
+import { getResultsCalendarData } from "./resultsCalendarService.js";
 // pdf-parse loaded dynamically when needed
 
 let aiClient: GoogleGenAI | null = null;
@@ -91,7 +93,104 @@ export function generateInstantHeuristicSummary(
   return output;
 }
 
-export async function generateDirectSummary(company: string, subject: string, details: string, category: string = 'OTHER', pdfLink: string = '', newsId?: string): Promise<string> {
+/**
+ * Language-aware summary dispatcher.
+ * - 'hinglish' (default): existing behavior — shared cached Hinglish summary.
+ * - 'english': returns a cached English variant when available; otherwise
+ *   translates the Hinglish summary once (cheap translation call, no PDF
+ *   re-analysis), caches it as `aiSummaryEn`, and returns it. Falls back to
+ *   the Hinglish text if translation fails — never blank.
+ * Cost-conscious: the English variant is generated at most ONCE per
+ * announcement (cached afterwards), and only when a user actually chose
+ * English in Settings → Telegram Alerts & AI Summaries.
+ */
+export async function generateDirectSummary(
+  company: string,
+  subject: string,
+  details: string,
+  category: string = 'OTHER',
+  pdfLink: string = '',
+  newsId?: string,
+  lang: 'hinglish' | 'english' = 'hinglish'
+): Promise<string> {
+  if (lang === 'english') {
+    if (newsId) {
+      try {
+        const existing = await getAnnouncementById(newsId);
+        const enCached = (existing as any)?.aiSummaryEn;
+        if (enCached && typeof enCached === 'string' && enCached.trim().length > 0) {
+          return enCached;
+        }
+      } catch { /* fall through to translation */ }
+
+      // Deduplicate concurrent English translations for the same announcement
+      const tKey = `en:${newsId}`;
+      if (activeSummaryRequests.has(tKey)) {
+        return activeSummaryRequests.get(tKey)!;
+      }
+      const translationPromise = (async () => {
+        const base = await generateDirectSummaryHinglish(company, subject, details, category, pdfLink, newsId);
+        if (!base) return '';
+        try {
+          const enText = await translateSummaryToEnglish(base, company);
+          if (enText && enText.trim().length > 0) {
+            try { await updateAnnouncementSummary(newsId, enText, 'english'); } catch {}
+            return enText;
+          }
+        } catch { /* fall through to base */ }
+        return base;
+      })();
+      activeSummaryRequests.set(tKey, translationPromise);
+      translationPromise.finally(() => { activeSummaryRequests.delete(tKey); });
+      return translationPromise;
+    }
+    // No newsId (e.g. company 360 overview): one-shot translation, never cached.
+    const base = await generateDirectSummaryHinglish(company, subject, details, category, pdfLink, newsId);
+    if (!base) return '';
+    try {
+      const enText = await translateSummaryToEnglish(base, company);
+      if (enText && enText.trim().length > 0) return enText;
+    } catch { /* fall through */ }
+    return base;
+  }
+  return generateDirectSummaryHinglish(company, subject, details, category, pdfLink, newsId);
+}
+
+/** Cheap one-shot translation: Hinglish summary → professional plain English. No PDF re-analysis. */
+async function translateSummaryToEnglish(hinglishSummary: string, company: string): Promise<string> {
+  const ai = getAI();
+  if (!ai) return '';
+  if (geminiCircuitBreaker.getState() === 'OPEN') return '';
+  const prompt = `Translate the following Hinglish (Hindi written in Roman/English script) financial disclosure summary into clear, professional plain English.
+
+STRICT RULES:
+1. Keep every number, date, rupee amount, percentage, company name, and proper noun EXACTLY as-is. Never convert, round, or reinterpret numbers.
+2. Keep the same structure, headings, and bullet points — change only the language.
+3. Output ONLY the translated summary. No preamble, no explanation.
+
+SUMMARY TO TRANSLATE:
+${hinglishSummary.slice(0, 4000)}`;
+  const models = ['gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-3.7-flash'];
+  for (const m of models) {
+    try {
+      const res: any = await ai.models.generateContent({
+        model: m,
+        contents: [{ text: prompt }],
+        config: { temperature: 0.2 }
+      });
+      const t = (res?.text || '').trim();
+      if (t) {
+        addLog('INFO', 'GEMINI', `[${company}] Summary translated to English (${t.length} chars)`);
+        return t;
+      }
+    } catch (e: any) {
+      addLog('WARNING', 'GEMINI', `[${company}] English translation attempt failed on ${m}: ${e?.message || e}`);
+    }
+  }
+  return '';
+}
+
+async function generateDirectSummaryHinglish(company: string, subject: string, details: string, category: string = 'OTHER', pdfLink: string = '', newsId?: string): Promise<string> {
   // Check if announcement already has a generated summary in cache/store
   if (newsId) {
     try {
@@ -352,25 +451,171 @@ Details: ${combinedDetails}`;
   return executionPromise;
 }
 
+// ---------- Watchlist-aware AI Guide context ----------
+// Builds a small, bounded context block from the user's OWN watchlists +
+// the app's results calendar + latest filing. Keeps the guide grounded in
+// real app data (never invented) and keeps token cost tiny: only the
+// matched company (max 3), a few lines each. Returns '' when the question
+// is pure app-help (no company intent).
+interface WatchlistAiItem {
+  symbol: string;
+  name: string;
+  listName: string;
+  priority: string;
+}
+
+function normalizeForMatch(s: string): string {
+  return (s || '').toUpperCase().replace(/[^A-Z0-9 ]/g, ' ');
+}
+
+async function buildWatchlistAiContext(uid: string | undefined, question: string): Promise<string> {
+  if (!uid || uid === 'anonymous' || uid.startsWith('guest_') || uid.startsWith('trader_')) return '';
+  let lists: any[] = [];
+  try {
+    lists = await getAllWatchlists(uid);
+  } catch {
+    return '';
+  }
+  if (!Array.isArray(lists) || lists.length === 0) return '';
+
+  const items: WatchlistAiItem[] = [];
+  for (const list of lists) {
+    const listName = list?.name || 'Watchlist';
+    const arr = Array.isArray(list?.items) ? list.items : [];
+    for (const it of arr) {
+      try {
+        const symbol = extractSymbol(it);
+        if (!symbol) continue;
+        items.push({
+          symbol: String(symbol).toUpperCase(),
+          name: normalizeForMatch(it?.name || it?.companyName || ''),
+          listName: String(listName),
+          priority: extractPriority(it) || 'MEDIUM',
+        });
+      } catch { /* skip malformed item */ }
+    }
+  }
+  if (items.length === 0) return '';
+
+  const qNorm = ' ' + normalizeForMatch(question) + ' ';
+  const matched: WatchlistAiItem[] = [];
+  for (const it of items) {
+    let hit = false;
+    if (it.symbol && it.symbol.length >= 2 && qNorm.includes(' ' + it.symbol + ' ')) hit = true;
+    if (!hit && it.name) {
+      const words = it.name.split(/\s+/).filter(w => w.length >= 5);
+      for (const w of words) {
+        if (qNorm.includes(' ' + w + ' ')) { hit = true; break; }
+      }
+    }
+    if (hit && !matched.some(m => m.symbol === it.symbol)) matched.push(it);
+  }
+
+  const looksLikeCompanyQ = /(result|results|board meeting|dividend|bonus|split|filing|announcement|share|price|stock|company|watchlist|add)/i.test(question);
+
+  if (matched.length === 0) {
+    if (!looksLikeCompanyQ) return ''; // pure app-help question — no context needed
+    return `USER_WATCHLIST_NOTE: The user asked about a company, but no company in their watchlist matched this question. Their watchlist currently tracks ${items.length} stock(s) across ${lists.length} list(s). Tell them this company is not in their watchlist yet, and briefly explain how to add it (Watchlists tab → Add stock → search the symbol → set priority High/Medium/Low). Do NOT invent any company facts, dates, or figures.`;
+  }
+
+  // Enrich matches with calendar + latest filing (bounded: max 3 companies).
+  // getResultsCalendarData already filters to this user's watchlist when uid is passed.
+  const uniqueSymbols = [...new Set(matched.map(m => m.symbol))].slice(0, 3);
+  let calendarItems: any[] = [];
+  try {
+    const calData = await getResultsCalendarData('all', undefined, uid);
+    if (calData && Array.isArray((calData as any).items)) calendarItems = (calData as any).items;
+  } catch { calendarItems = []; }
+
+  const lines: string[] = [];
+  for (const sym of uniqueSymbols) {
+    const entries = matched.filter(m => m.symbol === sym);
+    const e0 = entries[0];
+    const listBits = entries.map(e => `"${e.listName}" (${e.priority})`).join(', ');
+
+    let calBit = 'no upcoming board meeting found in the app calendar';
+    try {
+      const calItems = (calendarItems || []).filter((c: any) =>
+        String(c.symbol || '').toUpperCase() === sym ||
+        String(c.companyName || '').toUpperCase().includes(sym)
+      );
+      const upcoming = calItems
+        .filter((c: any) => c.status === 'UPCOMING' || c.status === 'TODAY')
+        .sort((a: any, b: any) => (a.meetingTimestamp || 0) - (b.meetingTimestamp || 0))[0];
+      if (upcoming) {
+        calBit = `${upcoming.status === 'TODAY' ? 'board meeting TODAY' : 'next board meeting'} on ${upcoming.meetingDate}${upcoming.purpose ? ` (${upcoming.purpose})` : ''}`;
+      } else {
+        const recent = calItems
+          .filter((c: any) => c.status === 'RECENT' || c.isDeclared)
+          .sort((a: any, b: any) => (b.meetingTimestamp || 0) - (a.meetingTimestamp || 0))[0];
+        if (recent) calBit = `last board meeting ${recent.meetingDate}${recent.purpose ? ` (${recent.purpose})` : ''}; no upcoming meeting scheduled in the app calendar`;
+      }
+    } catch { /* keep default */ }
+
+    let filingBit = 'no recent filing found in the last 7 days';
+    try {
+      const recent = await getRecentAnnouncements(3, [sym]);
+      if (recent && recent.length > 0) {
+        const f = recent[0] as any;
+        const when = f.bseTime || f.time || '';
+        filingBit = `latest filing: "${String(f.subject || f.NEWSSUB || 'announcement').slice(0, 90)}"${when ? ` (${when})` : ''}`;
+      }
+    } catch { /* keep default */ }
+
+    lines.push(`- ${sym}: in watchlist ${listBits}. Calendar: ${calBit}. ${filingBit}.`);
+  }
+
+  const ambiguous = uniqueSymbols.length > 1;
+  return `USER_WATCHLIST_CONTEXT (use ONLY these app facts for company specifics; never invent dates or figures):\n` +
+    lines.join('\n') +
+    (ambiguous ? `\nNOTE: Multiple watchlist companies matched — ask the user which one they mean before giving specifics.` : '');
+}
+
 export async function askAppHelpAI(
   userQuestion: string, 
-  history: Array<{ role: 'user' | 'model'; text: string }> = []
+  history: Array<{ role: 'user' | 'model'; text: string }> = [],
+  opts: { uid?: string } = {}
 ): Promise<string> {
   const ai = getAI();
   if (!ai) {
     return "Gemini AI is not configured yet. Please ensure the GEMINI_API_KEY environment secret is active in settings.";
   }
 
+  // Watchlist grounding: real app facts for company questions (bounded, cheap).
+  // Never let a context failure break the guide — fail open to plain app help.
+  let watchlistContext = '';
+  try {
+    watchlistContext = await buildWatchlistAiContext(opts.uid, userQuestion);
+  } catch {
+    watchlistContext = '';
+  }
+
+  // Cost-control nudge: after 2-3 user questions in this session, steer the
+  // user toward exploring the app themselves instead of more AI questions.
+  const userQuestionsInSession = history.filter(m => m.role === 'user').length + 1;
+
   const systemInstruction = `You are the official AI Assistant and Guide for **BSE Nexus** (Bombay Stock Exchange Live Disclosures & Regulatory Intelligence Terminal).
 Your job is to guide users, explain all app features, and help them configure and use BSE Nexus effectively in clear, friendly, and structured language (reply in Hindi, Hinglish, or English matching the user's language).
 
+### ANSWER STYLE (strict — keeps answers useful and AI costs low):
+- Keep every answer under 90 words. Be casual, direct, and warm — like a knowledgeable friend, not a manual.
+- No long bullet essays unless the user explicitly asks for step-by-step instructions.
+- When the user asks about a company, answer ONLY from USER_WATCHLIST_CONTEXT below. If a fact is missing there, say "the app doesn't show this right now" — never invent dates, figures, or filings.
+${userQuestionsInSession >= 3 ? `
+### SESSION NUDGE (this user has asked ${userQuestionsInSession} questions in this chat):
+After your brief answer, add ONE short line pointing them to the exact app screen where they can explore this themselves (e.g. "Results Calendar tab", "Company Hub → Filing Facts", "Watchlists tab"), plus 2 short follow-up questions they could ask. Goal: help them discover the app so they need the AI less. Stay helpful — never refuse, never give wrong info.` : ''}
+${watchlistContext ? `
+### ${watchlistContext.startsWith('USER_WATCHLIST_CONTEXT') ? 'Live watchlist facts for this question' : 'Watchlist note'}:
+${watchlistContext}
+` : ''}
+
 ### Comprehensive Knowledge Base about BSE Nexus:
 1. **What is BSE Nexus?**
-   - A real-time market terminal tracking all official corporate disclosures, board meetings, and financial filings from BSE India with sub-second latency.
+   - A fast market terminal tracking official corporate disclosures, board meetings, and financial filings from BSE India.
    - Designed for active equity investors, traders, and fund managers.
 
 2. **Watchlist & Priority Tiers (High / Medium / Low)**:
-   - Users can create unlimited custom watchlists (e.g. "Core Port", "Defense", "PSU Banks", "EV & Auto").
+   - Users can create custom watchlists (e.g. "Core Port", "Defense", "PSU Banks", "EV & Auto") — Free plan: up to 2 lists, Pro: unlimited.
    - Each stock can be assigned a Conviction Priority:
      - 🔴 **HIGH Priority**: High conviction core holdings (top alerts & Telegram push).
      - 🟡 **MEDIUM Priority**: Positional & momentum watchlist.
@@ -393,8 +638,10 @@ Your job is to guide users, explain all app features, and help them configure an
    - Users can customize which categories (Results, Concalls, Dividends, Order Wins, Insider Trading) and stock priorities trigger Telegram messages.
 
 6. **Free Tier vs Pro Membership**:
-   - **Free Plan**: Track up to 5 stocks across watchlists with live BSE feed and standard tools.
-   - **Pro Plan**: Unlimited stocks, unlimited custom watchlists, instant AI summaries, granular Telegram filter routing, and historical data archive.
+   - **Free Plan**: Up to 2 watchlist lists, live BSE feed, standard tools.
+   - **Pro Plan — one-time packs (no auto-renewal, no subscription)**: Weekly ₹59 (7 days), Monthly ₹199 (30 days), 6-Month ₹999 (180 days), Yearly ₹1,799 (365 days).
+   - **Pro includes**: Unlimited watchlists & stocks, instant AI summaries (100/day), Telegram alerts with AI summary replies, granular Telegram filter routing, data export (CSV).
+   - **Free trial**: 7-day Pro trial, no card required. After it ends, the paywall shows the one-time packs above.
 
 7. **Storage Quota & Free Tier Optimizer (Automatic + Manual)**:
    - Automatically stores data in Firebase Firestore.
@@ -405,7 +652,7 @@ Your job is to guide users, explain all app features, and help them configure an
    - Set a Master Security PIN to lock Admin controls and Telegram settings.
    - Mute routine spam filings (loss of share certificates, trading window closures) via Noise Filter.
 
-Provide direct, actionable, step-by-step guidance. Be polite, precise, and supportive.`;
+When the user asks how to do something in the app, give direct, actionable steps. Otherwise keep it short and conversational. Be polite, precise, and supportive.`;
 
   if (geminiCircuitBreaker.getState() === 'OPEN') {
     return "The AI Assistant is currently in protective cooldown due to upstream rate limits. Please try asking again in a few moments, or check Settings to verify your Gemini API key.";
@@ -468,9 +715,10 @@ export async function generateAndSendSummary(
   category: string = 'OTHER', 
   pdfLink: string = '', 
   newsId?: string,
-  customChatId?: string | null
+  customChatId?: string | null,
+  lang: 'hinglish' | 'english' = 'hinglish'
 ) {
-  const summaryText = await generateDirectSummary(company, subject, details, category, pdfLink, newsId);
+  const summaryText = await generateDirectSummary(company, subject, details, category, pdfLink, newsId, lang);
   if (!summaryText) {
     addLog('WARNING', 'GEMINI', `[${company}] No AI summary generated. Telegram reply skipped.`);
     return;

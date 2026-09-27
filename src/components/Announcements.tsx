@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { customFetch } from '../api';
 import { 
@@ -506,6 +506,8 @@ export function Announcements({
   const [copiedSummary, setCopiedSummary] = useState(false);
 
   const isProOrAdmin = Boolean(isAdmin || (isPro && !user?.isAnonymous) || profile?.tier === 'admin');
+  // AI summary language chosen in Settings → Telegram Alerts & AI Summaries (default: Hinglish)
+  const summaryLang: 'hinglish' | 'english' = profile?.notificationPreferences?.aiSummaryLang === 'english' ? 'english' : 'hinglish';
   const aiQuota = useAiQuota(user, profile, isPro, isAdmin);
 
   // Cycle through AI thinking steps
@@ -569,7 +571,7 @@ export function Announcements({
     }
   };
 
-  const handleGenerateSummary = async (id: string) => {
+  const handleGenerateSummary = async (id: string, forLang: 'hinglish' | 'english' = summaryLang) => {
     // 1. Guests are strictly view-only: prompt Google sign-in for 1-week Free Pro
     const isGuestUser = !user || user.isAnonymous;
     if (isGuestUser) {
@@ -597,7 +599,7 @@ export function Announcements({
       const res = await customFetch(`/api/announcements/${id}/generate-summary`, { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(currentItem)
+        body: JSON.stringify({ ...currentItem, lang: forLang })
       });
       const data = await res.json().catch(() => null);
 
@@ -616,9 +618,15 @@ export function Announcements({
 
       if (res.ok && data && data.aiSummary) {
         syncQuotaFromResponse(data);
-        showToast('✨ Gemini AI neural synthesis ready!', 'success');
-        setSelectedItem((prev: any) => prev && prev.id === id ? { ...prev, aiSummary: data.aiSummary } : prev);
-        setAnnouncements((prev: any[]) => prev.map(a => a.id === id ? { ...a, aiSummary: data.aiSummary } : a));
+        showToast(forLang === 'english' ? '✨ English AI summary ready!' : '✨ Gemini AI neural synthesis ready!', 'success');
+        // English translations are stored separately so the Hinglish original is never overwritten.
+        // The server also returns the Hinglish base (aiSummaryHinglish) so first-time
+        // English generations render correctly even when no Hinglish summary existed before.
+        const patch = forLang === 'english'
+          ? { aiSummaryEn: data.aiSummary, ...(data.aiSummaryHinglish ? { aiSummary: data.aiSummaryHinglish } : {}) }
+          : { aiSummary: data.aiSummary };
+        setSelectedItem((prev: any) => prev && prev.id === id ? { ...prev, ...patch } : prev);
+        setAnnouncements((prev: any[]) => prev.map(a => a.id === id ? { ...a, ...patch } : a));
       } else {
         const errMsg = data?.error || 'AI summary service is currently busy or rate-limited. Please retry shortly.';
         showToast(`⚠️ AI Summary Alert: ${errMsg}`, 'error');
@@ -629,6 +637,24 @@ export function Announcements({
       setIsGeneratingAi(false);
     }
   };
+
+  // Auto-translate: when the user chose English and opens a disclosure whose
+  // Hinglish summary exists but the English variant was never generated,
+  // fetch it once (server caches it as aiSummaryEn afterwards).
+  const autoTranslatedIds = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const it: any = selectedItem;
+    if (
+      summaryLang === 'english' &&
+      it?.id && it.aiSummary && !it.aiSummaryEn &&
+      !autoTranslatedIds.current.has(it.id) &&
+      !isGeneratingAi && isProOrAdmin
+    ) {
+      autoTranslatedIds.current.add(it.id);
+      handleGenerateSummary(it.id, 'english');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedItem?.id, summaryLang]);
 
   const handleSelectAnnouncement = (item: any) => {
     setSelectedItem(item);
@@ -976,7 +1002,7 @@ export function Announcements({
             <div className="flex items-center gap-2">
               <span className="text-[11px] font-black text-purple-700 dark:text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
                 <Sparkles size={13} className="text-purple-500 fill-purple-500" />
-                <span>AI Plain-English Digest</span>
+                <span>AI {summaryLang === 'english' ? 'Plain-English' : 'Hinglish'} Digest</span>
               </span>
             </div>
 
@@ -1019,7 +1045,7 @@ export function Announcements({
             </div>
           ) : item.aiSummary ? (
             <AiSummaryViewer
-              summaryText={item.aiSummary}
+              summaryText={summaryLang === 'english' ? (item.aiSummaryEn || item.aiSummary) : item.aiSummary}
               category={item.category}
               companyName={item.companyName}
               onRegenerate={() => handleGenerateSummary(item.id)}

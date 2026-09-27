@@ -313,7 +313,7 @@ export async function getCompanyIntelligence(scripCode: string, symbol: string):
   };
 }
 
-export async function generateCompanyAiOverview(scripCode: string, symbol: string): Promise<string> {
+export async function generateCompanyAiOverview(scripCode: string, symbol: string, lang: 'hinglish' | 'english' = 'hinglish'): Promise<string> {
   const intel = await getCompanyIntelligence(scripCode, symbol);
   
   const filingsSummary = (intel.recentFilings || []).slice(0, 8).map(f => `- ${f.bseTime || 'Recent'}: ${f.subject}`).join('\n');
@@ -328,7 +328,7 @@ ${filingsSummary || 'None'}
   `.trim();
 
   try {
-    const summary = await generateDirectSummary(intel.companyName, `360 Corporate Intelligence Brief: ${intel.companyName}`, detailsText, 'OTHER');
+    const summary = await generateDirectSummary(intel.companyName, `360 Corporate Intelligence Brief: ${intel.companyName}`, detailsText, 'OTHER', '', undefined, lang);
     return summary || `Analysis for ${intel.companyName}: Active BSE tracking initialized. ${intel.quarterlyResults.length} quarterly results indexed with ${intel.materialTimeline.length} material corporate actions tracked.`;
   } catch (e: any) {
     return `Analysis for ${intel.companyName}: Active BSE tracking initialized. ${intel.quarterlyResults.length} quarterly results indexed with ${intel.materialTimeline.length} material corporate actions tracked.`;

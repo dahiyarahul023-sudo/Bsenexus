@@ -561,7 +561,8 @@ export async function processAnnouncements() {
                     if (userRes.success && userRes.messageId) {
                       const userWantsAiSummary = uPrefs?.telegramAiSummaryEnabled !== false;
                       if (userWantsAiSummary) {
-                        generateAndSendSummary(userRes.messageId, companyName, subject, details, priority.category, pdfLink, newsId, rawUserChatId)
+                        const userSummaryLang = (uPrefs as any)?.aiSummaryLang === 'english' ? 'english' : 'hinglish';
+                        generateAndSendSummary(userRes.messageId, companyName, subject, details, priority.category, pdfLink, newsId, rawUserChatId, userSummaryLang)
                           .catch(() => {});
                       }
                     }

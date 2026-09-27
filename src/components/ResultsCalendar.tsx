@@ -126,6 +126,10 @@ export interface ResultCalendarItem {
 
 export function ResultsCalendar() {
   const { user, profile, isAdmin, isPro, adminUnlocked, setIsAuthModalOpen, setIsProModalOpen } = useAuth();
+  // AI summary language (Settings → Telegram Alerts & AI Summaries); English variant lives in aiSummaryEn
+  const summaryLang: 'hinglish' | 'english' = profile?.notificationPreferences?.aiSummaryLang === 'english' ? 'english' : 'hinglish';
+  const displaySummary = (item: any): string | undefined =>
+    summaryLang === 'english' ? (item?.aiSummaryEn || item?.aiSummary) : item?.aiSummary;
   const isSuperAdmin = Boolean(isAdmin || adminUnlocked || profile?.tier === 'admin' || user?.isAdmin);
   const { isDeveloperMode } = useDeveloperMode();
   // SWR: Initialize calendar items immediately from client cache for 0ms transition
@@ -543,7 +547,11 @@ export function ResultsCalendar() {
     setIsGeneratingAi(true);
     setAiStepIndex(0);
     try {
-      const res = await customFetch(`/api/announcements/${announcementId}/generate-summary`, { method: 'POST' });
+      const res = await customFetch(`/api/announcements/${announcementId}/generate-summary`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lang: profile?.notificationPreferences?.aiSummaryLang === 'english' ? 'english' : 'hinglish' })
+      });
       const data = await res.json().catch(() => null);
 
       if (res.status === 401 || data?.authRequired) {
@@ -561,8 +569,12 @@ export function ResultsCalendar() {
 
       if (res.ok && data && data.aiSummary) {
         syncQuotaFromResponse(data);
-        setSelectedModalItem(prev => prev ? { ...prev, aiSummary: data.aiSummary } : prev);
-        setItems(prev => prev.map(i => i.declarationAnnouncementId === announcementId ? { ...i, aiSummary: data.aiSummary } : i));
+        // Keep language variants separate: English goes to aiSummaryEn, Hinglish base stays in aiSummary
+        const summaryPatch = data.aiSummaryLang === 'english'
+          ? { aiSummaryEn: data.aiSummary, ...(data.aiSummaryHinglish ? { aiSummary: data.aiSummaryHinglish } : {}) }
+          : { aiSummary: data.aiSummary };
+        setSelectedModalItem(prev => prev ? { ...prev, ...summaryPatch } : prev);
+        setItems(prev => prev.map(i => i.declarationAnnouncementId === announcementId ? { ...i, ...summaryPatch } : i));
       } else {
         const errMsg = data?.error || 'Failed to generate AI summary';
         alert(`⚠️ AI Summary Alert: ${errMsg}`);
@@ -2660,9 +2672,9 @@ export function ResultsCalendar() {
                       </div>
 
                       <div className="flex items-center gap-2">
-                        {selectedModalItem.aiSummary && (
+                        {displaySummary(selectedModalItem) && (
                           <button
-                            onClick={() => handleCopySummary(selectedModalItem.aiSummary!)}
+                            onClick={() => handleCopySummary(displaySummary(selectedModalItem)!)}
                             className="px-2 py-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100/80 dark:bg-emerald-900/50 hover:bg-emerald-200 rounded-md transition-colors flex items-center gap-1 cursor-pointer"
                             title="Copy Summary"
                           >
@@ -2671,7 +2683,7 @@ export function ResultsCalendar() {
                           </button>
                         )}
 
-                        {selectedModalItem.declarationAnnouncementId && !selectedModalItem.aiSummary && (
+                        {selectedModalItem.declarationAnnouncementId && !displaySummary(selectedModalItem) && (
                           <ActionButton
                             onClick={() => handleGenerateSummary(selectedModalItem.declarationAnnouncementId)}
                             isLoading={isGeneratingAi}
@@ -2705,9 +2717,9 @@ export function ResultsCalendar() {
                           <div className="h-3 w-2/3 bg-emerald-100 dark:bg-emerald-950/40 rounded" />
                         </div>
                       </div>
-                    ) : selectedModalItem.aiSummary ? (
+                    ) : displaySummary(selectedModalItem) ? (
                       <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap font-sans">
-                        {selectedModalItem.aiSummary}
+                        {displaySummary(selectedModalItem)}
                       </p>
                     ) : (
                       <p className="text-xs text-slate-500 italic">

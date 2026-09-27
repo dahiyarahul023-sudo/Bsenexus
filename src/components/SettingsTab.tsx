@@ -132,6 +132,7 @@ export function SettingsTab({
   const [tgAlertsEnabled, setTgAlertsEnabled] = useState(true);
   const [tgAiSummaryEnabled, setTgAiSummaryEnabled] = useState(true);
   const [tgAlertScope, setTgAlertScope] = useState<'WATCHLIST_ONLY' | 'ALL_MARKET'>('WATCHLIST_ONLY');
+  const [tgSummaryLang, setTgSummaryLang] = useState<'hinglish' | 'english'>('hinglish');
   const [isSavingTg, setIsSavingTg] = useState(false);
   const [tgSaveSuccess, setTgSaveSuccess] = useState(false);
   const [isTestingTelegram, setIsTestingTelegram] = useState(false);
@@ -227,6 +228,7 @@ export function SettingsTab({
       setTgAlertsEnabled(profile.notificationPreferences?.telegramAlertsEnabled !== false);
       setTgAiSummaryEnabled(profile.notificationPreferences?.telegramAiSummaryEnabled !== false);
       setTgAlertScope(profile.notificationPreferences?.telegramAlertScope || 'WATCHLIST_ONLY');
+      setTgSummaryLang(profile.notificationPreferences?.aiSummaryLang === 'english' ? 'english' : 'hinglish');
     }
   }, [profile]);
 
@@ -451,7 +453,8 @@ export function SettingsTab({
       username: tgUsernameInput.trim() || null,
       alertsEnabled: tgAlertsEnabled,
       aiSummaryEnabled: tgAiSummaryEnabled,
-      alertScope: tgAlertScope
+      alertScope: tgAlertScope,
+      summaryLang: tgSummaryLang
     });
 
     setIsSavingTg(false);
@@ -1950,6 +1953,54 @@ export function SettingsTab({
                       />
                     </button>
                   </div>
+                </div>
+
+                {/* 2b. AI SUMMARY LANGUAGE */}
+                <div className="p-3 bg-slate-50 dark:bg-[#201E2E] border border-slate-200 dark:border-[#2D283E] rounded-xl space-y-2">
+                  <div className="font-semibold text-slate-700 dark:text-slate-300 text-[11px]">
+                    AI Summary Language
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTgSummaryLang('hinglish')}
+                      className={cn(
+                        "p-2.5 rounded-lg border text-left cursor-pointer transition-all",
+                        tgSummaryLang === 'hinglish'
+                          ? "bg-white dark:bg-[#28253B] border-purple-500 ring-1 ring-purple-500 text-slate-900 dark:text-white"
+                          : "bg-transparent border-slate-200 dark:border-[#2D283E] text-slate-600 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-[#252236]"
+                      )}
+                    >
+                      <div className="font-bold text-[11px] flex items-center justify-between">
+                        <span>Hinglish</span>
+                        {tgSummaryLang === 'hinglish' && <Check size={12} className="text-purple-500" />}
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        जैसी बोलते हैं — current style
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTgSummaryLang('english')}
+                      className={cn(
+                        "p-2.5 rounded-lg border text-left cursor-pointer transition-all",
+                        tgSummaryLang === 'english'
+                          ? "bg-white dark:bg-[#28253B] border-purple-500 ring-1 ring-purple-500 text-slate-900 dark:text-white"
+                          : "bg-transparent border-slate-200 dark:border-[#2D283E] text-slate-600 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-[#252236]"
+                      )}
+                    >
+                      <div className="font-bold text-[11px] flex items-center justify-between">
+                        <span>English</span>
+                        {tgSummaryLang === 'english' && <Check size={12} className="text-purple-500" />}
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        Plain professional English
+                      </div>
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                    Applies to in-app AI digests, Company Hub takeaways & Telegram summary replies.
+                  </p>
                 </div>
 
                 {/* 3. ALERT SCOPE SELECTOR */}

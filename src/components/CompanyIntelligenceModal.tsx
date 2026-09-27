@@ -693,7 +693,7 @@ export function CompanyIntelligenceModal({
                           <div className="flex items-center justify-between flex-wrap gap-2">
                             <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5 whitespace-nowrap select-none">
                               <Sparkles size={13} className="text-amber-500 fill-amber-500" />
-                              <span>Plain-English Takeaway</span>
+                              <span>{profile?.notificationPreferences?.aiSummaryLang === 'english' ? 'Plain-English Takeaway' : 'Hinglish Takeaway'}</span>
                             </span>
 
                             <div className="flex items-center gap-2">

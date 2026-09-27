@@ -485,6 +485,10 @@ const SwipeableFilingCard: React.FC<{
 
 export function WatchlistManager() {
   const { user, profile, isPro, isAdmin, adminUnlocked, setIsAuthModalOpen, setIsProModalOpen } = useAuth();
+  // AI summary language (Settings → Telegram Alerts & AI Summaries); English variant lives in aiSummaryEn
+  const summaryLang: 'hinglish' | 'english' = profile?.notificationPreferences?.aiSummaryLang === 'english' ? 'english' : 'hinglish';
+  const displaySummary = (item: any): string | undefined =>
+    summaryLang === 'english' ? (item?.aiSummaryEn || item?.aiSummary) : item?.aiSummary;
   const [watchlists, setWatchlists] = useState<any[]>([]);
   const [activeListId, setActiveListId] = useState<string>('ALL');
   const [newListName, setNewListName] = useState('');
@@ -760,7 +764,11 @@ export function WatchlistManager() {
 
     setIsGeneratingSummary(true);
     try {
-      const response = await customFetch(`/api/announcements/${id}/generate-summary`, { method: 'POST' });
+      const response = await customFetch(`/api/announcements/${id}/generate-summary`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lang: profile?.notificationPreferences?.aiSummaryLang === 'english' ? 'english' : 'hinglish' })
+      });
       const data = await response.json().catch(() => null);
 
       if (response.status === 401 || data?.authRequired) {
@@ -778,8 +786,12 @@ export function WatchlistManager() {
 
       if (response.ok && data && data.aiSummary) {
         syncQuotaFromResponse(data);
-        setSelectedAnnouncement((prev: any) => prev && prev.id === id ? { ...prev, aiSummary: data.aiSummary } : prev);
-        setAnnouncements((prev: any[]) => prev.map(a => a.id === id ? { ...a, aiSummary: data.aiSummary } : a));
+        // Keep language variants separate: English goes to aiSummaryEn, Hinglish base stays in aiSummary
+        const summaryPatch = data.aiSummaryLang === 'english'
+          ? { aiSummaryEn: data.aiSummary, ...(data.aiSummaryHinglish ? { aiSummary: data.aiSummaryHinglish } : {}) }
+          : { aiSummary: data.aiSummary };
+        setSelectedAnnouncement((prev: any) => prev && prev.id === id ? { ...prev, ...summaryPatch } : prev);
+        setAnnouncements((prev: any[]) => prev.map(a => a.id === id ? { ...a, ...summaryPatch } : a));
       } else {
         const errMsg = data?.error || 'Failed to generate AI summary';
         alert(`⚠️ AI Summary Alert: ${errMsg}`);
@@ -3516,7 +3528,7 @@ export function WatchlistManager() {
                       <SwipeableFilingCard
                         onSwipeLeft={() => {
                           setSelectedAnnouncement(item);
-                          if (!item.aiSummary) handleGenerateSummary(item.id);
+                          if (!displaySummary(item)) handleGenerateSummary(item.id);
                         }}
                         onSwipeRight={() => {
                           handleManualSendTelegram(item);
@@ -4002,7 +4014,7 @@ export function WatchlistManager() {
                     <span>Gemini AI YoY & Financial Extraction</span>
                   </div>
 
-                  {!selectedAnnouncement.aiSummary && (
+                  {!displaySummary(selectedAnnouncement) && (
                     <ActionButton
                       onClick={() => handleGenerateSummary(selectedAnnouncement.id)}
                       isLoading={isGeneratingSummary}
@@ -4016,9 +4028,9 @@ export function WatchlistManager() {
                   )}
                 </div>
 
-                {selectedAnnouncement.aiSummary ? (
+                {displaySummary(selectedAnnouncement) ? (
                   <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
-                    {selectedAnnouncement.aiSummary}
+                    {displaySummary(selectedAnnouncement)}
                   </p>
                 ) : (
                   <p className="text-xs text-slate-500 italic">

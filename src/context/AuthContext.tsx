@@ -49,6 +49,7 @@ export interface UpdateTelegramOptions {
   alertsEnabled?: boolean;
   aiSummaryEnabled?: boolean;
   alertScope?: 'WATCHLIST_ONLY' | 'ALL_MARKET';
+  summaryLang?: 'hinglish' | 'english';
   unlink?: boolean;
 }
 
@@ -1035,6 +1036,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ...(options.alertsEnabled !== undefined ? { telegramAlertsEnabled: options.alertsEnabled } : {}),
       ...(options.aiSummaryEnabled !== undefined ? { telegramAiSummaryEnabled: options.aiSummaryEnabled } : {}),
       ...(options.alertScope !== undefined ? { telegramAlertScope: options.alertScope } : {}),
+      ...(options.summaryLang !== undefined ? { aiSummaryLang: options.summaryLang } : {}),
     };
 
     if (unlink) {
@@ -1076,6 +1078,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           telegramAlertsEnabled: updatedPrefs.telegramAlertsEnabled,
           telegramAiSummaryEnabled: updatedPrefs.telegramAiSummaryEnabled,
           telegramAlertScope: updatedPrefs.telegramAlertScope,
+          aiSummaryLang: updatedPrefs.aiSummaryLang,
           unlink
         })
       });

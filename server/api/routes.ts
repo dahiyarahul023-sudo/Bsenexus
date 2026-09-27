@@ -488,13 +488,18 @@ apiRouter.post("/announcements/:id/generate-summary", aiRateLimiter, async (req,
     if (!item) {
       return res.status(404).json({ error: "Announcement not found in memory or database" });
     }
+    // AI summary language: user's Settings choice (Telegram Alerts & AI Summaries).
+    // English variant is translated once per announcement and cached (aiSummaryEn).
+    const reqLang = (req.body && (req.body as any).lang) || req.query.lang;
+    const summaryLang = reqLang === 'english' ? 'english' : 'hinglish';
     const summary = await generateDirectSummary(
       item.companyName || item.SLONGNAME || "",
       item.subject || item.NEWSSUB || "",
       item.details || item.HEADLINE || "",
       item.category || "OTHER",
       item.pdfLink || item.attachmentUrl || "",
-      newsId
+      newsId,
+      summaryLang
     );
     if (!summary) {
       return res.status(500).json({ 
@@ -506,9 +511,22 @@ apiRouter.post("/announcements/:id/generate-summary", aiRateLimiter, async (req,
     // 2. Consume quota ONLY after successful generation
     const consumed = await consumeServerAiQuota(uid, isAdminUser);
 
+    // For English requests the Hinglish base is also cached server-side during
+    // generation — return it too so the client can render consistently.
+    let baseSummary: string | undefined;
+    if (summaryLang === 'english') {
+      try {
+        const fresh = await getAnnouncementById(newsId);
+        const b = (fresh as any)?.aiSummary;
+        if (b && typeof b === 'string' && b.trim().length > 0) baseSummary = b;
+      } catch { /* optional */ }
+    }
+
     res.json({
       success: true,
       aiSummary: summary,
+      aiSummaryLang: summaryLang,
+      ...(baseSummary ? { aiSummaryHinglish: baseSummary } : {}),
       remainingQuota: consumed.remaining,
       dailyLimit: consumed.dailyLimit,
       isPro: consumed.isPro
@@ -906,17 +924,21 @@ apiRouter.post("/users/telegram/settings", requireAuth, async (req, res) => {
       telegramAlertsEnabled, 
       telegramAiSummaryEnabled, 
       telegramAlertScope,
+      aiSummaryLang,
       unlink 
     } = req.body || {};
 
     const existingProfile = await getUserProfile(uid);
     const currentPrefs = existingProfile?.notificationPreferences || ({} as any);
 
+    const cleanSummaryLang = aiSummaryLang === 'english' ? 'english' : aiSummaryLang === 'hinglish' ? 'hinglish' : undefined;
+
     const updatedPrefs = {
       ...currentPrefs,
       ...(telegramAlertsEnabled !== undefined ? { telegramAlertsEnabled: Boolean(telegramAlertsEnabled) } : {}),
       ...(telegramAiSummaryEnabled !== undefined ? { telegramAiSummaryEnabled: Boolean(telegramAiSummaryEnabled) } : {}),
       ...(telegramAlertScope !== undefined ? { telegramAlertScope: telegramAlertScope } : {}),
+      ...(cleanSummaryLang !== undefined ? { aiSummaryLang: cleanSummaryLang } : {}),
     };
 
     const patch: Record<string, any> = {
@@ -946,7 +968,8 @@ apiRouter.post("/users/telegram/settings", requireAuth, async (req, res) => {
       telegramChatId: updatedProfile.telegramChatId,
       telegramAlertsEnabled: updatedProfile.notificationPreferences?.telegramAlertsEnabled !== false,
       telegramAiSummaryEnabled: updatedProfile.notificationPreferences?.telegramAiSummaryEnabled !== false,
-      telegramAlertScope: updatedProfile.notificationPreferences?.telegramAlertScope || 'WATCHLIST_ONLY'
+      telegramAlertScope: updatedProfile.notificationPreferences?.telegramAlertScope || 'WATCHLIST_ONLY',
+      aiSummaryLang: updatedProfile.notificationPreferences?.aiSummaryLang || 'hinglish'
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -1571,7 +1594,8 @@ apiRouter.post("/help/ask-ai", requireProOrAdmin, aiRateLimiter, async (req, res
     }
     const cleanQuestion = question.trim().slice(0, 500);
     const safeHistory = Array.isArray(history) ? history.slice(-10) : [];
-    const answer = await askAppHelpAI(cleanQuestion, safeHistory);
+    const uid = getReqUserId(req);
+    const answer = await askAppHelpAI(cleanQuestion, safeHistory, { uid });
     res.json({ success: true, answer });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -1693,7 +1717,14 @@ apiRouter.all("/company-intel/:identifier/ai-overview", requireProOrAdmin, aiRat
     const scripCode = (req.query.scripCode as string) || (req.body?.scripCode as string) || (/^\d+$/.test(identifier) ? identifier : '');
     const symbol = (req.query.symbol as string) || (req.body?.symbol as string) || (!/^\d+$/.test(identifier) ? identifier : '');
 
-    const aiOverview = await generateCompanyAiOverview(scripCode, symbol);
+    // Honor the user's AI summary language (Settings → Telegram Alerts & AI Summaries)
+    let overviewLang: 'hinglish' | 'english' = 'hinglish';
+    try {
+      const prof = await getUserProfile(uid);
+      if ((prof as any)?.notificationPreferences?.aiSummaryLang === 'english') overviewLang = 'english';
+    } catch { /* default stays hinglish */ }
+
+    const aiOverview = await generateCompanyAiOverview(scripCode, symbol, overviewLang);
     if (!aiOverview) {
       return res.status(500).json({ success: false, error: "Gemini AI was unable to generate company overview." });
     }
