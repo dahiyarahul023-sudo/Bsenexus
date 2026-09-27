@@ -1,5 +1,19 @@
 @import "tailwindcss";
 
+/* Self-hosted fonts (GDPR: no requests to Google's servers, visitor IPs stay private) */
+@font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 400; font-display: swap; src: url('/fonts/JetBrainsMono-400.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 600; font-display: swap; src: url('/fonts/JetBrainsMono-600.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 700; font-display: swap; src: url('/fonts/JetBrainsMono-700.woff2') format('woff2'); }
+@font-face { font-family: 'Outfit'; font-style: normal; font-weight: 600; font-display: swap; src: url('/fonts/Outfit-600.woff2') format('woff2'); }
+@font-face { font-family: 'Outfit'; font-style: normal; font-weight: 700; font-display: swap; src: url('/fonts/Outfit-700.woff2') format('woff2'); }
+@font-face { font-family: 'Outfit'; font-style: normal; font-weight: 800; font-display: swap; src: url('/fonts/Outfit-800.woff2') format('woff2'); }
+@font-face { font-family: 'Outfit'; font-style: normal; font-weight: 900; font-display: swap; src: url('/fonts/Outfit-900.woff2') format('woff2'); }
+@font-face { font-family: 'Plus Jakarta Sans'; font-style: normal; font-weight: 400; font-display: swap; src: url('/fonts/PlusJakartaSans-400.woff2') format('woff2'); }
+@font-face { font-family: 'Plus Jakarta Sans'; font-style: normal; font-weight: 500; font-display: swap; src: url('/fonts/PlusJakartaSans-500.woff2') format('woff2'); }
+@font-face { font-family: 'Plus Jakarta Sans'; font-style: normal; font-weight: 600; font-display: swap; src: url('/fonts/PlusJakartaSans-600.woff2') format('woff2'); }
+@font-face { font-family: 'Plus Jakarta Sans'; font-style: normal; font-weight: 700; font-display: swap; src: url('/fonts/PlusJakartaSans-700.woff2') format('woff2'); }
+@font-face { font-family: 'Plus Jakarta Sans'; font-style: normal; font-weight: 800; font-display: swap; src: url('/fonts/PlusJakartaSans-800.woff2') format('woff2'); }
+
 @variant dark (&:where(.dark, .dark *));
 
 @theme {
