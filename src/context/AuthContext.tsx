@@ -85,7 +85,7 @@ interface AuthContextType {
   }>;
   loginWithEmail: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
   signupWithEmail: (email: string, pass: string, name: string, username?: string) => Promise<{ success: boolean; error?: string; needsEmailVerification?: boolean }>;
-  quickDemoLogin: (role?: 'user' | 'admin') => Promise<{ success: boolean; error?: string }>;
+  quickDemoLogin: (customName?: string) => Promise<{ success: boolean; error?: string }>;
   loginWithAdminPin: (pin: string) => Promise<{ success: boolean; error?: string }>;
   verifyAdminPin: (pin: string) => Promise<{ success: boolean; error?: string }>;
   lockAdminSession: () => Promise<void>;
@@ -117,6 +117,25 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // In-flight concurrency lock for anonymous guest sessions to prevent duplicate calls
 let inFlightGuestLoginPromise: Promise<{ success: boolean; error?: string }> | null = null;
+
+// Debounce for 'auth-state-changed': a single login fires syncUserProfile 2-3x
+// (onAuthStateChanged + each login method), which used to refetch watchlists /
+// announcements repeatedly. Collapses bursts for the same uid into one event.
+let lastAuthEventAt = 0;
+let lastAuthEventUid = '';
+function dispatchAuthChanged(uid: string, user: any, profile: any) {
+  const now = Date.now();
+  if (uid === lastAuthEventUid && now - lastAuthEventAt < 1500) return;
+  lastAuthEventUid = uid;
+  lastAuthEventAt = now;
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('auth-state-changed', { detail: { uid, user, profile } }));
+  }
+}
+function resetAuthEventDebounce() {
+  lastAuthEventUid = '';
+  lastAuthEventAt = 0;
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Read cached session synchronously to allow instant First Contentful Paint without blocking visitors
@@ -381,9 +400,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfile(userProfile);
       saveLocalSession(firebaseUser, userProfile);
 
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('auth-state-changed', { detail: { uid, user: firebaseUser, profile: userProfile } }));
-      }
+      dispatchAuthChanged(uid, firebaseUser, userProfile);
 
       return userProfile;
     } catch (e: any) {
@@ -848,9 +865,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       
       sessionStorage.clear();
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('auth-state-changed', { detail: { uid: 'guest', user: null, profile: null } }));
-      }
+      resetAuthEventDebounce();
+      dispatchAuthChanged('guest', null, null);
     } catch (e) {}
     
     setUser(null);

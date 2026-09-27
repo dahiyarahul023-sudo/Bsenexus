@@ -122,6 +122,11 @@ export interface ResultCalendarItem {
   declarationPdfLink?: string;
   declarationSubject?: string;
   aiSummary?: string;
+  quarterKey?: string;
+  declaredDetails?: {
+    pdfUrl?: string;
+    [key: string]: any;
+  };
 }
 
 export function ResultsCalendar() {
@@ -1804,11 +1809,11 @@ export function ResultsCalendar() {
                   </button>
                 )}
 
-                {summaryStats.recentCount > 0 && statusFilter !== 'recent' && (
+                {summaryStats.recentCount > 0 && statusFilter !== 'declared' && (
                   <button
                     type="button"
                     onClick={() => {
-                      setStatusFilter('recent');
+                      setStatusFilter('declared');
                       setDeclarationFilter('all');
                       setSearchQuery('');
                     }}

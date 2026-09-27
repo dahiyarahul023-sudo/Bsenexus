@@ -22,7 +22,7 @@ export interface HonestProgressBarProps {
   /** Is the operation actively running */
   isRunning?: boolean;
   /** Theme accent */
-  color?: 'emerald' | 'purple' | 'sky' | 'amber';
+  color?: 'emerald' | 'purple' | 'sky' | 'amber' | 'indigo' | 'rose';
   className?: string;
 }
 
@@ -108,8 +108,23 @@ export const HonestProgressBar: React.FC<HonestProgressBarProps> = ({
       bar: 'bg-gradient-to-r from-amber-500 to-orange-500',
       badge: 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/80',
       text: 'text-amber-600 dark:text-amber-400'
+    },
+    indigo: {
+      bar: 'bg-gradient-to-r from-indigo-500 to-blue-500',
+      badge: 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800/80',
+      text: 'text-indigo-600 dark:text-indigo-400'
+    },
+    rose: {
+      bar: 'bg-gradient-to-r from-rose-500 to-pink-500',
+      badge: 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/80',
+      text: 'text-rose-600 dark:text-rose-400'
     }
-  }[color];
+  }[color] || {
+    // Fail-safe: an unknown color can never crash the render again
+    bar: 'bg-gradient-to-r from-emerald-500 to-teal-400',
+    badge: 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/80',
+    text: 'text-emerald-600 dark:text-emerald-400'
+  };
 
   return (
     <div className={`w-full p-3.5 rounded-xl border border-slate-200/90 dark:border-[#2D283E] bg-white/90 dark:bg-[#181624]/90 backdrop-blur-xs space-y-2.5 ${className}`}>

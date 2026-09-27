@@ -198,7 +198,9 @@ export function UserProfileModal({
                   {displayName}
                 </h3>
                 {isAdmin && (
-                  <ShieldCheck size={14} className="text-purple-500 shrink-0" title="Admin Active" />
+                  <span title="Admin Active" className="inline-flex shrink-0">
+                    <ShieldCheck size={14} className="text-purple-500 shrink-0" />
+                  </span>
                 )}
               </div>
 

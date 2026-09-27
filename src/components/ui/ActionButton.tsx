@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check, RefreshCw } from 'lucide-react';
 
-export interface ActionButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  /** Text shown during default state */
-  children: React.ReactNode;
+export interface ActionButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'onAnimationStart' | 'onDrag' | 'onDragStart' | 'onDragEnd'> {
+  /** Text shown during default state (optional for icon-only buttons) */
+  children?: React.ReactNode;
   /** Text shown immediately once pressed / loading (e.g. "Syncing...", "Placing...") */
   loadingText?: string;
   /** External loading boolean */
@@ -18,7 +18,7 @@ export interface ActionButtonProps extends React.ButtonHTMLAttributes<HTMLButton
   /** Variant */
   variant?: 'primary' | 'secondary' | 'emerald' | 'danger' | 'ghost';
   /** Size */
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'xs' | 'sm' | 'md' | 'lg';
   icon?: React.ReactNode;
 }
 
@@ -72,6 +72,7 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
   }[variant];
 
   const sizeStyles = {
+    xs: 'px-2 py-0.5 text-[11px] gap-1 min-h-[30px] touch-manipulation',
     sm: 'px-2.5 py-1 text-xs gap-1.5 min-h-[38px] sm:min-h-[32px] touch-manipulation',
     md: 'px-3.5 py-2 text-xs sm:text-sm gap-2 min-h-[44px] sm:min-h-[40px] touch-manipulation',
     lg: 'px-5 py-2.5 text-sm sm:text-base gap-2.5 min-h-[48px] sm:min-h-[46px] touch-manipulation'

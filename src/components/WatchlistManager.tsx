@@ -490,6 +490,7 @@ export function WatchlistManager() {
   const displaySummary = (item: any): string | undefined =>
     summaryLang === 'english' ? (item?.aiSummaryEn || item?.aiSummary) : item?.aiSummary;
   const [watchlists, setWatchlists] = useState<any[]>([]);
+  const watchlistsFetchInFlight = useRef(false);
   const [activeListId, setActiveListId] = useState<string>('ALL');
   const [newListName, setNewListName] = useState('');
   const [isCreatingList, setIsCreatingList] = useState(false);
@@ -817,6 +818,9 @@ export function WatchlistManager() {
       setWatchlists([]);
       return;
     }
+    // Skip if a fetch is already running — login fires several triggers at once
+    if (watchlistsFetchInFlight.current) return;
+    watchlistsFetchInFlight.current = true;
     try {
       const res = await customFetch('/api/watchlists');
       if (res.ok) {
@@ -825,6 +829,8 @@ export function WatchlistManager() {
       }
     } catch (e) {
       console.error('Error fetching watchlists:', e);
+    } finally {
+      watchlistsFetchInFlight.current = false;
     }
   };
 

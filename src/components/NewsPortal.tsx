@@ -1155,7 +1155,7 @@ export const NewsPortal: React.FC<NewsPortalProps> = ({
                       <button
                         key={s.value}
                         type="button"
-                        onClick={() => setSentimentFilter(s.value)}
+                        onClick={() => setSentimentFilter(String(s.value))}
                         className={cn(
                           "min-h-[44px] px-3 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-1.5 cursor-pointer",
                           isSelected
