@@ -12,9 +12,17 @@
  */
 import express from 'express';
 import crypto from 'crypto';
+import rateLimit from 'express-rate-limit';
 import { requireAuth } from '../security/auth.js';
 import { getUserProfile, saveUserProfile, invalidateUserProfileCache } from '../database/usersDao.js';
 import { sanitizeUserId } from '../database/watchlistDao.js';
+import {
+  recordPendingOrder,
+  getPendingOrdersForUser,
+  tryClaimOrderForGrant,
+  markOrderGranted,
+  markOrderFailed,
+} from '../database/paymentOrdersDao.js';
 
 /** Extract the verified uid from the authenticated request (local copy — avoids a routes.ts import cycle). */
 function getReqUserId(req: express.Request): string {
@@ -39,6 +47,20 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | null> {
 }
 
 export const paymentsRouter = express.Router();
+
+// ---------------------------------------------------------------------------
+// Strict rate limit for the recovery endpoints below (/recover, /claim).
+// Each call fans out to the Cashfree Orders API, so abuse here would burn
+// gateway quota. 10 attempts per minute per IP is plenty for genuine use.
+// ---------------------------------------------------------------------------
+const paymentRecoveryLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { xForwardedForHeader: false, forwardedHeader: false, default: true },
+  message: { success: false, error: 'Too many recovery attempts. Please wait a minute and try again.' },
+});
 
 // ---------------------------------------------------------------------------
 // Plan catalogue — single source of truth for sellable plans.
@@ -304,6 +326,74 @@ async function doGrantProForOrder(uid: string, orderId: string, planId: PlanId):
   return { proExpiresAt, alreadyGranted: false };
 }
 
+/**
+ * Grant Pro with the durable order ledger (27 Sep 2026).
+ *
+ * Every grant path — webhook, return-URL verify, login recovery, manual
+ * claim — funnels through here so a payment can never be lost or granted
+ * twice, even across Cloud Run instances:
+ *
+ * 1. Atomically claim the order in the ledger (pending -> granting).
+ *    A concurrent grant on another instance loses the claim and returns
+ *    already-granted instead of double-extending Pro.
+ * 2. Run the profile grant (itself idempotent per order via lastOrderId).
+ * 3. Mark the ledger `granted` — the durable proof of what was given.
+ */
+async function grantWithLedger(
+  uid: string,
+  orderId: string,
+  planId: PlanId,
+  source: 'webhook' | 'verify' | 'recover' | 'claim',
+  orderMeta?: { email?: string; amountPaise?: number },
+): Promise<{ proExpiresAt: number; alreadyGranted: boolean }> {
+  const claim = await tryClaimOrderForGrant(orderId, uid);
+  if (!claim.ok) {
+    const p = await getUserProfile(uid);
+    console.log(`[Payments] ledger claim lost (already granted): uid=${uid} order=${orderId} source=${source}`);
+    return { proExpiresAt: p?.proExpiresAt || Date.now(), alreadyGranted: true };
+  }
+  const r = await grantProForOrder(uid, orderId, planId);
+  await markOrderGranted(orderId, {
+    uid,
+    proExpiresAt: r.proExpiresAt,
+    grantSource: source,
+    email: orderMeta?.email,
+    planId,
+    amountPaise: orderMeta?.amountPaise,
+  });
+  return r;
+}
+
+/** Build the invoice payload shared by verify and claim responses. */
+function buildReceipt(order: any, orderId: string, plan: (typeof PRO_PLANS)[PlanId], proExpiresAt: number, paymentMethod: string) {
+  return {
+    orderId,
+    amount: Number(order.order_amount),
+    currency: String(order.order_currency || plan.currency),
+    paidAt: String(order.created_at || new Date().toISOString()),
+    email: String(order?.customer_details?.customer_email || ''),
+    validUntil: proExpiresAt,
+    planId: plan.id,
+    planLabel: plan.label,
+    validityDays: plan.validityDays,
+    paymentMethod,
+  };
+}
+
+/** Best-effort lookup of the successful payment's instrument (UPI/card/netbanking). Display-only. */
+async function describeSuccessfulPayment(orderId: string): Promise<string> {
+  try {
+    const payRes = await cashfreeFetch(`/orders/${encodeURIComponent(orderId)}/payments`);
+    const list = Array.isArray(payRes?.data) ? payRes.data : [];
+    const okPay =
+      list.find((p: any) => String(p?.payment_status || '').toUpperCase() === 'SUCCESS') ||
+      list[0];
+    return describePaymentMethod(okPay);
+  } catch {
+    return '';
+  }
+}
+
 // ---------------------------------------------------------------------------
 // POST /api/payments/create-order — authenticated user starts a purchase.
 // Body: { planId }. Returns a Cashfree payment_session_id for the JS checkout.
@@ -390,6 +480,22 @@ paymentsRouter.post('/create-order', requireAuth, async (req, res) => {
       });
     }
 
+    // Durable order ledger (27 Sep 2026): record the order as pending BEFORE
+    // the user pays, so a missed webhook / return-verify can never lose the
+    // payment. Best-effort — the Cashfree order must not fail over this.
+    try {
+      await recordPendingOrder({
+        orderId,
+        uid,
+        email,
+        planId: plan.id,
+        amountPaise: plan.amountPaise,
+        currency: plan.currency,
+      });
+    } catch (ledgerErr: any) {
+      console.warn('[Payments] recordPendingOrder failed (non-fatal):', ledgerErr?.message || ledgerErr);
+    }
+
     res.json({
       success: true,
       orderId,
@@ -438,30 +544,12 @@ paymentsRouter.get('/verify', requireAuth, async (req, res) => {
         console.warn('[Payments] verify amount mismatch:', orderId, paidAmount, paidCurrency, 'expected', plan.id);
         return res.status(200).json({ success: false, paid: false, error: 'Payment amount does not match the selected plan.' });
       }
-      const { proExpiresAt, alreadyGranted } = await grantProForOrder(uid, orderId, planId);
-      // Best-effort: which instrument paid (UPI / card / netbanking) for the
-      // invoice. Display-only, never PII — and never fails the verify.
-      let paymentMethod = '';
-      try {
-        const payRes = await cashfreeFetch(`/orders/${encodeURIComponent(orderId)}/payments`);
-        const list = Array.isArray(payRes?.data) ? payRes.data : [];
-        const okPay =
-          list.find((p: any) => String(p?.payment_status || '').toUpperCase() === 'SUCCESS') ||
-          list[0];
-        paymentMethod = describePaymentMethod(okPay);
-      } catch { /* ignore — receipt works without it */ }
-      const receipt = {
-        orderId,
-        amount: paidAmount,
-        currency: paidCurrency,
-        paidAt: String(order.created_at || new Date().toISOString()),
+      const { proExpiresAt, alreadyGranted } = await grantWithLedger(uid, orderId, planId, 'verify', {
         email: String(order?.customer_details?.customer_email || ''),
-        validUntil: proExpiresAt,
-        planId: plan.id,
-        planLabel: plan.label,
-        validityDays: plan.validityDays,
-        paymentMethod,
-      };
+        amountPaise: plan.amountPaise,
+      });
+      const paymentMethod = await describeSuccessfulPayment(orderId);
+      const receipt = buildReceipt(order, orderId, plan, proExpiresAt, paymentMethod);
       return res.json({ success: true, paid: true, alreadyGranted, proExpiresAt, orderId, receipt });
     }
 
@@ -499,6 +587,135 @@ paymentsRouter.get('/status', requireAuth, async (req, res) => {
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: 'Could not load subscription status.' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/payments/recover — login-time pending-order recovery (27 Sep 2026).
+//
+// Finds this user's unresolved orders in the ledger, re-checks each one with
+// Cashfree (source of truth) and grants Pro for the ones that are PAID.
+// This is the safety net for a missed webhook / return-verify: even if the
+// browser never came back, the next login repairs the entitlement.
+//
+// Only PAID orders grant. Dropped / failed / expired orders are marked
+// `failed` in the ledger so they are never re-checked.
+// ---------------------------------------------------------------------------
+paymentsRouter.post('/recover', requireAuth, paymentRecoveryLimiter, async (req, res) => {
+  try {
+    const uid = getReqUserId(req);
+    if (!isConfigured()) {
+      return res.status(200).json({ success: false, error: 'Payment gateway not configured.' });
+    }
+    const pending = await getPendingOrdersForUser(uid);
+    const recovered: Array<{ orderId: string; planId: string; proExpiresAt: number }> = [];
+    const cleanUid = uid.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 45);
+
+    for (const o of pending) {
+      try {
+        const order = await fetchOrderFromCashfree(o.orderId);
+        if (!order) continue;
+        const status = String(order.order_status || '').toUpperCase();
+        if (status === 'PAID') {
+          // Ownership MUST match the signed-in user — fail closed.
+          const orderCustomer = String(order?.customer_details?.customer_id || '');
+          if (orderCustomer && orderCustomer !== cleanUid && orderCustomer !== uid) {
+            await markOrderFailed(o.orderId, 'recover: customer mismatch');
+            continue;
+          }
+          const planId = planIdFromOrderId(o.orderId);
+          const plan = PRO_PLANS[planId];
+          if (Number(order.order_amount) !== plan.amountPaise / 100 || String(order.order_currency || '') !== plan.currency) {
+            await markOrderFailed(o.orderId, 'recover: amount/currency mismatch');
+            continue;
+          }
+          const r = await grantWithLedger(uid, o.orderId, planId, 'recover', {
+            email: String(order?.customer_details?.customer_email || o.email || ''),
+            amountPaise: plan.amountPaise,
+          });
+          if (!r.alreadyGranted) {
+            recovered.push({ orderId: o.orderId, planId, proExpiresAt: r.proExpiresAt });
+          }
+        } else if (status && status !== 'ACTIVE') {
+          // Terminal non-paid state (EXPIRED / CANCELLED / ...): stop re-checking.
+          await markOrderFailed(o.orderId, `recover: order ${status}`);
+        }
+        // ACTIVE = user may still be paying; leave pending.
+      } catch (oneErr: any) {
+        console.warn('[Payments] recover: order check failed:', o.orderId, oneErr?.message || oneErr);
+      }
+    }
+    return res.json({ success: true, recovered, recoveredCount: recovered.length });
+  } catch (err: any) {
+    console.error('[Payments] recover error:', err?.message || err);
+    return res.status(200).json({ success: false, error: 'Recovery check failed. Please try again.' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/payments/claim — "Maine payment kar diya hai" (27 Sep 2026).
+//
+// The user pastes their BN_... order id (from the Cashfree receipt). The
+// server re-fetches the order from Cashfree and grants Pro iff:
+//   - the order is PAID,
+//   - the order's customer_id matches the signed-in user (ownership),
+//   - amount + currency match the plan encoded in the order id.
+// Works even for orders that predate the ledger.
+// ---------------------------------------------------------------------------
+const ORDER_ID_RE = /^BN_[WMHY]_[A-Za-z0-9_-]{1,45}_\d{10,}$/;
+
+paymentsRouter.post('/claim', requireAuth, paymentRecoveryLimiter, async (req, res) => {
+  try {
+    const uid = getReqUserId(req);
+    if (!isConfigured()) {
+      return res.status(200).json({ success: false, error: 'Payment gateway not configured.' });
+    }
+    const orderId = String(req.body?.orderId || '').trim();
+    if (!ORDER_ID_RE.test(orderId)) {
+      return res.status(200).json({
+        success: false,
+        error: 'Order ID sahi format me daalo — ye BN_ se shuru hota hai aur receipt par likha hota hai.',
+      });
+    }
+
+    const order = await fetchOrderFromCashfree(orderId);
+    if (!order) {
+      return res.status(200).json({ success: false, error: 'Ye order gateway par nahi mila. Order ID dobara check karo.' });
+    }
+
+    // Ownership: the Cashfree customer_id must be this signed-in user. Fail closed.
+    const orderCustomer = String(order?.customer_details?.customer_id || '');
+    const cleanUid = uid.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 45);
+    if (!orderCustomer || (orderCustomer !== cleanUid && orderCustomer !== uid)) {
+      console.warn('[Payments] claim ownership mismatch:', orderId, 'uid=', uid);
+      return res.status(200).json({ success: false, error: 'Ye order tumhare account ka nahi lag raha.' });
+    }
+
+    if (String(order.order_status || '').toUpperCase() !== 'PAID') {
+      return res.status(200).json({
+        success: false,
+        error: `Is order ka status ${order.order_status || 'unknown'} hai. PAID hone par hi Pro milega.`,
+      });
+    }
+
+    const planId = planIdFromOrderId(orderId);
+    const plan = PRO_PLANS[planId];
+    if (Number(order.order_amount) !== plan.amountPaise / 100 || String(order.order_currency || '') !== plan.currency) {
+      console.warn('[Payments] claim amount mismatch:', orderId);
+      return res.status(200).json({ success: false, error: 'Payment amount plan se match nahi hua.' });
+    }
+
+    const { proExpiresAt, alreadyGranted } = await grantWithLedger(uid, orderId, planId, 'claim', {
+      email: String(order?.customer_details?.customer_email || ''),
+      amountPaise: plan.amountPaise,
+    });
+    const paymentMethod = await describeSuccessfulPayment(orderId);
+    const receipt = buildReceipt(order, orderId, plan, proExpiresAt, paymentMethod);
+    console.log(`[Payments] claim granted Pro: uid=${uid} order=${orderId} plan=${planId} already=${alreadyGranted}`);
+    return res.json({ success: true, alreadyGranted, proExpiresAt, orderId, receipt });
+  } catch (err: any) {
+    console.error('[Payments] claim error:', err?.message || err);
+    return res.status(200).json({ success: false, error: 'Claim failed. Please try again.' });
   }
 });
 
@@ -557,7 +774,10 @@ paymentsRouter.post('/webhook', async (req, res) => {
       const currencyOk = String(order?.order_currency || '') === plan.currency;
       if (order?.order_status === 'PAID' && rawUid && amountOk && currencyOk) {
         const uid = sanitizeUserId(rawUid);
-        const { alreadyGranted } = await grantProForOrder(uid, orderId, planId);
+        const { alreadyGranted } = await grantWithLedger(uid, orderId, planId, 'webhook', {
+          email: String(order?.customer_details?.customer_email || ''),
+          amountPaise: plan.amountPaise,
+        });
         console.log(`[Payments] webhook granted Pro: uid=${uid} order=${orderId} plan=${planId} already=${alreadyGranted}`);
       } else {
         console.warn('[Payments] webhook skipped: order not PAID / amount mismatch / no customer_id', orderId);

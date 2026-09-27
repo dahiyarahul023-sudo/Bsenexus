@@ -176,6 +176,44 @@ export async function verifyProPayment(orderId: string): Promise<{ paid: boolean
   }
 }
 
+/**
+ * Login-time recovery: ask OUR server to re-check any unresolved orders in
+ * the ledger and grant Pro for the ones Cashfree confirms as PAID.
+ * Silent best-effort — never throws, never blocks the UI.
+ */
+export async function recoverPendingPayments(): Promise<{ recoveredCount: number; recovered: Array<{ orderId: string; planId: string; proExpiresAt: number }> }> {
+  try {
+    const res = await customFetch('/api/payments/recover', { method: 'POST' });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.success) return { recoveredCount: 0, recovered: [] };
+    return { recoveredCount: Number(data.recoveredCount || 0), recovered: Array.isArray(data.recovered) ? data.recovered : [] };
+  } catch {
+    return { recoveredCount: 0, recovered: [] };
+  }
+}
+
+/**
+ * "Maine payment kar diya hai" — the user pastes their BN_... order id from
+ * the Cashfree receipt; OUR server verifies ownership + PAID status with
+ * Cashfree and grants Pro. Never trusts the client.
+ */
+export async function claimProPayment(orderId: string): Promise<{ ok: boolean; alreadyGranted?: boolean; proExpiresAt?: number; receipt?: PaymentReceipt; error?: string }> {
+  try {
+    const res = await customFetch('/api/payments/claim', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId: orderId.trim() }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.success) {
+      return { ok: false, error: data?.error || 'Claim failed. Please try again.' };
+    }
+    return { ok: true, alreadyGranted: Boolean(data.alreadyGranted), proExpiresAt: data.proExpiresAt, receipt: data.receipt || undefined };
+  } catch {
+    return { ok: false, error: 'Claim failed. Please try again.' };
+  }
+}
+
 export function getPendingOrderId(): string | null {
   try {
     return sessionStorage.getItem('cf_pending_order');

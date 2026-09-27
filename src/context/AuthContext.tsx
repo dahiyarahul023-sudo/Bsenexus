@@ -16,6 +16,12 @@ import { customFetch } from '../api';
 import { reportSyncStatus, withRetry } from '../utils/retry';
 import { executeRecaptcha } from '../utils/recaptcha';
 import type { PaymentReceipt } from '../utils/cashfree';
+import { recoverPendingPayments } from '../utils/cashfree';
+
+// Login-time payment recovery runs at most once per uid per page load:
+// the server re-checks unresolved orders with Cashfree and grants Pro for
+// the ones that are PAID (safety net for a missed webhook / return-verify).
+const paymentRecoverAttempted = new Set<string>();
 
 const ADMIN_EMAIL = 'dahiyarahul023@gmail.com';
 const STORAGE_SESSION_KEY = 'bse_nexus_auth_session';
@@ -408,6 +414,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       saveLocalSession(firebaseUser, userProfile);
 
       dispatchAuthChanged(uid, firebaseUser, userProfile);
+
+      // Login-time payment recovery (27 Sep 2026): if a past payment's grant
+      // was missed (webhook never fired / return-verify never ran), the
+      // server repairs it now from the durable order ledger. Once per uid per
+      // page load, silent best-effort — a repaired grant re-syncs the profile
+      // so the badge updates by itself.
+      if (!isGuestUser && !paymentRecoverAttempted.has(uid)) {
+        paymentRecoverAttempted.add(uid);
+        recoverPendingPayments()
+          .then((r) => {
+            if (r.recoveredCount > 0) {
+              syncUserProfile(firebaseUser).catch(() => {});
+            }
+          })
+          .catch(() => {});
+      }
 
       return userProfile;
     } catch (e: any) {

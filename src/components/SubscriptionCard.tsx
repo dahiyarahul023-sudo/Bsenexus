@@ -7,7 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { Crown, CreditCard, BadgeCheck, Info } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { customFetch } from '../api';
-import { verifyProPayment } from '../utils/cashfree';
+import { verifyProPayment, claimProPayment } from '../utils/cashfree';
 
 interface SubStatus {
   configured: boolean;
@@ -43,6 +43,11 @@ export function SubscriptionCard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loadingReceipt, setLoadingReceipt] = useState(false);
+  // "Maine payment kar diya hai" claim flow (27 Sep 2026)
+  const [claimOpen, setClaimOpen] = useState(false);
+  const [claimOrderId, setClaimOrderId] = useState('');
+  const [claiming, setClaiming] = useState(false);
+  const [claimMsg, setClaimMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -85,6 +90,37 @@ export function SubscriptionCard() {
       setReceipt(v.receipt);
     } else {
       setError(v.error || 'Could not load the receipt.');
+    }
+  };
+
+  const handleClaim = async () => {
+    if (claiming) return;
+    const orderId = claimOrderId.trim();
+    if (!orderId) {
+      setClaimMsg({ ok: false, text: 'Order ID daalo — ye BN_ se shuru hota hai aur Cashfree receipt par likha hota hai.' });
+      return;
+    }
+    setClaiming(true);
+    setClaimMsg(null);
+    const r = await claimProPayment(orderId);
+    setClaiming(false);
+    if (r.ok) {
+      setClaimMsg({
+        ok: true,
+        text: r.alreadyGranted
+          ? 'Ye payment pehle hi Pro me jud chuka hai. Kuch karne ki zaroorat nahi.'
+          : 'Payment mil gayi — Pro activate ho gaya! 🎉',
+      });
+      if (r.receipt) setReceipt(r.receipt);
+      // Refresh both the card and the app-wide Pro badge.
+      try {
+        const res = await customFetch('/api/payments/status');
+        const data = await res.json().catch(() => null);
+        if (data?.success) setStatus(data as SubStatus);
+      } catch { /* ignore */ }
+      refreshProfile().catch(() => {});
+    } else {
+      setClaimMsg({ ok: false, text: r.error || 'Claim failed. Please try again.' });
     }
   };
 
@@ -175,6 +211,81 @@ export function SubscriptionCard() {
       <p className="text-[10px] text-slate-400 dark:text-slate-500 text-center mt-2">
         One-time secure payment via Cashfree · No auto-charge
       </p>
+
+      {/* "Maine payment kar diya hai" — manual recovery (27 Sep 2026).
+          For payments whose grant was missed: the user pastes the BN_ order
+          id from the Cashfree receipt and the server verifies + grants Pro. */}
+      {!loading && status?.configured && (
+        <button
+          onClick={() => { setClaimOpen(true); setClaimMsg(null); setClaimOrderId(''); }}
+          className="w-full mt-2 py-2.5 text-[11px] font-bold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-[#2D283E] rounded-xl hover:bg-slate-50 dark:hover:bg-white/5 active:scale-95 transition-all cursor-pointer"
+        >
+          Payment ho gaya, Pro nahi mila? Order ID se restore karo
+        </button>
+      )}
+
+      {claimOpen && (
+        <div
+          className="fixed inset-0 z-[97] bg-[#0B0B14]/85 backdrop-blur-md flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Restore Pro with order ID"
+          onClick={() => { if (!claiming) setClaimOpen(false); }}
+        >
+          <div
+            className="w-full max-w-sm bg-white dark:bg-[#181626] border border-slate-200 dark:border-[#2D283E] rounded-2xl p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-sm font-black text-slate-900 dark:text-white mb-1">Pro restore karo</h3>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-3">
+              Cashfree receipt par likha <span className="font-bold">Order ID</span> yahan daalo
+              (BN_ se shuru hota hai). Server payment verify karke Pro de dega.
+            </p>
+            <input
+              value={claimOrderId}
+              onChange={(e) => setClaimOrderId(e.target.value)}
+              placeholder="BN_M_xxxxxxxxxx_..."
+              disabled={claiming}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              className="w-full px-3 py-2.5 text-xs font-mono bg-slate-50 dark:bg-black/30 border border-slate-200 dark:border-[#2D283E] rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 disabled:opacity-60"
+            />
+            {claimMsg && (
+              <div className={`mt-3 py-2.5 px-4 text-[11px] font-semibold rounded-xl border ${
+                claimMsg.ok
+                  ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
+                  : 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300'
+              }`}>
+                {claimMsg.text}
+              </div>
+            )}
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => { if (!claiming) setClaimOpen(false); }}
+                disabled={claiming}
+                className="flex-1 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-[#2D283E] rounded-xl hover:bg-slate-50 dark:hover:bg-white/5 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+              >
+                Band karo
+              </button>
+              <button
+                onClick={handleClaim}
+                disabled={claiming}
+                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-black rounded-xl shadow-lg shadow-emerald-600/25 transition-all cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {claiming ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    Checking…
+                  </>
+                ) : (
+                  'Verify & Activate'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
