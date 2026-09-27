@@ -217,7 +217,7 @@ export function UserProfileModal({
                   isPro ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800" :
                   "bg-slate-100 text-slate-600 dark:bg-[#252236] dark:text-slate-400 border-slate-200 dark:border-[#352F48]"
                 )}>
-                  {isAdmin ? 'Admin' : isPro ? `Pro (${proDaysLeft}d Trial)` : user?.isAnonymous ? 'Guest' : 'Free'}
+                  {isAdmin ? 'Admin' : isPro ? (profile?.lastPaymentAt ? `Pro (${proDaysLeft}d)` : `Pro Trial (${proDaysLeft}d)`) : user?.isAnonymous ? 'Guest' : 'Free'}
                 </span>
               </div>
             </div>

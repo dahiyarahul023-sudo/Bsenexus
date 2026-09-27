@@ -33,6 +33,10 @@ function fmtDate(ts: number | null): string {
   }
 }
 
+function fmtINR(paise: number): string {
+  return '₹' + (paise / 100).toLocaleString('en-IN');
+}
+
 export function SubscriptionCard() {
   const { user, refreshProfile, openCheckout, setReceipt } = useAuth();
   const [status, setStatus] = useState<SubStatus | null>(null);
@@ -106,7 +110,11 @@ export function SubscriptionCard() {
         <div className="space-y-2.5 text-xs mb-4">
           <div className="flex items-center justify-between">
             <span className="text-slate-500 dark:text-slate-400">Plan</span>
-            <span className="font-semibold text-slate-900 dark:text-white">Pro Monthly — ₹199/mo</span>
+            <span className="font-semibold text-slate-900 dark:text-white">
+              {status.lastPaymentAt
+                ? `${status.plan.label} — ${fmtINR(status.plan.amountPaise)} · ${status.plan.validityDays} days (one-time)`
+                : 'Pro Trial — 7-day free trial'}
+            </span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-slate-500 dark:text-slate-400">Valid until</span>
@@ -158,9 +166,9 @@ export function SubscriptionCard() {
           <span>
             {!status?.configured
               ? 'Payments coming online…'
-              : status?.isPro
-                ? 'Renew Pro — ₹199/mo'
-                : 'Upgrade to Pro — ₹199/mo'}
+              : status?.isPro && status?.lastPaymentAt
+                ? 'Extend Pro'
+                : 'Upgrade to Pro — from ₹59'}
           </span>
         </button>
       )}

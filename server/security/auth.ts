@@ -244,6 +244,20 @@ export const requireProOrAdmin = async (req: express.Request, res: express.Respo
     return next();
   }
 
+  // The JWT `isPro` claim is minted at login and goes stale the moment a user
+  // purchases Pro, so always re-check the live profile here. The payment
+  // verify endpoint invalidates the profile cache on grant (TTL is 2.5s), so a
+  // fresh purchase is honoured immediately — no logout/login needed.
+  try {
+    const profile = await getUserProfile(user.uid);
+    const now = Date.now();
+    if (profile && (profile.tier === 'admin' || (profile.proExpiresAt && profile.proExpiresAt > now))) {
+      return next();
+    }
+  } catch {
+    // fall through to the JWT claim below as a best-effort backup
+  }
+
   if (user.isPro) {
     return next();
   }
@@ -251,7 +265,7 @@ export const requireProOrAdmin = async (req: express.Request, res: express.Respo
   return res.status(403).json({ 
     success: false, 
     proRequired: true, 
-    error: "1-Week Free Pro trial has ended. Please upgrade to Pro (₹499/mo) to continue using this feature." 
+    error: "1-Week Free Pro trial has ended. Please upgrade to Pro — one-time plans from ₹59 (Weekly), ₹199 (Monthly), ₹999 (6-Month), ₹1,799 (Yearly) — to continue using this feature." 
   });
 };
 

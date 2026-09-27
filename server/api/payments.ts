@@ -479,12 +479,16 @@ paymentsRouter.get('/status', requireAuth, async (req, res) => {
     const profile = await getUserProfile(uid);
     const now = Date.now();
     const proExpiresAt = profile?.proExpiresAt || 0;
+    // Return the user's ACTUAL purchased plan (not a hardcoded default) so the
+    // Settings UI shows the right pack, price and validity days.
+    const planId = (profile as any)?.proPlanId as PlanId | undefined;
+    const plan = (planId && (PRO_PLANS as Record<string, (typeof PRO_PLANS)[PlanId]>)[planId]) || PRO_PLANS.pro_monthly;
     res.json({
       success: true,
       configured: isConfigured(),
       isPro: (profile?.tier === 'pro' || (profile as any)?.isAdmin) && proExpiresAt > now,
       proExpiresAt,
-      plan: PRO_PLANS.pro_monthly,
+      plan,
       plans: Object.values(PRO_PLANS),
       lastPaymentAt: (profile as any)?.lastPaymentAt || null,
       lastOrderId: (profile as any)?.lastOrderId || null,

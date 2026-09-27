@@ -44,7 +44,7 @@ export async function checkServerAiQuota(
       allowed: false,
       remaining: 0,
       dailyLimit: 0,
-      error: "Your 1-Week Free Pro trial has ended. Upgrade to Pro (₹499/mo) to continue generating Gemini AI summaries.",
+      error: "Your 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹59) to continue generating Gemini AI summaries.",
       isPro: false
     };
   }
