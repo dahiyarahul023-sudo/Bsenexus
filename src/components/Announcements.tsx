@@ -85,8 +85,9 @@ export function Announcements({
   const { openIntelModal } = useIntelModal();
 
   // SWR: Initialize announcements immediately from client cache to achieve 0ms initial paint
+  // (12h TTL — survives app restarts via localStorage; fresh data loads in background)
   const [announcements, setAnnouncements] = useState<any[]>(() => {
-    const cached = getCacheItem<any[]>('announcements_feed', 5 * 60 * 1000);
+    const cached = getCacheItem<any[]>('announcements_feed', 12 * 60 * 60 * 1000);
     if (cached && cached.length > 0) return cached;
     return [];
   });

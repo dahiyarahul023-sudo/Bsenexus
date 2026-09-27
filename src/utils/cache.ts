@@ -20,10 +20,11 @@ export function getCacheItem<T>(key: string, maxAgeMs: number = 5 * 60 * 1000): 
     memoryCache.delete(key);
   }
 
-  // 2. Fall back to sessionStorage for cross-navigation state preservation
+  // 2. Fall back to localStorage for cross-session persistence
+  // (survives app restarts — sessionStorage would be wiped on every login)
   try {
-    if (typeof window !== 'undefined' && window.sessionStorage) {
-      const stored = window.sessionStorage.getItem(`nexus_cache_${key}`);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const stored = window.localStorage.getItem(`nexus_cache_${key}`);
       if (stored) {
         const parsed: CacheEntry<T> = JSON.parse(stored);
         if (Date.now() - parsed.timestamp < maxAgeMs) {
@@ -31,12 +32,12 @@ export function getCacheItem<T>(key: string, maxAgeMs: number = 5 * 60 * 1000): 
           memoryCache.set(key, parsed);
           return parsed.data;
         } else {
-          window.sessionStorage.removeItem(`nexus_cache_${key}`);
+          window.localStorage.removeItem(`nexus_cache_${key}`);
         }
       }
     }
   } catch (err) {
-    // Gracefully handle sessionStorage quota or private-browsing restrictions
+    // Gracefully handle localStorage quota or private-browsing restrictions
   }
 
   return null;
@@ -51,10 +52,11 @@ export function setCacheItem<T>(key: string, data: T): void {
   // Always update in-memory store
   memoryCache.set(key, entry);
 
-  // Attempt to persist in sessionStorage for cross-tab-navigation instant loading
+  // Persist in localStorage for cross-session instant loading
+  // (survives app restarts — sessionStorage would be wiped on every login)
   try {
-    if (typeof window !== 'undefined' && window.sessionStorage) {
-      window.sessionStorage.setItem(`nexus_cache_${key}`, JSON.stringify(entry));
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(`nexus_cache_${key}`, JSON.stringify(entry));
     }
   } catch (err) {
     // Quota reached or security error - in-memory cache remains active
@@ -64,8 +66,8 @@ export function setCacheItem<T>(key: string, data: T): void {
 export function invalidateCacheItem(key: string): void {
   memoryCache.delete(key);
   try {
-    if (typeof window !== 'undefined' && window.sessionStorage) {
-      window.sessionStorage.removeItem(`nexus_cache_${key}`);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.removeItem(`nexus_cache_${key}`);
     }
   } catch (err) {}
 }
@@ -73,10 +75,10 @@ export function invalidateCacheItem(key: string): void {
 export function clearAllCache(): void {
   memoryCache.clear();
   try {
-    if (typeof window !== 'undefined' && window.sessionStorage) {
+    if (typeof window !== 'undefined' && window.localStorage) {
       const keysToRemove: string[] = [];
-      for (let i = 0; i < window.sessionStorage.length; i++) {
-        const k = window.sessionStorage.key(i);
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const k = window.localStorage.key(i);
         if (k && k.startsWith('nexus_cache_')) {
           keysToRemove.push(k);
         }

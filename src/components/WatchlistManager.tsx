@@ -489,7 +489,19 @@ export function WatchlistManager() {
   const summaryLang: 'hinglish' | 'english' = profile?.notificationPreferences?.aiSummaryLang === 'hinglish' ? 'hinglish' : 'english';
   const displaySummary = (item: any): string | undefined =>
     summaryLang === 'english' ? (item?.aiSummaryEn || item?.aiSummary) : item?.aiSummary;
-  const [watchlists, setWatchlists] = useState<any[]>([]);
+  const [watchlists, setWatchlists] = useState<any[]>(() => {
+    // Show last cached watchlists instantly on login; fresh data replaces in background.
+    try {
+      const cached = localStorage.getItem('bsenexus_watchlists_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed.items) && Date.now() - (parsed.ts || 0) < 12 * 60 * 60 * 1000) {
+          return parsed.items;
+        }
+      }
+    } catch { /* ignore corrupt cache */ }
+    return [];
+  });
   const watchlistsFetchInFlight = useRef(false);
   const [activeListId, setActiveListId] = useState<string>('ALL');
   const [newListName, setNewListName] = useState('');
@@ -568,13 +580,14 @@ export function WatchlistManager() {
       const cached = localStorage.getItem('bsenexus_watchlist_feed');
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed.items) && Date.now() - (parsed.ts || 0) < 30 * 60 * 1000) {
+        if (Array.isArray(parsed.items) && Date.now() - (parsed.ts || 0) < 12 * 60 * 60 * 1000) {
           return parsed.items;
         }
       }
     } catch { /* ignore corrupt cache */ }
     return [];
   });
+  const [isFeedRefreshing, setIsFeedRefreshing] = useState(false);
   const [selectedStockFilter, setSelectedStockFilter] = useState<string | null>(null);
   const [announcementCategory, setAnnouncementCategory] = useState<string>('ALL');
   const [announcementPriorityFilter, setAnnouncementPriorityFilter] = useState<string>('ALL');
@@ -826,6 +839,10 @@ export function WatchlistManager() {
       if (res.ok) {
         const data = await res.json();
         setWatchlists(data);
+        // Cache for instant display on next login (stale-while-revalidate).
+        try {
+          localStorage.setItem('bsenexus_watchlists_cache', JSON.stringify({ ts: Date.now(), items: data }));
+        } catch { /* storage full or unavailable */ }
       }
     } catch (e) {
       console.error('Error fetching watchlists:', e);
@@ -844,6 +861,8 @@ export function WatchlistManager() {
   }, [watchlists, activeListId]);
 
   const fetchAnnouncements = useCallback(async () => {
+    // Show a subtle "updating" indicator when cached data is already on screen
+    setIsFeedRefreshing(true);
     try {
       const symbolsToFetch = activeSymbols.length > 0
         ? activeSymbols
@@ -873,6 +892,8 @@ export function WatchlistManager() {
       }
     } catch (e) {
       console.warn("Error fetching announcements in WatchlistManager:", e);
+    } finally {
+      setIsFeedRefreshing(false);
     }
   }, [activeSymbols, watchlists]);
 
@@ -2185,6 +2206,12 @@ export function WatchlistManager() {
                     >
                       All Symbols ({totalWatchlistDisclosures})
                     </button>
+                    {isFeedRefreshing && announcements.length > 0 && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                        <RefreshCw size={10} className="animate-spin" />
+                        Updating…
+                      </span>
+                    )}
                     {filteredTrackedSymbols.map(sym => {
                       const count = stockCounts[sym] || 0;
                       const isSelected = selectedStockFilter === sym;

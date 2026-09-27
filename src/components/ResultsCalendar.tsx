@@ -138,11 +138,12 @@ export function ResultsCalendar() {
   const isSuperAdmin = Boolean(isAdmin || adminUnlocked || profile?.tier === 'admin' || user?.isAdmin);
   const { isDeveloperMode } = useDeveloperMode();
   // SWR: Initialize calendar items immediately from client cache for 0ms transition
+  // (12h TTL — survives app restarts via localStorage; fresh data loads in background)
   const [items, setItems] = useState<ResultCalendarItem[]>(() => {
-    return getCacheItem<ResultCalendarItem[]>('results_calendar_items', 5 * 60 * 1000) || [];
+    return getCacheItem<ResultCalendarItem[]>('results_calendar_items', 12 * 60 * 60 * 1000) || [];
   });
   const [loading, setLoading] = useState(() => {
-    const cached = getCacheItem<ResultCalendarItem[]>('results_calendar_items', 5 * 60 * 1000);
+    const cached = getCacheItem<ResultCalendarItem[]>('results_calendar_items', 12 * 60 * 60 * 1000);
     return !cached || cached.length === 0;
   });
   const [refreshing, setRefreshing] = useState(false);
@@ -418,6 +419,9 @@ export function ResultsCalendar() {
       setRefreshing(true);
     } else if (items.length === 0) {
       setLoading(true);
+    } else {
+      // Cached data is showing — indicate the silent background refresh
+      setRefreshing(true);
     }
 
     try {
