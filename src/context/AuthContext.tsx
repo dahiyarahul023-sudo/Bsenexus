@@ -74,6 +74,9 @@ interface AuthContextType {
   isOwner: boolean;
   isAdmin: boolean;
   isPro: boolean;
+  /** HARD RULE: user has a successful payment on record (server-set at grant time).
+   *  A paid user is NEVER labelled "Trial" anywhere. */
+  isPaidPro: boolean;
   proDaysLeft: number;
   adminUnlocked: boolean;
   loginWithGoogle: (forceRedirect?: boolean) => Promise<{ 
@@ -329,6 +332,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               photoURL: firebaseUser.photoURL || data.profile.photoURL || null,
               tier: resolvedTier,
               proExpiresAt: proExpiresAt,
+              // HARD RULE: payment markers must survive into the client profile —
+              // a paid user is NEVER labelled "Trial". (Server is source of truth.)
+              lastPaymentAt: (data.profile as any)?.lastPaymentAt || null,
+              proPlanId: (data.profile as any)?.proPlanId || null,
               telegramChatId: data.profile.telegramChatId || savedLocalTgChatId || null,
               telegramUsername: data.profile.telegramUsername || savedLocalTgUsername || null,
               notificationPreferences: {
@@ -1211,6 +1218,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     )
   );
 
+  // HARD RULE: payment succeeded => "Pro", never "Trial".
+  // lastPaymentAt / proPlanId are set ONLY by the server payment grant
+  // (server/api/payments.ts doGrantProForOrder) and can never come from a trial.
+  const isPaidPro = Boolean(profile?.lastPaymentAt || (profile as any)?.proPlanId);
+
   return (
     <AuthContext.Provider
       value={{
@@ -1221,6 +1233,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isOwner,
         isAdmin,
         isPro,
+        isPaidPro,
         proDaysLeft,
         adminUnlocked,
         loginWithGoogle,

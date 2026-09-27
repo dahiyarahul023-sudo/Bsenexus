@@ -384,7 +384,7 @@ export const NewsPortal: React.FC<NewsPortalProps> = ({
   onOpenWatchlists,
   onOpenSettings
 }) => {
-  const { user: authUser, profile, isPro, isAdmin, setIsAuthModalOpen, setIsProModalOpen } = useAuth();
+  const { user: authUser, profile, isPro, isPaidPro, isAdmin, setIsAuthModalOpen, setIsProModalOpen } = useAuth();
   const currentUser = user || authUser;
   const [activeSubTab, setActiveSubTab] = useState<'general' | 'watchlist'>('general');
   const [generalNews, setGeneralNews] = useState<StockNewsItem[]>([]);
@@ -641,7 +641,7 @@ export const NewsPortal: React.FC<NewsPortalProps> = ({
 
     if (!isPro && !isAdmin) {
       setIsProModalOpen(true);
-      setSendError('1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹59) to broadcast to Telegram!');
+      setSendError(isPaidPro ? 'Your Pro subscription has expired. Renew Pro (one-time plans from ₹59) to broadcast to Telegram!' : '1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹59) to broadcast to Telegram!');
       setTimeout(() => setSendError(null), 5000);
       return;
     }

@@ -30,7 +30,7 @@ const PRESET_QUESTIONS = [
 ];
 
 export function HelpModal({ isOpen, onClose, onOpenSettings }: HelpModalProps) {
-  const { user, isPro, isAdmin, setIsAuthModalOpen, setIsProModalOpen } = useAuth();
+  const { user, isPro, isPaidPro, isAdmin, setIsAuthModalOpen, setIsProModalOpen } = useAuth();
   const [activeTab, setActiveTab] = useState<'ask_ai' | 'quickstart' | 'telegram' | 'ai' | 'faq'>('ask_ai');
   
   useBodyScrollLock(isOpen);
@@ -65,12 +65,14 @@ export function HelpModal({ isOpen, onClose, onOpenSettings }: HelpModalProps) {
       return;
     }
 
-    // 2. Expired trial
+    // 2. Expired Pro / trial — HARD RULE: a paid user is never told about a "trial".
     if (!isPro && !isAdmin) {
       setChatMessages(prev => [
         ...prev,
         { role: 'user', text: q },
-        { role: 'model', text: '🔒 **Pro Upgrade Required**: Your 1-Week Free Pro trial has ended. Please upgrade to Pro (one-time plans from ₹59) to continue asking the AI Assistant.' }
+        { role: 'model', text: isPaidPro
+          ? '🔒 **Pro Upgrade Required**: Your Pro subscription has expired. Please renew Pro (one-time plans from ₹59) to continue asking the AI Assistant.'
+          : '🔒 **Pro Upgrade Required**: Your 1-Week Free Pro trial has ended. Please upgrade to Pro (one-time plans from ₹59) to continue asking the AI Assistant.' }
       ]);
       setInputQuestion('');
       setIsProModalOpen(true);
@@ -101,7 +103,9 @@ export function HelpModal({ isOpen, onClose, onOpenSettings }: HelpModalProps) {
       }
       if (res.status === 403 || data?.proRequired) {
         setIsProModalOpen(true);
-        setChatMessages([...nextHistory, { role: 'model', text: data.error || '🔒 Your 1-Week Free Pro trial has ended. Please upgrade to Pro (one-time plans from ₹59).' }]);
+        setChatMessages([...nextHistory, { role: 'model', text: data.error || (isPaidPro
+          ? '🔒 Your Pro subscription has expired. Please renew Pro (one-time plans from ₹59).'
+          : '🔒 Your 1-Week Free Pro trial has ended. Please upgrade to Pro (one-time plans from ₹59).') }]);
         return;
       }
       if (data.success && data.answer) {

@@ -250,9 +250,13 @@ export const requireProOrAdmin = async (req: express.Request, res: express.Respo
   // grant (TTL is 2.5s), so a fresh purchase is honoured immediately —
   // no logout/login needed.
   let profileReadFailed = false;
+  let wasPaidUser = false;
   try {
     const profile = await getUserProfile(user.uid);
     const now = Date.now();
+    // HARD RULE: a user with a successful payment on record is NEVER told
+    // about a "trial" — even after their Pro expires.
+    wasPaidUser = Boolean((profile as any)?.lastPaymentAt || (profile as any)?.proPlanId);
     if (profile && (profile.tier === 'admin' || (profile.proExpiresAt && profile.proExpiresAt > now))) {
       return next();
     }
@@ -272,7 +276,9 @@ export const requireProOrAdmin = async (req: express.Request, res: express.Respo
   return res.status(403).json({ 
     success: false, 
     proRequired: true, 
-    error: "1-Week Free Pro trial has ended. Please upgrade to Pro — one-time plans from ₹59 (Weekly), ₹199 (Monthly), ₹999 (6-Month), ₹1,799 (Yearly) — to continue using this feature." 
+    error: wasPaidUser
+      ? "Your Pro subscription has expired. Renew Pro — one-time plans from ₹59 (Weekly), ₹199 (Monthly), ₹999 (6-Month), ₹1,799 (Yearly) — to continue using this feature."
+      : "1-Week Free Pro trial has ended. Please upgrade to Pro — one-time plans from ₹59 (Weekly), ₹199 (Monthly), ₹999 (6-Month), ₹1,799 (Yearly) — to continue using this feature." 
   });
 };
 

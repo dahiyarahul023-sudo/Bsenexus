@@ -130,7 +130,7 @@ export interface ResultCalendarItem {
 }
 
 export function ResultsCalendar() {
-  const { user, profile, isAdmin, isPro, adminUnlocked, setIsAuthModalOpen, setIsProModalOpen } = useAuth();
+  const { user, profile, isAdmin, isPro, isPaidPro, adminUnlocked, setIsAuthModalOpen, setIsProModalOpen } = useAuth();
   // AI summary language (Settings → Telegram Alerts & AI Summaries); English variant lives in aiSummaryEn
   const summaryLang: 'hinglish' | 'english' = profile?.notificationPreferences?.aiSummaryLang === 'hinglish' ? 'hinglish' : 'english';
   const displaySummary = (item: any): string | undefined =>
@@ -624,7 +624,7 @@ export function ResultsCalendar() {
 
     if (!isProOrAdmin) {
       setIsProModalOpen(true);
-      alert('🔒 Direct Telegram Broadcasting is a Pro & Admin feature.\n\nYour 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹59) to dispatch alerts to Telegram!');
+      alert(isPaidPro ? '🔒 Direct Telegram Broadcasting is a Pro & Admin feature.\n\nYour Pro subscription has expired. Renew Pro (one-time plans from ₹59) to dispatch alerts to Telegram!' : '🔒 Direct Telegram Broadcasting is a Pro & Admin feature.\n\nYour 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹59) to dispatch alerts to Telegram!');
       return;
     }
 

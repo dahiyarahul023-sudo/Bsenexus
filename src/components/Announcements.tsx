@@ -80,7 +80,7 @@ export function Announcements({
   isRunning: propIsRunning,
   onToggleEngine: propOnToggleEngine
 }: AnnouncementsProps = {}) {
-  const { user, profile, isAdmin, isPro, adminUnlocked, setIsAuthModalOpen, setIsProModalOpen, updateTelegramPreferences } = useAuth();
+  const { user, profile, isAdmin, isPro, isPaidPro, adminUnlocked, setIsAuthModalOpen, setIsProModalOpen, updateTelegramPreferences } = useAuth();
   const { isDeveloperMode } = useDeveloperMode();
   const { openIntelModal } = useIntelModal();
 
@@ -537,7 +537,7 @@ export function Announcements({
         showToast('🔒 Google Sign-In Required: Sign in with Google to activate your 1-Week Free Pro trial to broadcast to Telegram!', 'info');
       } else {
         setIsProModalOpen(true);
-        showToast('🔒 Direct Telegram Broadcasting is a Pro feature (1-week trial ended. Upgrade to Pro — one-time plans from ₹59).', 'info');
+        showToast(isPaidPro ? '🔒 Direct Telegram Broadcasting is a Pro feature (your Pro subscription has expired. Renew Pro — one-time plans from ₹59).' : '🔒 Direct Telegram Broadcasting is a Pro feature (1-week trial ended. Upgrade to Pro — one-time plans from ₹59).', 'info');
       }
       return;
     }
