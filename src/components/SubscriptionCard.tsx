@@ -244,6 +244,10 @@ export function SubscriptionCard() {
               Cashfree receipt (it starts with BN_). The server will verify the
               payment and activate Pro.
             </p>
+            <p className="text-[10px] text-slate-400 dark:text-slate-500 mb-3">
+              Can't find it? It's the "Invoice No." on the invoice shown right
+              after payment, or in the receipt email if you sent it to yourself.
+            </p>
             <input
               value={claimOrderId}
               onChange={(e) => setClaimOrderId(e.target.value)}
