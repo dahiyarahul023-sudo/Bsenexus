@@ -675,13 +675,13 @@ paymentsRouter.post('/claim', requireAuth, paymentRecoveryLimiter, async (req, r
     if (!ORDER_ID_RE.test(orderId)) {
       return res.status(200).json({
         success: false,
-        error: 'Order ID sahi format me daalo — ye BN_ se shuru hota hai aur receipt par likha hota hai.',
+        error: 'Enter the Order ID in the correct format — it starts with BN_ and is printed on your receipt.',
       });
     }
 
     const order = await fetchOrderFromCashfree(orderId);
     if (!order) {
-      return res.status(200).json({ success: false, error: 'Ye order gateway par nahi mila. Order ID dobara check karo.' });
+      return res.status(200).json({ success: false, error: 'This order was not found on the gateway. Please check the Order ID and try again.' });
     }
 
     // Ownership: the Cashfree customer_id must be this signed-in user. Fail closed.
@@ -689,13 +689,13 @@ paymentsRouter.post('/claim', requireAuth, paymentRecoveryLimiter, async (req, r
     const cleanUid = uid.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 45);
     if (!orderCustomer || (orderCustomer !== cleanUid && orderCustomer !== uid)) {
       console.warn('[Payments] claim ownership mismatch:', orderId, 'uid=', uid);
-      return res.status(200).json({ success: false, error: 'Ye order tumhare account ka nahi lag raha.' });
+      return res.status(200).json({ success: false, error: 'This order does not appear to belong to your account.' });
     }
 
     if (String(order.order_status || '').toUpperCase() !== 'PAID') {
       return res.status(200).json({
         success: false,
-        error: `Is order ka status ${order.order_status || 'unknown'} hai. PAID hone par hi Pro milega.`,
+        error: `This order's status is ${order.order_status || 'unknown'}. Pro is granted only for PAID orders.`,
       });
     }
 

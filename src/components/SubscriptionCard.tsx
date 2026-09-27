@@ -98,7 +98,7 @@ export function SubscriptionCard() {
     if (claiming) return;
     const orderId = claimOrderId.trim();
     if (!orderId) {
-      setClaimMsg({ ok: false, text: 'Order ID daalo — ye BN_ se shuru hota hai aur Cashfree receipt par likha hota hai.' });
+      setClaimMsg({ ok: false, text: 'Enter the Order ID — it starts with BN_ and is printed on your Cashfree receipt.' });
       return;
     }
     setClaiming(true);
@@ -109,8 +109,8 @@ export function SubscriptionCard() {
       setClaimMsg({
         ok: true,
         text: r.alreadyGranted
-          ? 'Ye payment pehle hi Pro me jud chuka hai. Kuch karne ki zaroorat nahi.'
-          : 'Payment mil gayi — Pro activate ho gaya! 🎉',
+          ? 'This payment is already linked to Pro. Nothing more to do.'
+          : 'Payment found — Pro activated! 🎉',
       });
       if (r.receipt) setReceipt(r.receipt);
       // Refresh both the card and the app-wide Pro badge.
@@ -222,7 +222,7 @@ export function SubscriptionCard() {
           onClick={() => { setClaimOpen(true); setClaimMsg(null); setClaimOrderId(''); }}
           className="w-full mt-2 py-2.5 text-[11px] font-bold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-[#2D283E] rounded-xl hover:bg-slate-50 dark:hover:bg-white/5 active:scale-95 transition-all cursor-pointer"
         >
-          Payment ho gaya, Pro nahi mila? Order ID se restore karo
+          Paid but Pro not activated? Restore with Order ID
         </button>
       )}
 
@@ -238,10 +238,11 @@ export function SubscriptionCard() {
             className="w-full max-w-sm bg-white dark:bg-[#181626] border border-slate-200 dark:border-[#2D283E] rounded-2xl p-5 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-sm font-black text-slate-900 dark:text-white mb-1">Pro restore karo</h3>
+            <h3 className="text-sm font-black text-slate-900 dark:text-white mb-1">Restore Pro</h3>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-3">
-              Cashfree receipt par likha <span className="font-bold">Order ID</span> yahan daalo
-              (BN_ se shuru hota hai). Server payment verify karke Pro de dega.
+              Enter the <span className="font-bold">Order ID</span> printed on your
+              Cashfree receipt (it starts with BN_). The server will verify the
+              payment and activate Pro.
             </p>
             <input
               value={claimOrderId}
@@ -268,7 +269,7 @@ export function SubscriptionCard() {
                 disabled={claiming}
                 className="flex-1 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-[#2D283E] rounded-xl hover:bg-slate-50 dark:hover:bg-white/5 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
               >
-                Band karo
+                Close
               </button>
               <button
                 onClick={handleClaim}
