@@ -868,14 +868,13 @@ export function WatchlistManager() {
         ? activeSymbols
         : Array.from(new Set(watchlists.flatMap(l => (l.items || []).map((it: any) => parseSymbolItem(it).symbol).filter(Boolean))));
 
-      // Feed size scales with the watchlist: ~25 filings per tracked stock
-      // (same PER_STOCK_FILINGS as the per-company modal on the server).
-      // The server further applies the "what's new" policy: last 7 days only,
-      // max 25 per stock — so this limit is just a safety backstop.
-      const PER_STOCK_FILINGS = 25;
+      // Feed size scales with the watchlist — mirrors the server's dynamic per-stock
+      // depth (2500 budget split across symbols, 25–100 each). Small watchlists get
+      // deeper per-stock history; the limit here just needs to cover the server's output.
+      const perStockDepth = Math.min(100, Math.max(25, Math.floor(2500 / Math.max(1, symbolsToFetch.length))));
       let url = '/api/announcements';
       if (symbolsToFetch.length > 0) {
-        const limit = Math.min(2500, Math.max(PER_STOCK_FILINGS, symbolsToFetch.length * PER_STOCK_FILINGS));
+        const limit = Math.min(2500, symbolsToFetch.length * perStockDepth);
         url += `?limit=${limit}&symbols=${encodeURIComponent(symbolsToFetch.join(','))}`;
       } else {
         url += '?limit=50';

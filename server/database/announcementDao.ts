@@ -717,12 +717,14 @@ export async function getRecentAnnouncements(limitNum: number = 1000, symbols?: 
     if (cleanSymbols.length > 0) {
       // Hybrid feed policy — "what's new", not an archive:
       //   1. Time window: only filings from the last 7 days. Older items are not "news".
-      //   2. Per-stock cap: each tracked stock contributes up to PER_STOCK of its newest
-      //      filings, so a hyperactive stock can't flood the feed and quiet stocks stay visible.
+      //   2. Per-stock cap: DYNAMIC — the 2500-item budget is split across the requested
+      //      symbols (max 100 per stock, min 25). A user tracking 10 stocks gets 100 filings
+      //      each (deep history); a user tracking 100+ stocks gets 25 each. Small watchlists
+      //      no longer waste most of the budget; hyperactive stocks still can't flood the feed.
       // The cache is sorted newest-first, so we stop at the first item older than the
       // window — no full-cache scan. (Archive needs are served by the per-company modal
       // and the global All-Filings tab, not this feed.)
-      const PER_STOCK = 25;
+      const PER_STOCK = Math.min(100, Math.max(25, Math.floor(2500 / cleanSymbols.length)));
       const WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
       const cutoff = Date.now() - WINDOW_MS;
       const buckets: any[][] = cleanSymbols.map(() => []);
