@@ -2309,8 +2309,8 @@ ${jsonLd}
         </thead>
         <tbody>
           <tr><td>BSE corporate filings feed</td><td><span class="tick">&#10003;</span></td><td><span class="tick">&#10003;</span></td></tr>
-          <tr><td>Watchlists</td><td>1 watchlist</td><td>Unlimited watchlists</td></tr>
-          <tr><td>Gemini AI filing summaries</td><td>1-week free trial</td><td>100 / day</td></tr>
+          <tr><td>Watchlists</td><td><span class="dash">&mdash;</span></td><td>Unlimited watchlists</td></tr>
+          <tr><td>Gemini AI filing summaries</td><td>1 free demo (one-time)</td><td>100 / day</td></tr>
           <tr><td>Telegram alerts</td><td><span class="dash">&mdash;</span></td><td>Instant broadcast to chats &amp; channels</td></tr>
           <tr><td>Board meeting &amp; results calendar</td><td><span class="tick">&#10003;</span></td><td><span class="tick">&#10003;</span></td></tr>
           <tr><td>Export summaries &amp; watchlists (CSV / JSON)</td><td><span class="dash">&mdash;</span></td><td><span class="tick">&#10003;</span></td></tr>

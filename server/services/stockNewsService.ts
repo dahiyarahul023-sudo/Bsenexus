@@ -611,7 +611,10 @@ export async function processAutomatedNewsAlerts(): Promise<{ checked: number; d
     }
 
     // User-specific recipients (Strict opt-in: only if explicitly enabled by user)
+    // Telegram is PRO-ONLY: skip users whose trial/pack has expired.
     for (const u of allUsers) {
+      const userProActive = Boolean(u.tier === 'admin' || (u.proExpiresAt && u.proExpiresAt > Date.now()));
+      if (!userProActive) continue;
       if (u.telegramChatId && u.notificationPreferences?.telegramNewsAlerts === true) {
         // Avoid duplicate if same as global
         if (u.telegramChatId !== settings.chatId) {

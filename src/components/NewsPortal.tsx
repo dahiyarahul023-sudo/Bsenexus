@@ -692,10 +692,11 @@ export const NewsPortal: React.FC<NewsPortalProps> = ({
       return;
     }
 
-    // 2. Authenticated user without active Pro trial
-    if (!isPro && !isAdmin) {
+    // 2. Free plan: exactly ONE AI summary demo, one time ever (server enforces via freeSummaryUsed)
+    const demoAlreadyUsed = (profile as any)?.freeSummaryUsed === true;
+    if (!isPro && !isAdmin && demoAlreadyUsed) {
       setIsProModalOpen(true);
-      setSendError('1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹59) for unlimited AI summaries!');
+      setSendError("🔒 You've used your one free AI summary demo. Upgrade to Pro (one-time plans from ₹59) for 100 AI summaries/day!");
       setTimeout(() => setSendError(null), 5000);
       return;
     }
@@ -742,6 +743,11 @@ export const NewsPortal: React.FC<NewsPortalProps> = ({
       if (res.ok && data?.success && data?.aiSummary) {
         syncQuotaFromResponse(data);
         setAiSummaries(prev => ({ ...prev, [item.id]: data.aiSummary }));
+      } else if (res.status === 403 && data?.demoUsed) {
+        setIsProModalOpen(true);
+        setSendError(`🔒 ${data?.error || "You've used your one free AI summary demo. Upgrade to Pro for 100 AI summaries/day!"}`);
+        setTimeout(() => setSendError(null), 5000);
+        setExpandedAiIds(prev => ({ ...prev, [item.id]: false }));
       } else {
         setSendError(data?.error || 'Could not generate AI summary');
         setTimeout(() => setSendError(null), 4000);
@@ -754,7 +760,7 @@ export const NewsPortal: React.FC<NewsPortalProps> = ({
     } finally {
       setGeneratingAiId(null);
     }
-  }, [aiSummaries, authUser, isPro, isAdmin, setIsAuthModalOpen, setIsProModalOpen]);
+  }, [aiSummaries, authUser, profile, isPro, isAdmin, setIsAuthModalOpen, setIsProModalOpen]);
 
   // Active base dataset
   const currentDataset = activeSubTab === 'general' ? generalNews : watchlistNews;
@@ -1379,6 +1385,23 @@ export const NewsPortal: React.FC<NewsPortalProps> = ({
                 </button>
               </div>
 
+              {/* Telegram is Pro-only: locked card for free users */}
+              {!isPro && !isAdmin && (
+                <div className="p-4 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/60 dark:bg-amber-950/20 space-y-2.5">
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                    🔒 24/7 Telegram news alerts are a <span className="font-bold">Pro feature</span>. Upgrade to receive breaking news for your watchlist stocks directly on Telegram.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => { setIsTgPrefModalOpen(false); setIsProModalOpen(true); }}
+                    className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-sm transition-colors cursor-pointer"
+                  >
+                    Upgrade to Pro — from ₹59
+                  </button>
+                </div>
+              )}
+              {(isPro || isAdmin) && (<>
+
               {/* Master 24/7 Switch */}
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#14131E] border border-slate-200/80 dark:border-[#2D283E] flex items-center justify-between">
                 <div>
@@ -1552,6 +1575,7 @@ export const NewsPortal: React.FC<NewsPortalProps> = ({
                   {tgSaveSuccess ? 'Saved!' : 'Save Preferences'}
                 </ActionButton>
               </div>
+              </>)}
             </motion.div>
           </div>
         )}

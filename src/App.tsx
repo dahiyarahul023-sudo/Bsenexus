@@ -216,7 +216,7 @@ function AppContent() {
   const [watchlists, setWatchlists] = useState<any[]>([]);
   const [health, setHealth] = useState({ bse: { status: 'stable', latency: 85 }, telegram: { status: 'connected', latency: 120 } });
   
-  const { user, profile, authLoading, isAdmin, adminUnlocked, logout, 
+  const { user, profile, authLoading, isAdmin, isPro, adminUnlocked, logout, 
     setIsAuthModalOpen, setIsProModalOpen, setCheckoutPlanId,
     isAuthModalOpen, isProModalOpen, isAdminPinModalOpen 
   } = useAuth();
@@ -244,6 +244,13 @@ function AppContent() {
   });
 
   const handleTabChange = (newTab: string) => {
+    // Watchlist is Pro-only: free users get the upgrade sheet instead (covers
+    // deep links, profile-modal shortcut and in-app buttons).
+    const canUseWatchlist = Boolean(isPro || isAdmin || adminUnlocked || profile?.tier === 'admin');
+    if (newTab === 'watchlists' && !canUseWatchlist) {
+      setIsProModalOpen(true);
+      return;
+    }
     if (newTab === activeTab) {
       // Tap active tab to scroll to top (like iOS / Twitter)
       scrollToTop();

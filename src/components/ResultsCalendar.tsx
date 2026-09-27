@@ -127,7 +127,7 @@ export interface ResultCalendarItem {
 export function ResultsCalendar() {
   const { user, profile, isAdmin, isPro, adminUnlocked, setIsAuthModalOpen, setIsProModalOpen } = useAuth();
   // AI summary language (Settings → Telegram Alerts & AI Summaries); English variant lives in aiSummaryEn
-  const summaryLang: 'hinglish' | 'english' = profile?.notificationPreferences?.aiSummaryLang === 'english' ? 'english' : 'hinglish';
+  const summaryLang: 'hinglish' | 'english' = profile?.notificationPreferences?.aiSummaryLang === 'hinglish' ? 'hinglish' : 'english';
   const displaySummary = (item: any): string | undefined =>
     summaryLang === 'english' ? (item?.aiSummaryEn || item?.aiSummary) : item?.aiSummary;
   const isSuperAdmin = Boolean(isAdmin || adminUnlocked || profile?.tier === 'admin' || user?.isAdmin);
@@ -533,9 +533,11 @@ export function ResultsCalendar() {
       return;
     }
 
-    if (!isProOrAdmin) {
+    // Free plan: exactly ONE AI summary demo, one time ever (server enforces via freeSummaryUsed)
+    const demoAlreadyUsed = (profile as any)?.freeSummaryUsed === true;
+    if (!isProOrAdmin && demoAlreadyUsed) {
       setIsProModalOpen(true);
-      alert('🔒 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹59) for unlimited Gemini AI summaries!');
+      alert("🔒 You've used your one free AI summary demo. Upgrade to Pro (one-time plans from ₹59) for 100 AI summaries/day!");
       return;
     }
 
@@ -550,7 +552,7 @@ export function ResultsCalendar() {
       const res = await customFetch(`/api/announcements/${announcementId}/generate-summary`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lang: profile?.notificationPreferences?.aiSummaryLang === 'english' ? 'english' : 'hinglish' })
+        body: JSON.stringify({ lang: profile?.notificationPreferences?.aiSummaryLang === 'hinglish' ? 'hinglish' : 'english' })
       });
       const data = await res.json().catch(() => null);
 
@@ -566,12 +568,18 @@ export function ResultsCalendar() {
         alert(`🔒 ${errMsg}`);
         return;
       }
+      // Free demo exhausted (server-side flag)
+      if (res.status === 403 && data?.demoUsed) {
+        setIsProModalOpen(true);
+        alert(`🔒 ${data?.error || "You've used your one free AI summary demo. Upgrade to Pro for 100 AI summaries/day!"}`);
+        return;
+      }
 
       if (res.ok && data && data.aiSummary) {
         syncQuotaFromResponse(data);
         // Keep language variants separate: English goes to aiSummaryEn, Hinglish base stays in aiSummary
         const summaryPatch = data.aiSummaryLang === 'english'
-          ? { aiSummaryEn: data.aiSummary, ...(data.aiSummaryHinglish ? { aiSummary: data.aiSummaryHinglish } : {}) }
+          ? { aiSummaryEn: data.aiSummary }
           : { aiSummary: data.aiSummary };
         setSelectedModalItem(prev => prev ? { ...prev, ...summaryPatch } : prev);
         setItems(prev => prev.map(i => i.declarationAnnouncementId === announcementId ? { ...i, ...summaryPatch } : i));

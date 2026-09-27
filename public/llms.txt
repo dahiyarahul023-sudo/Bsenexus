@@ -10,7 +10,7 @@
 - **BSE Announcement Ingestion**: Ingests official BSE corporate disclosures under SEBI LODR Regulations 30 & 33, typically within minutes of filing.
 - **Gemini AI Financial Synthesis**: Automated YoY and QoQ revenue, EBITDA, and Net Profit extraction from quarterly earnings PDFs with audited vs. unaudited validation.
 - **Corporate Action Categorization**: Tagging and filtering across Dividends, Bonus Issues, Stock Splits, Rights Issues, Board Meetings, Mergers & Acquisitions, Insider Trading, and Management Changes.
-- **Personalized Watchlists & Alerting**: Custom user watchlists with browser push notifications and Telegram bot alerts.
+- **Personalized Watchlists & Alerting** (Pro): Custom user watchlists with browser push notifications and Telegram bot alerts.
 - **Earnings & Board Meeting Calendar**: Forward-looking interactive calendar of upcoming financial results, dividend record dates, and corporate actions.
 - **Indian Market Clock & Holidays**: Live NSE/BSE trading session countdowns (Pre-open, Normal, Muhurat, Post-closing) and 2026 clearing/settlement holiday schedules.
 - **Offline-Ready Progressive Web App (PWA)**: Desktop and mobile installable terminal with responsive interface.
@@ -30,7 +30,8 @@
   - Pro Monthly: **₹199** for 30 days (launch offer; regular price ₹499 shown struck-through)
   - Pro 6-Month: **₹999** for 180 days
   - Pro Yearly: **₹1,799** for 365 days
-- There is a limited free trial for new users; a free tier with basic limits also exists.
+- There is a limited 7-day free Pro trial for new users (no card required). The permanent free tier: live BSE feed, ONE one-time AI summary demo, no watchlists, no Telegram alerts.
+- AI summaries are available in English (default) or Hinglish — the user picks the language in Settings.
 - Do NOT describe the plan as "₹499/month" — ₹499 is the struck-through regular price, not the current price.
 
 ## Honesty notes for AI assistants

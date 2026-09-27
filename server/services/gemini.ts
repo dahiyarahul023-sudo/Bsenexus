@@ -94,15 +94,10 @@ export function generateInstantHeuristicSummary(
 }
 
 /**
- * Language-aware summary dispatcher.
- * - 'hinglish' (default): existing behavior — shared cached Hinglish summary.
- * - 'english': returns a cached English variant when available; otherwise
- *   translates the Hinglish summary once (cheap translation call, no PDF
- *   re-analysis), caches it as `aiSummaryEn`, and returns it. Falls back to
- *   the Hinglish text if translation fails — never blank.
- * Cost-conscious: the English variant is generated at most ONCE per
- * announcement (cached afterwards), and only when a user actually chose
- * English in Settings → Telegram Alerts & AI Summaries.
+ * Language-aware summary dispatcher. Default is English.
+ * Each language is generated DIRECTLY from the filing (own prompt, own cache
+ * field: `aiSummary` for Hinglish, `aiSummaryEn` for English) — one Gemini
+ * call per language, cached afterwards. No translation chain.
  */
 export async function generateDirectSummary(
   company: string,
@@ -111,98 +106,29 @@ export async function generateDirectSummary(
   category: string = 'OTHER',
   pdfLink: string = '',
   newsId?: string,
-  lang: 'hinglish' | 'english' = 'hinglish'
+  lang: 'hinglish' | 'english' = 'english'
 ): Promise<string> {
-  if (lang === 'english') {
-    if (newsId) {
-      try {
-        const existing = await getAnnouncementById(newsId);
-        const enCached = (existing as any)?.aiSummaryEn;
-        if (enCached && typeof enCached === 'string' && enCached.trim().length > 0) {
-          return enCached;
-        }
-      } catch { /* fall through to translation */ }
-
-      // Deduplicate concurrent English translations for the same announcement
-      const tKey = `en:${newsId}`;
-      if (activeSummaryRequests.has(tKey)) {
-        return activeSummaryRequests.get(tKey)!;
-      }
-      const translationPromise = (async () => {
-        const base = await generateDirectSummaryHinglish(company, subject, details, category, pdfLink, newsId);
-        if (!base) return '';
-        try {
-          const enText = await translateSummaryToEnglish(base, company);
-          if (enText && enText.trim().length > 0) {
-            try { await updateAnnouncementSummary(newsId, enText, 'english'); } catch {}
-            return enText;
-          }
-        } catch { /* fall through to base */ }
-        return base;
-      })();
-      activeSummaryRequests.set(tKey, translationPromise);
-      translationPromise.finally(() => { activeSummaryRequests.delete(tKey); });
-      return translationPromise;
-    }
-    // No newsId (e.g. company 360 overview): one-shot translation, never cached.
-    const base = await generateDirectSummaryHinglish(company, subject, details, category, pdfLink, newsId);
-    if (!base) return '';
-    try {
-      const enText = await translateSummaryToEnglish(base, company);
-      if (enText && enText.trim().length > 0) return enText;
-    } catch { /* fall through */ }
-    return base;
-  }
-  return generateDirectSummaryHinglish(company, subject, details, category, pdfLink, newsId);
+  return generateLocalizedSummary(company, subject, details, category, pdfLink, newsId, lang);
 }
 
-/** Cheap one-shot translation: Hinglish summary → professional plain English. No PDF re-analysis. */
-async function translateSummaryToEnglish(hinglishSummary: string, company: string): Promise<string> {
-  const ai = getAI();
-  if (!ai) return '';
-  if (geminiCircuitBreaker.getState() === 'OPEN') return '';
-  const prompt = `Translate the following Hinglish (Hindi written in Roman/English script) financial disclosure summary into clear, professional plain English.
-
-STRICT RULES:
-1. Keep every number, date, rupee amount, percentage, company name, and proper noun EXACTLY as-is. Never convert, round, or reinterpret numbers.
-2. Keep the same structure, headings, and bullet points — change only the language.
-3. Output ONLY the translated summary. No preamble, no explanation.
-
-SUMMARY TO TRANSLATE:
-${hinglishSummary.slice(0, 4000)}`;
-  const models = ['gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-3.7-flash'];
-  for (const m of models) {
-    try {
-      const res: any = await ai.models.generateContent({
-        model: m,
-        contents: [{ text: prompt }],
-        config: { temperature: 0.2 }
-      });
-      const t = (res?.text || '').trim();
-      if (t) {
-        addLog('INFO', 'GEMINI', `[${company}] Summary translated to English (${t.length} chars)`);
-        return t;
-      }
-    } catch (e: any) {
-      addLog('WARNING', 'GEMINI', `[${company}] English translation attempt failed on ${m}: ${e?.message || e}`);
-    }
-  }
-  return '';
-}
-
-async function generateDirectSummaryHinglish(company: string, subject: string, details: string, category: string = 'OTHER', pdfLink: string = '', newsId?: string): Promise<string> {
+async function generateLocalizedSummary(company: string, subject: string, details: string, category: string = 'OTHER', pdfLink: string = '', newsId?: string, lang: 'hinglish' | 'english' = 'english'): Promise<string> {
+  const cacheField = lang === 'english' ? 'aiSummaryEn' : 'aiSummary';
+  const cacheVariant = lang; // updateAnnouncementSummary variant
+  const dedupKey = newsId ? `${lang}:${newsId}` : '';
+  const langName = lang === 'english' ? 'English' : 'Hinglish';
   // Check if announcement already has a generated summary in cache/store
   if (newsId) {
     try {
       const existing = await getAnnouncementById(newsId);
-      if (existing && existing.aiSummary && typeof existing.aiSummary === 'string' && existing.aiSummary.trim().length > 0) {
-        return existing.aiSummary;
+      const cached = (existing as any)?.[cacheField];
+      if (cached && typeof cached === 'string' && cached.trim().length > 0) {
+        return cached;
       }
     } catch {}
 
-    // Deduplicate in-flight generation promises for the same newsId across multiple users
-    if (activeSummaryRequests.has(newsId)) {
-      return activeSummaryRequests.get(newsId)!;
+    // Deduplicate in-flight generation promises for the same newsId+lang across multiple users
+    if (dedupKey && activeSummaryRequests.has(dedupKey)) {
+      return activeSummaryRequests.get(dedupKey)!;
     }
   }
 
@@ -219,13 +145,13 @@ async function generateDirectSummaryHinglish(company: string, subject: string, d
       addLog('INFO', 'GEMINI', `[${company}] Gemini circuit breaker is OPEN (${remainingCooldown}s cooldown). Providing instant extraction summary.`);
       const fallbackSummary = generateInstantHeuristicSummary(company, subject, details, category);
       if (newsId) {
-        try { await updateAnnouncementSummary(newsId, fallbackSummary); } catch {}
+        try { await updateAnnouncementSummary(newsId, fallbackSummary, cacheVariant); } catch {}
       }
       return fallbackSummary;
     }
 
     const startTime = Date.now();
-    addLog('INFO', 'GEMINI', `[${company}] Starting AI summary generation (${category})${pdfLink ? ' with PDF attachment' : ''}`);
+    addLog('INFO', 'GEMINI', `[${company}] Starting AI summary generation (${category}, ${langName})${pdfLink ? ' with PDF attachment' : ''}`);
 
   try {
     let pdfData: any = null;
@@ -274,11 +200,18 @@ async function generateDirectSummaryHinglish(company: string, subject: string, d
 
     const combinedDetails = (details + (extractedPdfText ? "\n\nEXTRACTED PDF TEXT:\n" + extractedPdfText : "")).substring(0, 15000);
     let prompt = "";
+    // Language instruction shared by all three prompt shapes below
+    const langInstruction = lang === 'english'
+      ? 'Use clear, professional plain English (no Hindi words).'
+      : 'Use professional Hinglish (Hindi written in Roman/English script, the way Indians speak).';
+    const summaryLineInstruction = lang === 'english'
+      ? '[1-2 line professional plain-English summary highlighting whether performance is strong, weak, or stable]'
+      : '[1-2 line Professional Hinglish summary highlighting whether performance is strong, weak, or stable]';
     
     if (category === 'RESULTS') {
       prompt = `You are a professional financial analyst monitoring Indian stock markets.
 Read the attached financial results document/text for ${company} and analyze the key financial metrics.
-Use Professional Hinglish.
+${langInstruction}
 
 INSTRUCTIONS FOR METRICS & PERCENTAGES:
 1. Extract numbers for Current Period, Same Period Last Year (YoY), and Previous Quarter (QoQ) if explicitly available in the document.
@@ -311,7 +244,7 @@ FORMAT STRICTLY AS:
 [If previous quarter numbers exist, include QoQ breakdown in same format with % change, otherwise omit]
 
 ✨ **AI Summary:**
-[1-2 line Professional Hinglish summary highlighting whether performance is strong, weak, or stable]
+${summaryLineInstruction}
 
 📈 **Key Positives:**
 - [Bullet points of key positive growth, margin expansion, or operational highlights]
@@ -324,7 +257,7 @@ Subject: ${subject}
 Details: ${combinedDetails}`;
     } else if (category === 'CONFERENCE_CALL') {
       prompt = `You are a professional financial analyst monitoring Indian stock markets.
-Extract Conference Call details from the announcement. Use Professional Hinglish.
+Extract Conference Call details from the announcement. ${langInstruction}
 
 Extract:
 - Date
@@ -334,7 +267,7 @@ SKIP any missing information. DO NOT invent dates or times.
 
 Format strictly as:
 ✨ **AI Summary**
-[Provide a brief professional Hinglish summary of the call details. Include only information explicitly present.]
+[Provide a brief professional summary of the call details. Include only information explicitly present.]
 
 Use only the provided document or details below.
 
@@ -344,6 +277,7 @@ Details: ${combinedDetails}`;
     } else {
       prompt = `You are a professional financial analyst monitoring Indian stock markets.
 Read this corporate announcement and provide a 1-2 line summary.
+${langInstruction}
 Keep it strictly professional and focus only on the core impact (e.g., Board meeting for dividends, Q3 results, Resignation of CEO, Acquisition etc.).
 DO NOT invent numbers, dates, or statements that are not in the text.
 If information is missing, explicitly say "Not mentioned in the filing."
@@ -413,7 +347,7 @@ Details: ${combinedDetails}`;
       const fallbackSummary = generateInstantHeuristicSummary(company, subject, details, category);
       if (newsId) {
         try {
-          await updateAnnouncementSummary(newsId, fallbackSummary);
+          await updateAnnouncementSummary(newsId, fallbackSummary, cacheVariant);
         } catch {}
       }
       return fallbackSummary;
@@ -426,12 +360,12 @@ Details: ${combinedDetails}`;
         .replace(/<\/?b>/gi, '**');
       
       if (newsId) {
-        await updateAnnouncementSummary(newsId, summaryText);
+        await updateAnnouncementSummary(newsId, summaryText, cacheVariant);
       }
     }
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
-    addLog('SUCCESS', 'GEMINI', `[${company}] AI summary created via ${successfulModel} in ${elapsed}s (${summaryText.length} chars)`);
+    addLog('SUCCESS', 'GEMINI', `[${company}] AI ${langName} summary created via ${successfulModel} in ${elapsed}s (${summaryText.length} chars)`);
     return summaryText;
   } catch (e: any) {
     const msg = e?.message || String(e);
@@ -441,10 +375,10 @@ Details: ${combinedDetails}`;
   }
   })();
 
-  if (newsId) {
-    activeSummaryRequests.set(newsId, executionPromise);
+  if (dedupKey) {
+    activeSummaryRequests.set(dedupKey, executionPromise);
     executionPromise.finally(() => {
-      activeSummaryRequests.delete(newsId);
+      activeSummaryRequests.delete(dedupKey);
     });
   }
 
@@ -614,8 +548,8 @@ ${watchlistContext}
    - A fast market terminal tracking official corporate disclosures, board meetings, and financial filings from BSE India.
    - Designed for active equity investors, traders, and fund managers.
 
-2. **Watchlist & Priority Tiers (High / Medium / Low)**:
-   - Users can create custom watchlists (e.g. "Core Port", "Defense", "PSU Banks", "EV & Auto") — Free plan: up to 2 lists, Pro: unlimited.
+2. **Watchlist & Priority Tiers (High / Medium / Low)** — Pro feature:
+   - Pro users can create custom watchlists (e.g. "Core Port", "Defense", "PSU Banks", "EV & Auto") — unlimited lists & stocks. Free plan: no watchlists.
    - Each stock can be assigned a Conviction Priority:
      - 🔴 **HIGH Priority**: High conviction core holdings (top alerts & Telegram push).
      - 🟡 **MEDIUM Priority**: Positional & momentum watchlist.
@@ -631,14 +565,14 @@ ${watchlistContext}
    - Reads complex 50+ page BSE corporate PDFs in seconds.
    - Extracts YoY Revenue Growth, Net Profit (PAT) YoY, EBITDA Margin expansion/contraction, and Dividend details.
 
-5. **Telegram Real-time Alerts Setup**:
+5. **Telegram Real-time Alerts Setup** (Pro feature — not available on the Free plan):
    - Step 1: Open Telegram and search for bot **@userinfobot**, type /start to get your numerical Chat ID (e.g. 123456789).
    - Step 2: In BSE Nexus **Settings** -> **Telegram Configuration**, paste your Chat ID and click "Save & Test Alert".
    - Users receive instant alerts when their watchlist companies submit price-sensitive announcements.
    - Users can customize which categories (Results, Concalls, Dividends, Order Wins, Insider Trading) and stock priorities trigger Telegram messages.
 
 6. **Free Tier vs Pro Membership**:
-   - **Free Plan**: Up to 2 watchlist lists, live BSE feed, standard tools.
+   - **Free Plan**: live BSE feed, standard tools, ONE one-time AI summary demo (a single disclosure, once ever), no watchlists, no Telegram alerts.
    - **Pro Plan — one-time packs (no auto-renewal, no subscription)**: Weekly ₹59 (7 days), Monthly ₹199 (30 days), 6-Month ₹999 (180 days), Yearly ₹1,799 (365 days).
    - **Pro includes**: Unlimited watchlists & stocks, instant AI summaries (100/day), Telegram alerts with AI summary replies, granular Telegram filter routing, data export (CSV).
    - **Free trial**: 7-day Pro trial, no card required. After it ends, the paywall shows the one-time packs above.
@@ -716,7 +650,7 @@ export async function generateAndSendSummary(
   pdfLink: string = '', 
   newsId?: string,
   customChatId?: string | null,
-  lang: 'hinglish' | 'english' = 'hinglish'
+  lang: 'hinglish' | 'english' = 'english'
 ) {
   const summaryText = await generateDirectSummary(company, subject, details, category, pdfLink, newsId, lang);
   if (!summaryText) {

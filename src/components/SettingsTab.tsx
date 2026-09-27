@@ -96,6 +96,8 @@ export function SettingsTab({
   } = useAuth();
 
   const isSuperAdmin = Boolean(isAdmin || isOwner || adminUnlocked || profile?.tier === 'admin' || user?.isAdmin);
+  // Telegram is Pro-only; the AI Summary Language picker stays visible for everyone.
+  const isTelegramPro = Boolean(isPro || isAdmin || isOwner || profile?.tier === 'admin');
 
   // Search filter query
   const [searchQuery, setSearchQuery] = useState('');
@@ -132,8 +134,9 @@ export function SettingsTab({
   const [tgAlertsEnabled, setTgAlertsEnabled] = useState(true);
   const [tgAiSummaryEnabled, setTgAiSummaryEnabled] = useState(true);
   const [tgAlertScope, setTgAlertScope] = useState<'WATCHLIST_ONLY' | 'ALL_MARKET'>('WATCHLIST_ONLY');
-  const [tgSummaryLang, setTgSummaryLang] = useState<'hinglish' | 'english'>('hinglish');
+  const [tgSummaryLang, setTgSummaryLang] = useState<'hinglish' | 'english'>('english');
   const [isSavingTg, setIsSavingTg] = useState(false);
+  const [isSavingLangOnly, setIsSavingLangOnly] = useState(false);
   const [tgSaveSuccess, setTgSaveSuccess] = useState(false);
   const [isTestingTelegram, setIsTestingTelegram] = useState(false);
   const [testTgResult, setTestTgResult] = useState<string | null>(null);
@@ -228,7 +231,7 @@ export function SettingsTab({
       setTgAlertsEnabled(profile.notificationPreferences?.telegramAlertsEnabled !== false);
       setTgAiSummaryEnabled(profile.notificationPreferences?.telegramAiSummaryEnabled !== false);
       setTgAlertScope(profile.notificationPreferences?.telegramAlertScope || 'WATCHLIST_ONLY');
-      setTgSummaryLang(profile.notificationPreferences?.aiSummaryLang === 'english' ? 'english' : 'hinglish');
+      setTgSummaryLang(profile.notificationPreferences?.aiSummaryLang === 'hinglish' ? 'hinglish' : 'english');
     }
   }, [profile]);
 
@@ -464,6 +467,21 @@ export function SettingsTab({
         setTgSaveSuccess(false);
         setActiveSheet(null);
       }, 1400);
+    }
+  };
+
+  // Free users can still change the AI summary language (no Telegram involved)
+  const handleSaveLangOnly = async () => {
+    if (!user || user.isAnonymous) {
+      setIsAuthModalOpen?.(true);
+      return;
+    }
+    setIsSavingLangOnly(true);
+    const success = await updateTelegramPreferences({ summaryLang: tgSummaryLang });
+    setIsSavingLangOnly(false);
+    if (success) {
+      setTgSaveSuccess(true);
+      setTimeout(() => setTgSaveSuccess(false), 1400);
     }
   };
 
@@ -1846,6 +1864,38 @@ export function SettingsTab({
               </div>
 
               <form onSubmit={handleSaveTelegram} className="space-y-4 text-xs">
+                {!isTelegramPro && (
+                  <div className="p-4 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/60 dark:bg-amber-950/20 space-y-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 rounded-lg bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400">
+                        <Lock size={14} />
+                      </div>
+                      <span className="font-bold text-xs text-slate-900 dark:text-white">Telegram Alerts are a Pro feature</span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                      Instant Telegram alerts with Gemini AI summary replies are only available on Pro. Your AI summary language below still applies to in-app summaries.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => { setActiveSheet(null); setIsProModalOpen(true); }}
+                      className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-sm transition-colors cursor-pointer"
+                    >
+                      Upgrade to Pro — from ₹59
+                    </button>
+                    {profile?.telegramChatId && (
+                      <button
+                        type="button"
+                        onClick={handleUnlinkTelegram}
+                        disabled={isUnlinkingTg}
+                        className="px-4 py-2 rounded-lg text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-xs font-medium transition-colors cursor-pointer inline-flex items-center gap-1"
+                      >
+                        <Unlink size={11} />
+                        {isUnlinkingTg ? 'Disconnecting...' : 'Disconnect Telegram'}
+                      </button>
+                    )}
+                  </div>
+                )}
+                {isTelegramPro && (<>
                 {/* 1. MASTER TOGGLE: TELEGRAM ALERTS ON/OFF */}
                 <div className={cn(
                   "p-3.5 rounded-xl border transition-all",
@@ -1954,6 +2004,7 @@ export function SettingsTab({
                     </button>
                   </div>
                 </div>
+                </>)}
 
                 {/* 2b. AI SUMMARY LANGUAGE */}
                 <div className="p-3 bg-slate-50 dark:bg-[#201E2E] border border-slate-200 dark:border-[#2D283E] rounded-xl space-y-2">
@@ -1961,24 +2012,6 @@ export function SettingsTab({
                     AI Summary Language
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setTgSummaryLang('hinglish')}
-                      className={cn(
-                        "p-2.5 rounded-lg border text-left cursor-pointer transition-all",
-                        tgSummaryLang === 'hinglish'
-                          ? "bg-white dark:bg-[#28253B] border-purple-500 ring-1 ring-purple-500 text-slate-900 dark:text-white"
-                          : "bg-transparent border-slate-200 dark:border-[#2D283E] text-slate-600 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-[#252236]"
-                      )}
-                    >
-                      <div className="font-bold text-[11px] flex items-center justify-between">
-                        <span>Hinglish</span>
-                        {tgSummaryLang === 'hinglish' && <Check size={12} className="text-purple-500" />}
-                      </div>
-                      <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
-                        जैसी बोलते हैं — current style
-                      </div>
-                    </button>
                     <button
                       type="button"
                       onClick={() => setTgSummaryLang('english')}
@@ -1997,12 +2030,44 @@ export function SettingsTab({
                         Plain professional English
                       </div>
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setTgSummaryLang('hinglish')}
+                      className={cn(
+                        "p-2.5 rounded-lg border text-left cursor-pointer transition-all",
+                        tgSummaryLang === 'hinglish'
+                          ? "bg-white dark:bg-[#28253B] border-purple-500 ring-1 ring-purple-500 text-slate-900 dark:text-white"
+                          : "bg-transparent border-slate-200 dark:border-[#2D283E] text-slate-600 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-[#252236]"
+                      )}
+                    >
+                      <div className="font-bold text-[11px] flex items-center justify-between">
+                        <span>Hinglish</span>
+                        {tgSummaryLang === 'hinglish' && <Check size={12} className="text-purple-500" />}
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        जैसी बोलते हैं — current style
+                      </div>
+                    </button>
                   </div>
                   <p className="text-[10px] text-slate-500 dark:text-slate-400">
                     Applies to in-app AI digests, Company Hub takeaways & Telegram summary replies.
                   </p>
                 </div>
+                {!isTelegramPro && (
+                  <ActionButton
+                    type="button"
+                    onClick={handleSaveLangOnly}
+                    isLoading={isSavingLangOnly}
+                    loadingText="Saving..."
+                    variant="primary"
+                    size="md"
+                    icon={tgSaveSuccess ? <Check size={13} className="text-emerald-300" /> : undefined}
+                  >
+                    {tgSaveSuccess ? 'Saved!' : 'Save Language'}
+                  </ActionButton>
+                )}
 
+                {isTelegramPro && (<>
                 {/* 3. ALERT SCOPE SELECTOR */}
                 <div className="p-3 bg-slate-50 dark:bg-[#201E2E] border border-slate-200 dark:border-[#2D283E] rounded-xl space-y-2">
                   <div className="font-semibold text-slate-700 dark:text-slate-300 text-[11px]">
@@ -2168,6 +2233,7 @@ export function SettingsTab({
                     </ActionButton>
                   </div>
                 </div>
+                </>)}
               </form>
             </motion.div>
           </div>

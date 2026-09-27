@@ -80,7 +80,7 @@ export function Announcements({
   isRunning: propIsRunning,
   onToggleEngine: propOnToggleEngine
 }: AnnouncementsProps = {}) {
-  const { user, profile, isAdmin, isPro, adminUnlocked, setIsAuthModalOpen, setIsProModalOpen } = useAuth();
+  const { user, profile, isAdmin, isPro, adminUnlocked, setIsAuthModalOpen, setIsProModalOpen, updateTelegramPreferences } = useAuth();
   const { isDeveloperMode } = useDeveloperMode();
   const { openIntelModal } = useIntelModal();
 
@@ -244,9 +244,13 @@ export function Announcements({
     const willExpand = !inlineAiExpanded[itemId];
     setInlineAiExpanded(prev => ({ ...prev, [itemId]: willExpand }));
     
-    // If expanding and doesn't have AI summary yet, auto-generate
+    // If expanding and doesn't have AI summary yet, auto-generate.
+    // Pro/trial only — never auto-burn a free user's one-time demo (they must tap Generate).
     const targetItem = announcements.find(a => a.id === itemId);
-    if (willExpand && targetItem && !targetItem.aiSummary && !inlineGeneratingMap[itemId]) {
+    const hasWantedLang = summaryLang === 'english'
+      ? (targetItem?.aiSummaryEn || targetItem?.aiSummary)
+      : (targetItem?.aiSummary || targetItem?.aiSummaryEn);
+    if (willExpand && targetItem && !hasWantedLang && !inlineGeneratingMap[itemId] && isProOrAdmin) {
       await handleGenerateSummary(itemId);
     }
   };
@@ -504,10 +508,14 @@ export function Announcements({
   const [telegramStatus, setTelegramStatus] = useState<string | null>(null);
   const [lightningId, setLightningId] = useState<string | null>(null);
   const [copiedSummary, setCopiedSummary] = useState(false);
+  const [isSavingLang, setIsSavingLang] = useState(false);
 
   const isProOrAdmin = Boolean(isAdmin || (isPro && !user?.isAnonymous) || profile?.tier === 'admin');
-  // AI summary language chosen in Settings → Telegram Alerts & AI Summaries (default: Hinglish)
-  const summaryLang: 'hinglish' | 'english' = profile?.notificationPreferences?.aiSummaryLang === 'english' ? 'english' : 'hinglish';
+  // AI summary language chosen in Settings (default: English)
+  const summaryLang: 'hinglish' | 'english' = profile?.notificationPreferences?.aiSummaryLang === 'hinglish' ? 'hinglish' : 'english';
+  // Display text in the chosen language; fall back to whichever variant exists.
+  const displaySummary = (item: any): string =>
+    summaryLang === 'english' ? (item?.aiSummaryEn || item?.aiSummary || '') : (item?.aiSummary || item?.aiSummaryEn || '');
   const aiQuota = useAiQuota(user, profile, isPro, isAdmin);
 
   // Cycle through AI thinking steps
@@ -580,11 +588,16 @@ export function Announcements({
       return;
     }
 
-    // 2. Authenticated user without active Pro trial / admin
-    if (!isProOrAdmin) {
+    // 2. Free plan: exactly ONE AI summary demo, one time ever (server enforces via freeSummaryUsed).
+    // Trial/paid/admin keep unlimited-within-quota access.
+    const demoAlreadyUsed = (profile as any)?.freeSummaryUsed === true;
+    if (!isProOrAdmin && demoAlreadyUsed) {
       setIsProModalOpen(true);
-      showToast('🔒 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹59) to continue generating Gemini AI summaries!', 'info');
+      showToast('🔒 You\'ve used your one free AI summary demo. Upgrade to Pro (one-time plans from ₹59) for 100 AI summaries/day!', 'info');
       return;
+    }
+    if (!isProOrAdmin && !demoAlreadyUsed) {
+      showToast('🎁 Free demo: this is your one-time AI summary. Choose wisely!', 'info');
     }
 
     if (!aiQuota.canGenerate) {
@@ -616,15 +629,18 @@ export function Announcements({
         return;
       }
 
+      // Free demo exhausted (server-side flag)
+      if (res.status === 403 && data?.demoUsed) {
+        setIsProModalOpen(true);
+        showToast(`🔒 ${data?.error || 'You\'ve used your one free AI summary demo. Upgrade to Pro for 100 AI summaries/day!'}`, 'info');
+        return;
+      }
+
       if (res.ok && data && data.aiSummary) {
         syncQuotaFromResponse(data);
         showToast(forLang === 'english' ? '✨ English AI summary ready!' : '✨ Gemini AI neural synthesis ready!', 'success');
-        // English translations are stored separately so the Hinglish original is never overwritten.
-        // The server also returns the Hinglish base (aiSummaryHinglish) so first-time
-        // English generations render correctly even when no Hinglish summary existed before.
-        const patch = forLang === 'english'
-          ? { aiSummaryEn: data.aiSummary, ...(data.aiSummaryHinglish ? { aiSummary: data.aiSummaryHinglish } : {}) }
-          : { aiSummary: data.aiSummary };
+        // Each language is stored in its own field so the other variant is never overwritten.
+        const patch = forLang === 'english' ? { aiSummaryEn: data.aiSummary } : { aiSummary: data.aiSummary };
         setSelectedItem((prev: any) => prev && prev.id === id ? { ...prev, ...patch } : prev);
         setAnnouncements((prev: any[]) => prev.map(a => a.id === id ? { ...a, ...patch } : a));
       } else {
@@ -638,23 +654,41 @@ export function Announcements({
     }
   };
 
-  // Auto-translate: when the user chose English and opens a disclosure whose
-  // Hinglish summary exists but the English variant was never generated,
-  // fetch it once (server caches it as aiSummaryEn afterwards).
-  const autoTranslatedIds = useRef<Set<string>>(new Set());
+  // Auto-generate the missing language variant once when the user opens a
+  // disclosure that already has the OTHER variant cached (server caches it
+  // afterwards). Pro/trial only — never auto-burn a free user's one-time
+  // demo (they must tap Generate). Fresh disclosures still need an explicit tap.
+  const autoFetchedIds = useRef<Set<string>>(new Set());
   useEffect(() => {
     const it: any = selectedItem;
+    const key = it?.id ? `${it.id}:${summaryLang}` : '';
+    const hasWanted = summaryLang === 'english' ? it?.aiSummaryEn : it?.aiSummary;
+    const hasOther = summaryLang === 'english' ? it?.aiSummary : it?.aiSummaryEn;
     if (
-      summaryLang === 'english' &&
-      it?.id && it.aiSummary && !it.aiSummaryEn &&
-      !autoTranslatedIds.current.has(it.id) &&
+      key && !hasWanted && hasOther &&
+      !autoFetchedIds.current.has(key) &&
       !isGeneratingAi && isProOrAdmin
     ) {
-      autoTranslatedIds.current.add(it.id);
-      handleGenerateSummary(it.id, 'english');
+      autoFetchedIds.current.add(key);
+      handleGenerateSummary(it.id, summaryLang);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedItem?.id, summaryLang]);
+
+  // Language toggle right at the AI summary: persists to Settings (same preference
+  // used by Telegram replies & Company Hub). Shows a spinner while saving.
+  const handleSummaryLangChange = async (lang: 'hinglish' | 'english') => {
+    if (lang === summaryLang || isSavingLang) return;
+    setIsSavingLang(true);
+    try {
+      const ok = await updateTelegramPreferences({ summaryLang: lang });
+      showToast(ok ? (lang === 'english' ? '🌐 Summaries will now appear in English' : '🌐 Summaries will now appear in Hinglish') : '⚠️ Could not save language preference', ok ? 'success' : 'error');
+    } catch {
+      showToast('⚠️ Could not save language preference', 'error');
+    } finally {
+      setIsSavingLang(false);
+    }
+  };
 
   const handleSelectAnnouncement = (item: any) => {
     setSelectedItem(item);
@@ -996,17 +1030,31 @@ export function Announcements({
           </div>
         </div>
 
-        {/* Plain-English / AI Summary Block (Placed Below Announcement) */}
+        {/* Plain-English / Hinglish AI Summary Block (Placed Below Announcement) */}
         <div className="space-y-2 pt-1">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2">
               <span className="text-[11px] font-black text-purple-700 dark:text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
                 <Sparkles size={13} className="text-purple-500 fill-purple-500" />
                 <span>AI {summaryLang === 'english' ? 'Plain-English' : 'Hinglish'} Digest</span>
               </span>
+              {/* Language toggle — right where the summary appears */}
+              <div className="flex items-center rounded-full border border-purple-200 dark:border-purple-800 bg-purple-50/60 dark:bg-purple-950/30 p-0.5" role="group" aria-label="Summary language">
+                {(['english', 'hinglish'] as const).map(l => (
+                  <button
+                    key={l}
+                    type="button"
+                    disabled={isSavingLang}
+                    onClick={() => handleSummaryLangChange(l)}
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-colors ${summaryLang === l ? 'bg-purple-600 text-white shadow-sm' : 'text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/40'} ${isSavingLang ? 'opacity-60' : ''}`}
+                  >
+                    {isSavingLang && summaryLang !== l ? '…' : (l === 'english' ? 'EN' : 'हिं')}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {!item.aiSummary && !isGeneratingAi && (
+            {!displaySummary(item) && !isGeneratingAi && (
               <ActionButton
                 onClick={() => handleGenerateSummary(item.id)}
                 isLoading={isGeneratingAi}
@@ -1043,9 +1091,9 @@ export function Announcements({
                 <div className="h-full bg-purple-500 rounded-full animate-ai-gradient w-full" />
               </div>
             </div>
-          ) : item.aiSummary ? (
+          ) : displaySummary(item) ? (
             <AiSummaryViewer
-              summaryText={summaryLang === 'english' ? (item.aiSummaryEn || item.aiSummary) : item.aiSummary}
+              summaryText={displaySummary(item)}
               category={item.category}
               companyName={item.companyName}
               onRegenerate={() => handleGenerateSummary(item.id)}

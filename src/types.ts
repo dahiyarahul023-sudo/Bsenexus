@@ -58,6 +58,7 @@ export interface UserProfile {
   proExpiresAt?: number | null;
   // --- Cashfree one-time Pro payments (server is source of truth) ---
   trialUsed?: boolean;          // 7-day free trial already consumed (client + server)
+  freeSummaryUsed?: boolean;    // free plan's ONE one-time AI summary demo already consumed
   proPlanId?: string | null;    // e.g. 'pro_monthly'
   lastPaymentAt?: number | null;
   lastOrderId?: string | null;  // idempotency key for webhook/verify grants

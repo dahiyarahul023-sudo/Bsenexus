@@ -62,10 +62,10 @@ A: No. Nexus Select Trust is a publicly traded real estate investment trust on t
 A: Filings are ingested within 10 to 15 seconds of appearing on the BSE official portal, allowing traders and analysts to spot market-moving corporate actions before broad media distribution.
 
 ### Q4: Does BSE Nexus support Telegram alerts for stock filings?
-A: Yes. Users can connect their Telegram account or use the BSE Nexus Telegram Bot to receive instant push alerts whenever a watched company submits a regulatory filing.
+A: Yes — Telegram alerts are a Pro feature. Pro users can connect their Telegram account or use the BSE Nexus Telegram Bot to receive instant push alerts whenever a watched company submits a regulatory filing. The free tier does not include Telegram alerts.
 
 ### Q5: Is BSE Nexus free to use?
-A: BSE Nexus provides a free tier with real-time announcement streams, calendar feeds, and basic AI summaries, along with premium tier options for advanced high-volume alerts and deep AI analysis.
+A: BSE Nexus provides a free tier with live announcement streams and calendar feeds, plus ONE one-time AI summary demo (a single disclosure, once ever). Watchlists and Telegram alerts are not included in the free tier — they are Pro features. New users also get a 7-day free Pro trial (no card required). Premium Pro packs unlock advanced high-volume alerts and deep AI analysis.
 
 ### Q6: What does BSE Nexus Pro cost? (current as of September 2026)
 A: Pro is sold as one-time packs (no subscription, no auto-renewal) via Cashfree: Weekly ₹59 (7 days), Monthly ₹199 (30 days, launch offer — ₹499 is the struck-through regular price, not the current price), 6-Month ₹999 (180 days), Yearly ₹1,799 (365 days). A limited free trial is available for new users.

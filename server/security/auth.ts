@@ -244,10 +244,12 @@ export const requireProOrAdmin = async (req: express.Request, res: express.Respo
     return next();
   }
 
-  // The JWT `isPro` claim is minted at login and goes stale the moment a user
-  // purchases Pro, so always re-check the live profile here. The payment
-  // verify endpoint invalidates the profile cache on grant (TTL is 2.5s), so a
-  // fresh purchase is honoured immediately — no logout/login needed.
+  // The JWT `isPro` claim is minted at login and goes stale the moment a user's
+  // Pro/trial expires, so it is NEVER trusted here. Only the live profile
+  // decides. The payment verify endpoint invalidates the profile cache on
+  // grant (TTL is 2.5s), so a fresh purchase is honoured immediately —
+  // no logout/login needed.
+  let profileReadFailed = false;
   try {
     const profile = await getUserProfile(user.uid);
     const now = Date.now();
@@ -255,11 +257,16 @@ export const requireProOrAdmin = async (req: express.Request, res: express.Respo
       return next();
     }
   } catch {
-    // fall through to the JWT claim below as a best-effort backup
+    profileReadFailed = true;
   }
 
-  if (user.isPro) {
-    return next();
+  if (profileReadFailed) {
+    // Fail closed: live Pro status could not be verified — never fall back to
+    // the stale JWT claim. The user retries once storage recovers.
+    return res.status(503).json({
+      success: false,
+      error: "Couldn't verify your Pro status right now. Please retry in a moment."
+    });
   }
 
   return res.status(403).json({ 

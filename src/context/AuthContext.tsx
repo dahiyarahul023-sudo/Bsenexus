@@ -1050,6 +1050,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       notificationPreferences: updatedPrefs
     };
 
+    const previousProfile = profile;
     setProfile(updatedProfile);
     saveLocalSession(user, updatedProfile);
 
@@ -1084,6 +1085,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (!res.ok) {
+        if (res.status === 403 || res.status === 401) {
+          // Pro-gated or auth failure: never bypass via the general profile
+          // endpoint — surface the real error instead.
+          const errBody = await res.json().catch(() => ({} as any));
+          throw new Error(errBody?.error || `Telegram settings update failed (${res.status})`);
+        }
         // Transparent fallback to general profile endpoint
         const fallbackRes = await customFetch('/api/users/profile', {
           method: 'POST',
@@ -1104,6 +1111,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (e: any) {
       console.warn('Telegram preferences update notice:', e);
       reportSyncStatus('failed', `Telegram settings update failed: ${e?.message || e}`);
+      // Roll back the optimistic update so the UI never shows a state the server rejected
+      setProfile(previousProfile);
+      saveLocalSession(user, previousProfile);
       return false;
     }
   };

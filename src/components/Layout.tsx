@@ -136,6 +136,7 @@ export function Layout({
     profile, 
     isAdmin, 
     isPro, 
+    adminUnlocked,
     proDaysLeft,
     setIsAuthModalOpen, 
     setIsProModalOpen,
@@ -331,6 +332,8 @@ export function Layout({
     badge?: string | number;
   }
 
+  // Watchlist is a Pro-only feature: hide the tab entirely for free users.
+  const canUseWatchlist = Boolean(isPro || isAdmin || adminUnlocked || profile?.tier === 'admin');
   const navItems: NavItem[] = [
     { id: 'home', label: 'For You', shortLabel: 'For You', icon: Home },
     { id: 'dashboard', label: 'Filings', shortLabel: 'Filings', icon: Flame },
@@ -339,7 +342,7 @@ export function Layout({
     { id: 'results-calendar', label: 'Earnings Calendar', shortLabel: 'Earnings', icon: CalendarDays },
     { id: 'news', label: 'Market News', shortLabel: 'News', icon: Newspaper },
     { id: 'more', label: 'More', shortLabel: 'More', icon: MoreHorizontal },
-  ];
+  ].filter(i => i.id !== 'watchlists' || canUseWatchlist);
 
   // Mobile Bottom Bar: Clean 5 tabs strictly adhering to touch-friendly mobile design
   const mobileNavItems: NavItem[] = [
@@ -348,7 +351,7 @@ export function Layout({
     { id: 'watchlists', label: 'Watchlist', shortLabel: 'Watchlist', icon: Star },
     { id: 'results-calendar', label: 'Earnings', shortLabel: 'Earnings', icon: CalendarDays },
     { id: 'more', label: 'More', shortLabel: 'More', icon: MoreHorizontal },
-  ];
+  ].filter(i => i.id !== 'watchlists' || canUseWatchlist);
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#12131C] text-slate-800 dark:text-slate-200 flex flex-col font-sans transition-colors duration-200">

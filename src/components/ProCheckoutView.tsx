@@ -30,8 +30,8 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 /** Compact Free vs Pro comparison shown in step 1, before payment. */
 function ProVsFree() {
   const rows: Array<[string, string, string]> = [
-    ['Watchlists', '1 watchlist', 'Unlimited'],
-    ['AI filing summaries', '1-week trial', '100 / day'],
+    ['Watchlists', '—', 'Unlimited'],
+    ['AI filing summaries', '1 demo (one-time)', '100 / day'],
     ['Telegram alerts', '—', 'Broadcast'],
     ['Export (CSV / JSON)', '—', 'Included'],
   ];

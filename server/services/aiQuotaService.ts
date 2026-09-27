@@ -177,12 +177,14 @@ export async function getServerAiQuotaStatus(
   const proDaysLeft = proExpiresAt ? Math.max(0, Math.ceil((proExpiresAt - now) / (24 * 60 * 60 * 1000))) : 0;
 
   if (!isProActive && profile?.tier !== 'admin') {
+    // FREE PLAN: exactly ONE AI summary demo (one disclosure, one time ever)
+    const demoUsed = (profile as any)?.freeSummaryUsed === true;
     return {
       tier: 'free',
-      dailyLimit: 0,
-      usedToday: 0,
-      remaining: 0,
-      canGenerate: false,
+      dailyLimit: 1,
+      usedToday: demoUsed ? 1 : 0,
+      remaining: demoUsed ? 0 : 1,
+      canGenerate: !demoUsed,
       proDaysLeft: 0
     };
   }

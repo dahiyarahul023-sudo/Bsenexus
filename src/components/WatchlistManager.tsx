@@ -486,7 +486,7 @@ const SwipeableFilingCard: React.FC<{
 export function WatchlistManager() {
   const { user, profile, isPro, isAdmin, adminUnlocked, setIsAuthModalOpen, setIsProModalOpen } = useAuth();
   // AI summary language (Settings → Telegram Alerts & AI Summaries); English variant lives in aiSummaryEn
-  const summaryLang: 'hinglish' | 'english' = profile?.notificationPreferences?.aiSummaryLang === 'english' ? 'english' : 'hinglish';
+  const summaryLang: 'hinglish' | 'english' = profile?.notificationPreferences?.aiSummaryLang === 'hinglish' ? 'hinglish' : 'english';
   const displaySummary = (item: any): string | undefined =>
     summaryLang === 'english' ? (item?.aiSummaryEn || item?.aiSummary) : item?.aiSummary;
   const [watchlists, setWatchlists] = useState<any[]>([]);
@@ -751,9 +751,11 @@ export function WatchlistManager() {
       return;
     }
 
-    if (!isProOrAdmin) {
+    // Free plan: exactly ONE AI summary demo, one time ever (server enforces via freeSummaryUsed)
+    const demoAlreadyUsed = (profile as any)?.freeSummaryUsed === true;
+    if (!isProOrAdmin && demoAlreadyUsed) {
       setIsProModalOpen(true);
-      alert('🔒 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹59) for unlimited Gemini AI summaries!');
+      alert("🔒 You've used your one free AI summary demo. Upgrade to Pro (one-time plans from ₹59) for 100 AI summaries/day!");
       return;
     }
 
@@ -767,7 +769,7 @@ export function WatchlistManager() {
       const response = await customFetch(`/api/announcements/${id}/generate-summary`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lang: profile?.notificationPreferences?.aiSummaryLang === 'english' ? 'english' : 'hinglish' })
+        body: JSON.stringify({ lang: profile?.notificationPreferences?.aiSummaryLang === 'hinglish' ? 'hinglish' : 'english' })
       });
       const data = await response.json().catch(() => null);
 
@@ -783,12 +785,18 @@ export function WatchlistManager() {
         alert(`🔒 ${errMsg}`);
         return;
       }
+      // Free demo exhausted (server-side flag)
+      if (response.status === 403 && data?.demoUsed) {
+        setIsProModalOpen(true);
+        alert(`🔒 ${data?.error || "You've used your one free AI summary demo. Upgrade to Pro for 100 AI summaries/day!"}`);
+        return;
+      }
 
       if (response.ok && data && data.aiSummary) {
         syncQuotaFromResponse(data);
         // Keep language variants separate: English goes to aiSummaryEn, Hinglish base stays in aiSummary
         const summaryPatch = data.aiSummaryLang === 'english'
-          ? { aiSummaryEn: data.aiSummary, ...(data.aiSummaryHinglish ? { aiSummary: data.aiSummaryHinglish } : {}) }
+          ? { aiSummaryEn: data.aiSummary }
           : { aiSummary: data.aiSummary };
         setSelectedAnnouncement((prev: any) => prev && prev.id === id ? { ...prev, ...summaryPatch } : prev);
         setAnnouncements((prev: any[]) => prev.map(a => a.id === id ? { ...a, ...summaryPatch } : a));
@@ -1739,6 +1747,28 @@ export function WatchlistManager() {
       currentPage * itemsPerPage
     );
   }, [clusteredWatchlistAnnouncements, currentPage, itemsPerPage]);
+
+  // Watchlist is Pro-only: free users see an upgrade card instead of the manager.
+  if (!isProOrAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center text-center px-6 py-16 space-y-4">
+        <div className="w-16 h-16 rounded-2xl bg-amber-100 dark:bg-amber-900/40 border border-amber-200 dark:border-amber-800 flex items-center justify-center">
+          <Lock className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+        </div>
+        <h2 className="text-lg font-black text-slate-900 dark:text-white">Watchlists are a Pro feature</h2>
+        <p className="text-sm text-slate-600 dark:text-slate-400 max-w-xs leading-relaxed">
+          Track unlimited stocks with priority tiers and instant Telegram alerts. Upgrade to Pro — one-time plans from ₹59.
+        </p>
+        <button
+          onClick={() => setIsProModalOpen(true)}
+          className="px-6 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-black shadow-lg shadow-amber-500/25 transition-colors flex items-center gap-2"
+        >
+          <Crown className="w-4 h-4" />
+          Upgrade to Pro
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div ref={watchlistContainerRef} className="space-y-2 overscroll-y-contain relative">

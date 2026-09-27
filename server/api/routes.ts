@@ -60,7 +60,9 @@ import {
   getUserProfile, 
   saveUserProfile, 
   isUsernameAvailable, 
-  generateUniqueUsername
+  generateUniqueUsername,
+  claimFreeSummaryDemo,
+  releaseFreeSummaryDemo
 } from "../database/usersDao.js";
 import { getAllAlertRules, saveAlertRule, toggleAlertRule, deleteAlertRule } from "../database/alertRulesDao.js";
 import { checkServerAiQuota, consumeServerAiQuota, getServerAiQuotaStatus, resetServerAiQuota } from "../services/aiQuotaService.js";
@@ -455,8 +457,11 @@ apiRouter.post("/billing/reset-quota", requireAdmin, async (req, res) => {
 });
 
 apiRouter.post("/announcements/:id/generate-summary", aiRateLimiter, async (req, res) => {
+  // Hoisted for the catch block: release the free-demo claim on ANY throw.
+  let uid = '';
+  let isFreeDemo = false;
   try {
-    const uid = getReqUserId(req);
+    uid = getReqUserId(req);
     const isAdminUser = (req as any).user?.isAdmin === true;
 
     // Reject unauthenticated guests immediately to safeguard Gemini API
@@ -468,18 +473,19 @@ apiRouter.post("/announcements/:id/generate-summary", aiRateLimiter, async (req,
       });
     }
 
-    // 1. Check server-side AI summary quota before generation
-    const quotaCheck = await checkServerAiQuota(uid, isAdminUser);
-    if (!quotaCheck.allowed) {
-      return res.status(429).json({
-        success: false,
-        error: quotaCheck.error || "Daily AI summary quota reached.",
-        upgradeRequired: true,
-        remainingQuota: 0,
-        dailyLimit: quotaCheck.dailyLimit
-      });
-    }
+    // Pro / active-trial check against the LIVE profile (JWT claim goes stale after purchase)
+    let isProLike = isAdminUser;
+    let profile: any = null;
+    try {
+      profile = await getUserProfile(uid);
+      const now = Date.now();
+      isProLike = isProLike || profile?.tier === 'admin' || Boolean(profile?.proExpiresAt && profile.proExpiresAt > now);
+    } catch { /* profile stays null -> treated as free */ }
 
+    // FREE PLAN: exactly ONE AI summary demo — one disclosure, one time ever.
+    // Claimed ATOMICALLY before generation (Firestore transaction + per-uid
+    // mutex), so two concurrent requests can't both win it.
+    let consumed = { remaining: 0, dailyLimit: 1, isPro: false };
     const newsId = req.params.id;
     let item = await getAnnouncementById(newsId);
     if (!item && req.body && req.body.companyName) {
@@ -488,10 +494,35 @@ apiRouter.post("/announcements/:id/generate-summary", aiRateLimiter, async (req,
     if (!item) {
       return res.status(404).json({ error: "Announcement not found in memory or database" });
     }
-    // AI summary language: user's Settings choice (Telegram Alerts & AI Summaries).
-    // English variant is translated once per announcement and cached (aiSummaryEn).
+    if (!isProLike) {
+      const won = await claimFreeSummaryDemo(uid);
+      if (!won) {
+        return res.status(403).json({
+          success: false,
+          demoUsed: true,
+          upgradeRequired: true,
+          error: "You've used your one free AI summary demo. Upgrade to Pro — one-time plans from ₹59 — for 100 AI summaries/day."
+        });
+      }
+      isFreeDemo = true; // this single request owns the demo; released if generation fails
+    } else {
+      // 1. Check server-side AI summary quota before generation (Pro / trial only)
+      const quotaCheck = await checkServerAiQuota(uid, isAdminUser);
+      if (!quotaCheck.allowed) {
+        return res.status(429).json({
+          success: false,
+          error: quotaCheck.error || "Daily AI summary quota reached.",
+          upgradeRequired: true,
+          remainingQuota: 0,
+          dailyLimit: quotaCheck.dailyLimit
+        });
+      }
+    }
+
+    // AI summary language: user's Settings choice (default English).
+    // Each language is generated directly and cached in its own field.
     const reqLang = (req.body && (req.body as any).lang) || req.query.lang;
-    const summaryLang = reqLang === 'english' ? 'english' : 'hinglish';
+    const summaryLang = reqLang === 'hinglish' ? 'hinglish' : 'english';
     const summary = await generateDirectSummary(
       item.companyName || item.SLONGNAME || "",
       item.subject || item.NEWSSUB || "",
@@ -502,80 +533,76 @@ apiRouter.post("/announcements/:id/generate-summary", aiRateLimiter, async (req,
       summaryLang
     );
     if (!summary) {
+      // Generation failed — release the free demo claim so the user can retry it
+      if (isFreeDemo) { try { await releaseFreeSummaryDemo(uid); } catch {} }
       return res.status(500).json({ 
         success: false, 
         error: "AI Summary generation failed or rate limited. Check Engine Activity Logs tab for details." 
       });
     }
 
-    // 2. Consume quota ONLY after successful generation
-    const consumed = await consumeServerAiQuota(uid, isAdminUser);
-
-    // For English requests the Hinglish base is also cached server-side during
-    // generation — return it too so the client can render consistently.
-    let baseSummary: string | undefined;
-    if (summaryLang === 'english') {
-      try {
-        const fresh = await getAnnouncementById(newsId);
-        const b = (fresh as any)?.aiSummary;
-        if (b && typeof b === 'string' && b.trim().length > 0) baseSummary = b;
-      } catch { /* optional */ }
+    // 2. Consume quota ONLY after successful generation (Pro/trial).
+    // Free demo was already claimed atomically above — nothing more to burn.
+    if (isProLike) {
+      consumed = await consumeServerAiQuota(uid, isAdminUser);
     }
 
     res.json({
       success: true,
       aiSummary: summary,
       aiSummaryLang: summaryLang,
-      ...(baseSummary ? { aiSummaryHinglish: baseSummary } : {}),
+      ...(isFreeDemo ? { freeDemo: true } : {}),
       remainingQuota: consumed.remaining,
       dailyLimit: consumed.dailyLimit,
       isPro: consumed.isPro
     });
   } catch (e: any) {
+    // Generation threw — release the free demo claim so the user can retry it
+    if (isFreeDemo) { try { await releaseFreeSummaryDemo(uid); } catch {} }
     res.status(500).json({ error: e.message });
   }
 });
 
-apiRouter.get("/watchlists", async (req, res) => {
+apiRouter.get("/watchlists", requireProOrAdmin, async (req, res) => {
   const uid = getReqUserId(req);
   res.json(await getAllWatchlists(uid));
 });
 
-apiRouter.post("/watchlists", requireAuth, async (req, res) => {
+apiRouter.post("/watchlists", requireProOrAdmin, async (req, res) => {
   const uid = getReqUserId(req);
   const id = await addWatchlist(req.body.name, uid);
   res.json({ id });
 });
 
-apiRouter.delete("/watchlists/:id", requireAuth, async (req, res) => {
+apiRouter.delete("/watchlists/:id", requireProOrAdmin, async (req, res) => {
   const uid = getReqUserId(req);
   await deleteWatchlist(req.params.id, uid);
   invalidateMonitorConfigCache();
   res.json({ success: true });
 });
 
-apiRouter.delete("/watchlists/all/symbols", requireAuth, async (req, res) => {
+apiRouter.delete("/watchlists/all/symbols", requireProOrAdmin, async (req, res) => {
   const uid = getReqUserId(req);
   await clearAllWatchlistsSymbols(uid);
   invalidateMonitorConfigCache();
   res.json({ success: true, message: "All watchlists cleared" });
 });
 
-apiRouter.delete("/watchlists/:id/symbols", requireAuth, async (req, res) => {
+apiRouter.delete("/watchlists/:id/symbols", requireProOrAdmin, async (req, res) => {
   const uid = getReqUserId(req);
   await clearWatchlistSymbols(req.params.id, uid);
   invalidateMonitorConfigCache();
   res.json({ success: true, message: "Watchlist cleared" });
 });
 
-apiRouter.post("/watchlists/reset-default", requireAuth, async (req, res) => {
+apiRouter.post("/watchlists/reset-default", requireProOrAdmin, async (req, res) => {
   const uid = getReqUserId(req);
   const data = await resetUserWatchlistsToDefault(uid);
   invalidateMonitorConfigCache();
   res.json({ success: true, data });
 });
 
-apiRouter.post(["/watchlists/sync", "/watchlists/sync-historical"], requireAuth, async (req, res) => {
+apiRouter.post(["/watchlists/sync", "/watchlists/sync-historical"], requireProOrAdmin, async (req, res) => {
   const mode = req.query.mode || req.body?.mode;
   if (mode === 'background' || mode === 'full') {
     syncWatchlistHistoricalData().catch(console.error);
@@ -585,7 +612,23 @@ apiRouter.post(["/watchlists/sync", "/watchlists/sync-historical"], requireAuth,
   res.json(result);
 });
 
-apiRouter.post(["/watchlists/sync-stock", "/results-calendar/sync-stock"], requireAuth, async (req, res) => {
+// Watchlist stock sync is Pro-only; the results-calendar path stays available to signed-in users.
+apiRouter.post("/watchlists/sync-stock", requireProOrAdmin, async (req, res) => {
+  const { symbol, scripCode } = req.body;
+  const target = scripCode || symbol;
+  const [histResult, calResult] = await Promise.allSettled([
+    syncSingleStockHistoricalData(target),
+    syncSingleStockResultsCalendar(target, scripCode)
+  ]);
+  res.json({
+    success: true,
+    symbol: target,
+    historical: histResult.status === 'fulfilled' ? histResult.value : null,
+    calendar: calResult.status === 'fulfilled' ? calResult.value : null
+  });
+});
+
+apiRouter.post("/results-calendar/sync-stock", requireAuth, async (req, res) => {
   const { symbol, scripCode } = req.body;
   const target = scripCode || symbol;
   const [histResult, calResult] = await Promise.allSettled([
@@ -608,14 +651,14 @@ apiRouter.get(
   }
 );
 
-apiRouter.patch("/watchlists/:id/toggle", requireAuth, async (req, res) => {
+apiRouter.patch("/watchlists/:id/toggle", requireProOrAdmin, async (req, res) => {
   const uid = getReqUserId(req);
   await toggleWatchlist(req.params.id, req.body.isActive, uid);
   syncWatchlistHistoricalData().catch(console.error);
   res.json({ success: true });
 });
 
-apiRouter.post("/watchlists/:id/symbols", requireAuth, async (req, res) => {
+apiRouter.post("/watchlists/:id/symbols", requireProOrAdmin, async (req, res) => {
   const uid = getReqUserId(req);
   const { symbol, priority, category } = req.body;
   const sym = (symbol || '').trim().toUpperCase();
@@ -633,7 +676,7 @@ apiRouter.post("/watchlists/:id/symbols", requireAuth, async (req, res) => {
   res.json({ success: true });
 });
 
-apiRouter.patch("/watchlists/:id/symbols/:symbol/priority", requireAuth, async (req, res) => {
+apiRouter.patch("/watchlists/:id/symbols/:symbol/priority", requireProOrAdmin, async (req, res) => {
   const uid = getReqUserId(req);
   const { priority, category } = req.body;
   await updateSymbolPriorityInWatchlist(req.params.id, req.params.symbol, priority, category, uid);
@@ -641,7 +684,7 @@ apiRouter.patch("/watchlists/:id/symbols/:symbol/priority", requireAuth, async (
   res.json({ success: true });
 });
 
-apiRouter.post("/watchlists/:id/symbols/bulk", requireAuth, async (req, res) => {
+apiRouter.post("/watchlists/:id/symbols/bulk", requireProOrAdmin, async (req, res) => {
   const uid = getReqUserId(req);
   if (Array.isArray(req.body.symbols)) {
     const isAdminUser = (req as any).user?.isAdmin === true || uid === 'admin';
@@ -693,14 +736,14 @@ apiRouter.get("/search-company", async (req, res) => {
   }
 });
 
-apiRouter.delete("/watchlists/:id/symbols/:symbol", requireAuth, async (req, res) => {
+apiRouter.delete("/watchlists/:id/symbols/:symbol", requireProOrAdmin, async (req, res) => {
   const uid = getReqUserId(req);
   await removeSymbolFromWatchlist(req.params.id, req.params.symbol, uid);
   invalidateMonitorConfigCache();
   res.json({ success: true });
 });
 
-apiRouter.post("/watchlists/:id/symbols/remove-batch", requireAuth, async (req, res) => {
+apiRouter.post("/watchlists/:id/symbols/remove-batch", requireProOrAdmin, async (req, res) => {
   try {
     const uid = getReqUserId(req);
     const symbols = Array.isArray(req.body.symbols) ? req.body.symbols : [];
@@ -714,7 +757,7 @@ apiRouter.post("/watchlists/:id/symbols/remove-batch", requireAuth, async (req, 
   }
 });
 
-apiRouter.post("/watchlists/:id/symbols/priority-batch", requireAuth, async (req, res) => {
+apiRouter.post("/watchlists/:id/symbols/priority-batch", requireProOrAdmin, async (req, res) => {
   try {
     const uid = getReqUserId(req);
     const updates = Array.isArray(req.body.updates) ? req.body.updates : [];
@@ -773,7 +816,7 @@ apiRouter.post("/test-telegram", requireAdmin, telegramRateLimiter, async (req, 
 });
 
 // Dedicated Personal Telegram Alert Test for Registered/Pro users (Does NOT touch global admin settings)
-apiRouter.post("/users/test-telegram", requireAuth, telegramRateLimiter, async (req, res) => {
+apiRouter.post("/users/test-telegram", requireProOrAdmin, telegramRateLimiter, async (req, res) => {
   try {
     const uid = getReqUserId(req);
     const { chatId } = req.body || {};
@@ -870,6 +913,42 @@ apiRouter.get("/users/profile", requireAuth, async (req, res) => {
   }
 });
 
+// ---- Telegram Pro-gating helpers -------------------------------------------
+// Live Pro/trial/admin check. Fail-closed: any profile-read failure => false.
+// (The JWT `isPro` claim is never trusted — it goes stale when Pro expires.)
+async function isProLikeUser(uid: string, isAdminUser: boolean): Promise<boolean> {
+  if (isAdminUser) return true;
+  try {
+    const p = await getUserProfile(uid);
+    if (!p) return false;
+    const now = Date.now();
+    return p.tier === 'admin' || Boolean(p.proExpiresAt && p.proExpiresAt > now);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Does this patch attempt to LINK or ENABLE Telegram relative to the existing
+ * profile? Change-based so that language-only saves (which echo the current
+ * prefs) don't trip the gate. Unlinking (null chat id) never counts.
+ */
+function wantsTelegramEnable(
+  patch: { telegramChatId?: string | null; telegramAlertsEnabled?: boolean; telegramAiSummaryEnabled?: boolean; telegramAlertScope?: string; telegramNewsAlerts?: boolean },
+  existingProfile: any
+): boolean {
+  const chatId = patch.telegramChatId;
+  if (typeof chatId === 'string' && chatId.trim().length > 0) return true; // linking a chat id
+  const cur = existingProfile?.notificationPreferences || {};
+  if (patch.telegramAlertsEnabled !== undefined && Boolean(patch.telegramAlertsEnabled) !== Boolean(cur.telegramAlertsEnabled)) return true;
+  if (patch.telegramAiSummaryEnabled !== undefined && Boolean(patch.telegramAiSummaryEnabled) !== Boolean(cur.telegramAiSummaryEnabled)) return true;
+  if (patch.telegramAlertScope !== undefined && patch.telegramAlertScope !== cur.telegramAlertScope) return true;
+  if (patch.telegramNewsAlerts !== undefined && Boolean(patch.telegramNewsAlerts) !== Boolean(cur.telegramNewsAlerts)) return true;
+  return false;
+}
+
+const TELEGRAM_PRO_ERROR = "Telegram alerts are a Pro feature. Upgrade to Pro — one-time plans from ₹59 — to link Telegram and receive instant alerts.";
+
 apiRouter.post("/users/profile", requireAuth, async (req, res) => {
   try {
     const uid = getReqUserId(req);
@@ -898,6 +977,25 @@ apiRouter.post("/users/profile", requireAuth, async (req, res) => {
       sanitizedPatch.notificationPreferences = body.notificationPreferences;
     }
 
+    // Telegram is Pro-only: block link/enable attempts here too, so the
+    // client fallback from /users/telegram/settings can't bypass the gate.
+    // Unlinking (null chat id) and language-only changes stay allowed.
+    const np = (sanitizedPatch.notificationPreferences || {}) as any;
+    const tgPatch = {
+      telegramChatId: sanitizedPatch.telegramChatId,
+      telegramAlertsEnabled: np.telegramAlertsEnabled,
+      telegramAiSummaryEnabled: np.telegramAiSummaryEnabled,
+      telegramAlertScope: np.telegramAlertScope,
+      telegramNewsAlerts: np.telegramNewsAlerts,
+    };
+    const existingForGate = await getUserProfile(uid).catch(() => null);
+    if (wantsTelegramEnable(tgPatch, existingForGate)) {
+      const proLike = await isProLikeUser(uid, (req as any).user?.isAdmin === true);
+      if (!proLike) {
+        return res.status(403).json({ success: false, proRequired: true, error: TELEGRAM_PRO_ERROR });
+      }
+    }
+
     const updatedProfile = await saveUserProfile(uid, { ...sanitizedPatch, uid });
     invalidateMonitorConfigCache(uid);
     res.json({ success: true, profile: updatedProfile });
@@ -915,21 +1013,40 @@ apiRouter.post("/users/profile", requireAuth, async (req, res) => {
 });
 
 // Dedicated User Telegram Settings Management (Toggle, AI Summary, Disconnect/Unlink, Scope)
+// Telegram is a PRO-ONLY feature. Anyone may unlink, and anyone may change
+// just the AI summary language — but linking / enabling Telegram requires Pro.
 apiRouter.post("/users/telegram/settings", requireAuth, async (req, res) => {
   try {
     const uid = getReqUserId(req);
-    const { 
-      telegramChatId, 
-      telegramUsername, 
-      telegramAlertsEnabled, 
-      telegramAiSummaryEnabled, 
+    const {
+      telegramChatId,
+      telegramUsername,
+      telegramAlertsEnabled,
+      telegramAiSummaryEnabled,
       telegramAlertScope,
       aiSummaryLang,
-      unlink 
+      unlink
     } = req.body || {};
 
-    const existingProfile = await getUserProfile(uid);
+    const existingProfile = await getUserProfile(uid).catch(() => null);
     const currentPrefs = existingProfile?.notificationPreferences || ({} as any);
+
+    // Change-based gate: linking a chat id or flipping any Telegram toggle /
+    // scope requires Pro. Language-only saves (which echo unchanged prefs)
+    // and unlinking stay open to everyone.
+    if (!unlink && wantsTelegramEnable(
+      { telegramChatId, telegramAlertsEnabled, telegramAiSummaryEnabled, telegramAlertScope },
+      existingProfile
+    )) {
+      const proLike = await isProLikeUser(uid, (req as any).user?.isAdmin === true);
+      if (!proLike) {
+        return res.status(403).json({
+          success: false,
+          proRequired: true,
+          error: TELEGRAM_PRO_ERROR
+        });
+      }
+    }
 
     const cleanSummaryLang = aiSummaryLang === 'english' ? 'english' : aiSummaryLang === 'hinglish' ? 'hinglish' : undefined;
 
@@ -969,7 +1086,7 @@ apiRouter.post("/users/telegram/settings", requireAuth, async (req, res) => {
       telegramAlertsEnabled: updatedProfile.notificationPreferences?.telegramAlertsEnabled !== false,
       telegramAiSummaryEnabled: updatedProfile.notificationPreferences?.telegramAiSummaryEnabled !== false,
       telegramAlertScope: updatedProfile.notificationPreferences?.telegramAlertScope || 'WATCHLIST_ONLY',
-      aiSummaryLang: updatedProfile.notificationPreferences?.aiSummaryLang || 'hinglish'
+      aiSummaryLang: updatedProfile.notificationPreferences?.aiSummaryLang || 'english'
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -996,7 +1113,7 @@ apiRouter.post("/test-bse", requireAdmin, async (req, res) => {
   res.json({ success: true, company: companyName });
 });
 
-apiRouter.patch("/watchlists/:id/name", requireAuth, async (req, res) => {
+apiRouter.patch("/watchlists/:id/name", requireProOrAdmin, async (req, res) => {
   const uid = getReqUserId(req);
   await renameWatchlist(req.params.id, req.body.name, uid);
   res.json({ success: true });
@@ -1221,12 +1338,15 @@ apiRouter.get("/news/stock/:symbol", async (req, res) => {
 });
 
 apiRouter.post("/news/summarize", aiRateLimiter, async (req, res) => {
+  // Hoisted for the catch block: release the free-demo claim on ANY throw.
+  let uid = '';
+  let isFreeDemo = false;
   try {
     const { title, snippet, source, symbol, companyName, link } = req.body;
     if (!title) {
       return res.status(400).json({ success: false, error: "News title required" });
     }
-    const uid = getReqUserId(req);
+    uid = getReqUserId(req);
     const isAdminUser = (req as any).user?.isAdmin === true;
 
     // Reject unauthenticated guests immediately to safeguard Gemini API
@@ -1238,16 +1358,35 @@ apiRouter.post("/news/summarize", aiRateLimiter, async (req, res) => {
       });
     }
 
-    // 1. Check AI quota without consuming
-    const quotaCheck = await checkServerAiQuota(uid, isAdminUser);
-    if (!quotaCheck.allowed) {
-      return res.status(429).json({
-        success: false,
-        error: quotaCheck.error || "Daily AI summary quota reached.",
-        upgradeRequired: true,
-        remainingQuota: 0,
-        dailyLimit: quotaCheck.dailyLimit
-      });
+    // Pro / active-trial check against the LIVE profile (fail-closed; never trusts the JWT claim)
+    const isProLike = await isProLikeUser(uid, isAdminUser);
+
+    // FREE PLAN: exactly ONE AI summary demo, one time ever — shared with the
+    // disclosure summary demo (same atomic server-side flag).
+    let consumed = { remaining: 0, dailyLimit: 1, isPro: false };
+    if (!isProLike) {
+      const won = await claimFreeSummaryDemo(uid);
+      if (!won) {
+        return res.status(403).json({
+          success: false,
+          demoUsed: true,
+          upgradeRequired: true,
+          error: "You've used your one free AI summary demo. Upgrade to Pro — one-time plans from ₹59 — for 100 AI summaries/day."
+        });
+      }
+      isFreeDemo = true; // released below if generation fails
+    } else {
+      // 1. Check AI quota without consuming (Pro / trial only)
+      const quotaCheck = await checkServerAiQuota(uid, isAdminUser);
+      if (!quotaCheck.allowed) {
+        return res.status(429).json({
+          success: false,
+          error: quotaCheck.error || "Daily AI summary quota reached.",
+          upgradeRequired: true,
+          remainingQuota: 0,
+          dailyLimit: quotaCheck.dailyLimit
+        });
+      }
     }
 
     const companyTarget = companyName || (symbol ? `${symbol}` : (source || "Market News"));
@@ -1255,11 +1394,15 @@ apiRouter.post("/news/summarize", aiRateLimiter, async (req, res) => {
     const summary = await generateDirectSummary(companyTarget, title, details, 'NEWS');
     
     if (!summary) {
+      if (isFreeDemo) { try { await releaseFreeSummaryDemo(uid); } catch {} }
       return res.status(500).json({ success: false, error: "Gemini AI was unable to summarize this news story." });
     }
 
-    // 2. Consume quota ONLY after successful generation
-    const consumed = await consumeServerAiQuota(uid, isAdminUser);
+    // 2. Consume quota ONLY after successful generation (Pro/trial).
+    // Free demo was already claimed atomically above.
+    if (isProLike) {
+      consumed = await consumeServerAiQuota(uid, isAdminUser);
+    }
 
     res.json({
       success: true,
@@ -1269,11 +1412,13 @@ apiRouter.post("/news/summarize", aiRateLimiter, async (req, res) => {
       isPro: consumed.isPro
     });
   } catch (err: any) {
+    // Generation threw — release the free demo claim so the user can retry it
+    if (isFreeDemo) { try { await releaseFreeSummaryDemo(uid); } catch {} }
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-apiRouter.post("/news/telegram/send", requireAuth, telegramRateLimiter, async (req, res) => {
+apiRouter.post("/news/telegram/send", requireProOrAdmin, telegramRateLimiter, async (req, res) => {
   try {
     const { newsItem, chatId } = req.body;
     if (!newsItem || !newsItem.title) {
@@ -1286,7 +1431,7 @@ apiRouter.post("/news/telegram/send", requireAuth, telegramRateLimiter, async (r
   }
 });
 
-apiRouter.post("/news/telegram/digest", requireAuth, telegramRateLimiter, async (req, res) => {
+apiRouter.post("/news/telegram/digest", requireProOrAdmin, telegramRateLimiter, async (req, res) => {
   try {
     const uid = getReqUserId(req);
     const { chatId } = req.body;
@@ -1334,6 +1479,11 @@ apiRouter.post("/news/telegram/toggle-auto", requireAuth, async (req, res) => {
     if (uid && uid !== 'anonymous') {
       const user = await getUserProfile(uid);
       if (user) {
+        // Telegram is PRO-ONLY: free users cannot enable or configure Telegram news alerts
+        const proActive = Boolean(user.tier === 'admin' || (user.proExpiresAt && user.proExpiresAt > Date.now()));
+        if (!proActive) {
+          return res.status(403).json({ success: false, proRequired: true, error: TELEGRAM_PRO_ERROR });
+        }
         const prefs = user.notificationPreferences || ({} as any);
         if (enabled !== undefined) prefs.telegramNewsAlerts = enabled === true;
         if (Array.isArray(sources)) prefs.telegramNewsSources = sources;
@@ -1349,7 +1499,10 @@ apiRouter.post("/news/telegram/toggle-auto", requireAuth, async (req, res) => {
       }
     }
 
-    // Fallback to global settings for admin / system
+    // Fallback to global settings — admin only
+    if (!(req as any).user?.isAdmin) {
+      return res.status(403).json({ success: false, error: "Admin access required." });
+    }
     const settings = await getSettings();
     await saveSettings({
       autoTelegramNews: enabled !== undefined ? enabled === true : settings.autoTelegramNews,
@@ -1368,8 +1521,8 @@ apiRouter.post("/news/telegram/toggle-auto", requireAuth, async (req, res) => {
   }
 });
 
-// Trigger immediate manual check of automated news worker (admin/test)
-apiRouter.post("/news/telegram/trigger-worker", requireAuth, async (_req, res) => {
+// Trigger immediate manual check of automated news worker (admin only — it dispatches real Telegram messages)
+apiRouter.post("/news/telegram/trigger-worker", requireAdmin, async (_req, res) => {
   try {
     const result = await processAutomatedNewsAlerts();
     res.json({ success: true, ...result });
@@ -1569,7 +1722,7 @@ apiRouter.get("/stocks/:scripCode/runup-announcements", async (req, res) => {
 });
 
 // Priority Sync Across All Watchlists
-apiRouter.patch("/watchlists/symbols/:symbol/priority-sync", requireAuth, async (req, res) => {
+apiRouter.patch("/watchlists/symbols/:symbol/priority-sync", requireProOrAdmin, async (req, res) => {
   try {
     const { priority, category } = req.body;
     const symbol = req.params.symbol;
@@ -1717,12 +1870,12 @@ apiRouter.all("/company-intel/:identifier/ai-overview", requireProOrAdmin, aiRat
     const scripCode = (req.query.scripCode as string) || (req.body?.scripCode as string) || (/^\d+$/.test(identifier) ? identifier : '');
     const symbol = (req.query.symbol as string) || (req.body?.symbol as string) || (!/^\d+$/.test(identifier) ? identifier : '');
 
-    // Honor the user's AI summary language (Settings → Telegram Alerts & AI Summaries)
-    let overviewLang: 'hinglish' | 'english' = 'hinglish';
+    // Honor the user's AI summary language (Settings → Telegram Alerts & AI Summaries); default English
+    let overviewLang: 'hinglish' | 'english' = 'english';
     try {
       const prof = await getUserProfile(uid);
-      if ((prof as any)?.notificationPreferences?.aiSummaryLang === 'english') overviewLang = 'english';
-    } catch { /* default stays hinglish */ }
+      if ((prof as any)?.notificationPreferences?.aiSummaryLang === 'hinglish') overviewLang = 'hinglish';
+    } catch { /* default stays english */ }
 
     const aiOverview = await generateCompanyAiOverview(scripCode, symbol, overviewLang);
     if (!aiOverview) {

@@ -156,15 +156,19 @@ export function getAiQuotaStatus(
     };
   }
 
-  // 4. Authenticated user whose 1-week trial has expired
+  // 4. Authenticated user whose 1-week trial has expired — FREE PLAN:
+  // exactly ONE AI summary demo (one disclosure, one time ever), tracked server-side.
+  const demoUsed = (profile as any)?.freeSummaryUsed === true;
   return {
     tier: 'free',
-    dailyLimit: 0,
-    usedToday: 0,
-    remaining: 0,
-    canGenerate: false,
-    allowed: false,
-    message: 'Your 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹59) for unlimited AI summaries.'
+    dailyLimit: 1,
+    usedToday: demoUsed ? 1 : 0,
+    remaining: demoUsed ? 0 : 1,
+    canGenerate: !demoUsed,
+    allowed: !demoUsed,
+    message: demoUsed
+      ? 'You\'ve used your one free AI summary demo. Upgrade to Pro (one-time plans from ₹59) for 100 AI summaries/day.'
+      : 'Free plan: 1 AI summary demo (one-time only). Upgrade to Pro (one-time plans from ₹59) for 100/day.'
   };
 }
 

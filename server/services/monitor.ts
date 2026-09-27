@@ -490,8 +490,11 @@ export async function processAnnouncements() {
             const rawUserChatId = u.telegramChatId ? String(u.telegramChatId).trim() : '';
 
             const uPrefs = u.notificationPreferences;
+            // Telegram is a PRO-ONLY feature: skip dispatch when the user's
+            // trial/pack has expired (in-app notifications above are unaffected).
+            const userProActive = Boolean(u.tier === 'admin' || (u.proExpiresAt && u.proExpiresAt > Date.now()));
             // Respect user toggle to turn OFF/ON Telegram alerts
-            const isUserTelegramActive = uPrefs?.telegramAlertsEnabled !== false;
+            const isUserTelegramActive = userProActive && uPrefs?.telegramAlertsEnabled !== false;
 
             const cachedUserWl = userWatchlistCache.get(u.uid);
             const userSymbols = cachedUserWl?.symbols || [];
@@ -561,7 +564,7 @@ export async function processAnnouncements() {
                     if (userRes.success && userRes.messageId) {
                       const userWantsAiSummary = uPrefs?.telegramAiSummaryEnabled !== false;
                       if (userWantsAiSummary) {
-                        const userSummaryLang = (uPrefs as any)?.aiSummaryLang === 'english' ? 'english' : 'hinglish';
+                        const userSummaryLang = (uPrefs as any)?.aiSummaryLang === 'hinglish' ? 'hinglish' : 'english';
                         generateAndSendSummary(userRes.messageId, companyName, subject, details, priority.category, pdfLink, newsId, rawUserChatId, userSummaryLang)
                           .catch(() => {});
                       }

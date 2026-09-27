@@ -414,6 +414,80 @@ export async function saveUserProfile(
   return updated;
 }
 
+// ---- One-time free AI summary demo: atomic claim -------------------------
+// Per-uid promise-chain mutex: serializes concurrent claims on this instance.
+const freeDemoLocks = new Map<string, Promise<void>>();
+
+/**
+ * Atomically claim the one-time free AI summary demo for a free-plan user.
+ * Returns true if THIS call won the claim (caller may generate the summary),
+ * false if the demo was already used (caller must 403).
+ * - Firestore transaction when available (atomic across Cloud Run instances).
+ * - Serialized local read-modify-write fallback when Firestore is down.
+ */
+export async function claimFreeSummaryDemo(uid: string): Promise<boolean> {
+  const prev = freeDemoLocks.get(uid) || Promise.resolve();
+  let release!: () => void;
+  const mine = new Promise<void>((res) => { release = () => res(); });
+  const chained = prev.then(() => mine);
+  freeDemoLocks.set(uid, chained);
+  await prev;
+  try {
+    if (!isFirestoreQuotaExceeded() && !isAdminPermissionDenied()) {
+      try {
+        const won = await adminDb.runTransaction(async (tx) => {
+          const ref = adminDb.collection('users').doc(uid);
+          const snap = await tx.get(ref);
+          const data = (snap.exists ? snap.data() : {}) as any;
+          if (data?.freeSummaryUsed) return false;
+          tx.set(ref, { freeSummaryUsed: true, uid }, { merge: true });
+          return true;
+        });
+        if (won) {
+          // Keep in-memory cache + local fallback in sync with the won claim
+          try {
+            const localUsersMap = readLocalJson<Record<string, UserProfile>>(USERS_FILE, {});
+            const existing = localUsersMap[uid] || userProfilesCache[uid]?.profile;
+            const updated = { ...(existing || { uid, createdAt: Date.now() }), freeSummaryUsed: true, uid } as UserProfile;
+            localUsersMap[uid] = updated;
+            writeLocalJson(USERS_FILE, localUsersMap);
+            userProfilesCache[uid] = { profile: updated, fetchedAt: Date.now() };
+          } catch { /* cache sync is best-effort; Firestore is authoritative */ }
+        }
+        return won;
+      } catch (err: any) {
+        if (isQuotaError(err)) setFirestoreQuotaExceeded(true);
+        else if (isPermissionDeniedError(err)) setAdminPermissionDenied(true);
+        else console.warn(`[UsersDao] Free-demo claim transaction notice for ${uid}:`, err?.message || err);
+        // fall through to the serialized local fallback
+      }
+    }
+    const localUsersMap = readLocalJson<Record<string, UserProfile>>(USERS_FILE, {});
+    const existing = localUsersMap[uid] || userProfilesCache[uid]?.profile;
+    if ((existing as any)?.freeSummaryUsed) return false;
+    const updated = { ...(existing || { uid, createdAt: Date.now() }), freeSummaryUsed: true, uid } as UserProfile;
+    localUsersMap[uid] = updated;
+    writeLocalJson(USERS_FILE, localUsersMap);
+    userProfilesCache[uid] = { profile: updated, fetchedAt: Date.now() };
+    return true;
+  } finally {
+    release();
+    if (freeDemoLocks.get(uid) === chained) freeDemoLocks.delete(uid);
+  }
+}
+
+/**
+ * Release a previously won free-demo claim (used when summary generation
+ * fails, so the user can retry their one demo). Best-effort.
+ */
+export async function releaseFreeSummaryDemo(uid: string): Promise<void> {
+  try {
+    await saveUserProfile(uid, { freeSummaryUsed: false } as any, true);
+  } catch (err: any) {
+    console.warn(`[UsersDao] Free-demo release notice for ${uid}:`, err?.message || err);
+  }
+}
+
 // Run boot deduplication pass asynchronously
 setTimeout(() => {
   cleanAndDeduplicateAllUsernames().catch(e => console.warn('[UsersDao] Initial username deduplication notice:', e));
