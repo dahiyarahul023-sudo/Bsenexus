@@ -8,12 +8,15 @@ import {
   CheckCheck, Terminal, ShieldAlert, Cpu, HardDrive, ChevronRight,
   Download, LogOut, Database, FileSpreadsheet,
   FileJson, Trash2, MoreHorizontal, X, Bell, ShieldCheck,
-  Volume2, VolumeX, Eye, HelpCircle, Scale, MessageSquare, ChevronDown,
+  Volume2, VolumeX, Eye, HelpCircle, Scale, MessageSquare,
   Cookie, FileText, Search, RotateCcw, LayoutGrid, Layers, ArrowUpRight,
-  Power, Unlink, Bot, Zap, UserX
+  Power, Unlink, Bot, Zap, UserX, SlidersHorizontal, Newspaper, Building2,
+  Crown, ArrowLeft
 } from 'lucide-react';
 import { TermsModal, LegalTabType } from './TermsModal';
 import { SecurityAuditModal } from './SecurityAuditModal';
+import { AlertRulesModal } from './AlertRulesModal';
+import { HelpModal } from './HelpModal';
 import { SubscriptionCard } from './SubscriptionCard';
 import { useAuth } from '../context/AuthContext';
 import { customFetch } from '../api';
@@ -59,7 +62,13 @@ const SETTINGS_REGISTRY = [
   { id: 'legal', title: 'Terms, Privacy & Policies', description: 'Terms of Service, Privacy (DPDP), Cookies, Refund and SEBI disclaimers', category: 'About & Legal', keywords: ['terms', 'privacy', 'legal', 'dpdp', 'sebi', 'policy', 'disclaimer'] },
   { id: 'clear-cache', title: 'Clear local cache & reset data', description: 'Clean temporary offline storage, cached filings, and indexes', category: 'Danger Zone', keywords: ['clear', 'cache', 'delete', 'reset', 'wipe', 'danger', 'offline', 'storage'] },
   { id: 'delete-account', title: 'Delete Account & All Personal Data', description: 'Permanently wipe your account, stored watchlists, and all cloud preferences', category: 'Danger Zone', keywords: ['delete account', 'delete my data', 'erase', 'wipe account', 'remove profile', 'gdpr', 'dpdp', 'danger'] },
-  { id: 'sign-out', title: 'Sign out of account', description: 'Log out of current investor session on this device', category: 'Danger Zone', keywords: ['sign out', 'logout', 'log out', 'exit', 'session'] }
+  { id: 'sign-out', title: 'Sign out of account', description: 'Log out of current investor session on this device', category: 'Danger Zone', keywords: ['sign out', 'logout', 'log out', 'exit', 'session'] },
+  { id: 'alerts-triggers', title: 'Alerts & Triggers', description: 'Keyword and filing-based alert rules', category: 'Tools', keywords: ['alerts', 'triggers', 'keyword', 'filters', 'rules', 'notifications'] },
+  { id: 'news-feed', title: 'Market News Feed', description: 'Live Indian business and macro news', category: 'Tools', keywords: ['news', 'market news', 'feed', 'headlines', 'macro'] },
+  { id: 'companies-dir', title: 'BSE Listed Companies', description: 'Company profiles, filings and disclosures', category: 'Tools', keywords: ['companies', 'directory', 'listed', 'profiles', 'bse'] },
+  { id: 'guides', title: 'User Guides & Tutorials', description: 'SEBI LODR and disclosure guides', category: 'Help & Support', keywords: ['guides', 'tutorials', 'help', 'how to', 'learn', 'user guide'] },
+  { id: 'sebi', title: 'SEBI & Legal Disclaimer', description: 'Investment risks and regulatory disclosures', category: 'About & Legal', keywords: ['sebi', 'disclaimer', 'legal', 'risk', 'regulatory'] },
+  { id: 'seo-suite', title: 'Super SEO Suite', description: 'Page audits, EEAT, snippets and anti-slop engine', category: 'Advanced Engine', keywords: ['seo', 'suite', 'audit', 'eeat', 'snippets', 'super'] }
 ];
 
 // Default baseline preferences for one-click resets
@@ -114,12 +123,13 @@ export function SettingsTab({
 
   // Active Sub-modal / Drawer state for progressive disclosure
   const [activeSheet, setActiveSheet] = useState<string | null>(null);
+  // Drill-down navigation: null = section index, otherwise the open section id
+  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [alertRulesOpen, setAlertRulesOpen] = useState(false);
+  const [helpGuideOpen, setHelpGuideOpen] = useState(false);
   const [legalModalOpen, setLegalModalOpen] = useState(false);
   const [legalModalTab, setLegalModalTab] = useState<LegalTabType>('privacy');
   const [securityAuditModalOpen, setSecurityAuditModalOpen] = useState(false);
-
-  // Collapsible Advanced section (collapsible by default; auto-expands if search matches or admin)
-  const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
 
   // Profile Edit State
   const [displayNameInput, setDisplayNameInput] = useState('');
@@ -807,7 +817,7 @@ export function SettingsTab({
   const queryLower = searchQuery.toLowerCase().trim();
   const isMatch = (id: string) => {
     // Advanced & Developer options are strictly admin-only
-    const advancedIds = ['security-audit', 'diagnostics', 'logs', 'storage', 'server-keys'];
+    const advancedIds = ['security-audit', 'diagnostics', 'logs', 'storage', 'server-keys', 'seo-suite'];
     if (advancedIds.includes(id) && !isSuperAdmin) {
       return false;
     }
@@ -841,13 +851,6 @@ export function SettingsTab({
     (isFilterModified ? 1 : 0) + 
     (isDensityModified ? 1 : 0);
 
-  // Auto-expand advanced section if search matches something inside it (Strictly for Admins)
-  const isSearchMatchingAdvanced = isSuperAdmin && queryLower.length > 0 && (
-    isMatch('security-audit') || isMatch('diagnostics') || isMatch('logs') || isMatch('storage') || isMatch('server-keys')
-  );
-  // Strictly gate the advanced section to superadmins only
-  const showAdvancedSection = isSuperAdmin && (isAdvancedExpanded || isSearchMatchingAdvanced);
-
   // Render Section Breadcrumb when filtering via search
   const renderSearchBreadcrumb = (category: string) => {
     if (!queryLower) return null;
@@ -858,22 +861,186 @@ export function SettingsTab({
     );
   };
 
+  // ---- Drill-down section index (iOS Settings style) ----
+  interface SectionDef {
+    id: string;
+    title: string;
+    subtitle: string;
+    icon: any;
+    iconClass: string;
+    registryIds: string[];
+    adminOnly?: boolean;
+    danger?: boolean;
+    badge?: React.ReactNode;
+    action?: () => void;
+  }
+
+  const sectionDefs: SectionDef[] = [
+    {
+      id: 'preferences', title: 'Preferences',
+      subtitle: modifiedPreferencesCount > 0 ? `${modifiedPreferencesCount} customized · Theme, audio, density, filters` : 'Appearance, audio, feed density & filters',
+      icon: SlidersHorizontal, iconClass: 'bg-slate-500/10 text-slate-600 dark:text-slate-300',
+      registryIds: ['appearance', 'density', 'sound', 'filter'],
+      badge: modifiedPreferencesCount > 0 ? (
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-950/70 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+          {modifiedPreferencesCount}
+        </span>
+      ) : undefined,
+    },
+    {
+      id: 'account', title: 'Account & Identity',
+      subtitle: profile?.displayName || user?.displayName || 'Profile, Telegram alerts & AI summaries',
+      icon: User, iconClass: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+      registryIds: ['profile', 'telegram'],
+    },
+    {
+      id: 'subscription', title: 'Subscription & Billing',
+      subtitle: isPro ? 'Pro active · plans & payments' : 'Free plan · Pro from ₹59',
+      icon: Crown, iconClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+      registryIds: ['subscription'],
+      badge: isPro ? (
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">PRO</span>
+      ) : undefined,
+    },
+    {
+      id: 'watchlist', title: 'Watchlist & Data',
+      subtitle: 'Export CSV & JSON backups',
+      icon: Download, iconClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+      registryIds: ['export-csv', 'export-json'],
+    },
+    {
+      id: 'alerts', title: 'Alerts & Triggers',
+      subtitle: 'Keyword & filing filters',
+      icon: Bell, iconClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+      registryIds: ['alerts-triggers'],
+      action: () => setAlertRulesOpen(true),
+    },
+    {
+      id: 'news', title: 'Market News Feed',
+      subtitle: 'Live Indian business & macro news',
+      icon: Newspaper, iconClass: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+      registryIds: ['news-feed'],
+      action: () => { if (onNavigate) onNavigate('news'); },
+    },
+    {
+      id: 'companies', title: 'BSE Listed Companies',
+      subtitle: 'Profiles, filings & disclosures',
+      icon: Building2, iconClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+      registryIds: ['companies-dir'],
+      action: () => { if (typeof window !== 'undefined') window.location.href = '/companies'; },
+    },
+    {
+      id: 'help', title: 'Help & Support',
+      subtitle: 'Guides, community & feedback',
+      icon: HelpCircle, iconClass: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400',
+      registryIds: ['help', 'guides'],
+    },
+    {
+      id: 'about', title: 'About & Legal',
+      subtitle: 'Terms, privacy, SEBI disclaimers',
+      icon: Scale, iconClass: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400',
+      registryIds: ['legal', 'sebi'],
+    },
+    {
+      id: 'danger', title: 'Danger Zone',
+      subtitle: 'Cache, sign out, delete account',
+      icon: AlertTriangle, iconClass: 'bg-rose-500/10 text-rose-600 dark:text-rose-400',
+      registryIds: ['clear-cache', 'delete-account', 'sign-out'],
+      danger: true,
+    },
+    {
+      id: 'admin', title: 'Admin Engine',
+      subtitle: 'Diagnostics, logs, storage & SEO',
+      icon: ShieldCheck, iconClass: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
+      registryIds: ['security-audit', 'diagnostics', 'logs', 'storage', 'server-keys', 'seo-suite'],
+      adminOnly: true,
+      badge: (
+        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 font-mono lowercase">
+          admin
+        </span>
+      ),
+    },
+  ];
+
+  const activeDef = sectionDefs.find(d => d.id === activeSection);
+
+  const isSectionVisible = (def: SectionDef) => {
+    if (def.adminOnly && !isSuperAdmin) return false;
+    if (!queryLower) return true;
+    return def.registryIds.some(id => isMatch(id));
+  };
+
+  const renderIndexRow = (def: SectionDef) => (
+    <motion.button
+      key={def.id}
+      type="button"
+      whileTap={buttonTap}
+      transition={springSnappy}
+      onClick={() => { def.action ? def.action() : setActiveSection(def.id); }}
+      className={cn(
+        "w-full min-h-[52px] p-3.5 flex items-center justify-between text-left transition-colors cursor-pointer text-xs",
+        def.danger
+          ? "hover:bg-rose-50/60 dark:hover:bg-rose-950/30"
+          : "hover:bg-slate-50 dark:hover:bg-[#201E2E]"
+      )}
+    >
+      <div className="flex items-center gap-3 min-w-0">
+        <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0", def.iconClass)}>
+          <def.icon size={16} />
+        </div>
+        <div className="min-w-0">
+          <span className={cn("font-semibold", def.danger ? "text-rose-600 dark:text-rose-400" : "text-slate-900 dark:text-white")}>
+            {def.title}
+          </span>
+          <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{def.subtitle}</div>
+        </div>
+      </div>
+      <div className="flex items-center gap-1.5 shrink-0">
+        {def.badge}
+        {queryLower ? (
+          <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 font-mono">
+            {def.registryIds.filter(id => isMatch(id)).length}
+          </span>
+        ) : null}
+        <ChevronRight size={14} className="text-slate-400" />
+      </div>
+    </motion.button>
+  );
+
+  const indexGroups: { label?: string; ids: string[]; danger?: boolean }[] = [
+    { ids: ['preferences', 'account', 'subscription', 'watchlist'] },
+    { label: 'Tools & Discovery', ids: ['alerts', 'news', 'companies'] },
+    { label: 'Support', ids: ['help', 'about'] },
+  ];
+
   return (
     <div className="max-w-2xl mx-auto space-y-5 animate-in fade-in duration-200 pb-28">
       
       {/* 1. PAGE HEADER & SEARCH BAR */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white font-display">
-              Settings
-            </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Personalize research defaults, push delivery, and system tools
-            </p>
+          <div className="flex items-center gap-2 min-w-0">
+            {activeSection && (
+              <button
+                type="button"
+                onClick={() => setActiveSection(null)}
+                aria-label="Back to settings"
+                className="p-2 -ml-2 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#201E2E] transition-colors cursor-pointer shrink-0"
+              >
+                <ArrowLeft size={18} />
+              </button>
+            )}
+            <div className="min-w-0">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white font-display truncate">
+                {activeDef ? activeDef.title : 'Settings'}
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                {activeDef ? activeDef.subtitle : 'Personalize research defaults, push delivery, and system tools'}
+              </p>
+            </div>
           </div>
           {profile?.username && (
-            <span className="hidden sm:inline-block font-mono text-[11px] text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-[#1f1c2d] px-2.5 py-1 rounded-lg border border-slate-200/80 dark:border-[#2b273d]">
+            <span className="hidden sm:inline-block font-mono text-[11px] text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-[#1f1c2d] px-2.5 py-1 rounded-lg border border-slate-200/80 dark:border-[#2b273d] shrink-0">
               @{profile.username}
             </span>
           )}
@@ -932,8 +1099,65 @@ export function SettingsTab({
         </div>
       )}
 
+      {/* DRILL-DOWN INDEX: grouped section rows (iOS Settings style) */}
+      {activeSection === null && (
+        <div className="space-y-4 select-none animate-in fade-in duration-200">
+          {indexGroups.map((group) => {
+            const defs = group.ids
+              .map(id => sectionDefs.find(d => d.id === id)!)
+              .filter(isSectionVisible);
+            if (defs.length === 0) return null;
+            return (
+              <div key={group.label || 'main'} className="space-y-2">
+                {group.label && (
+                  <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider px-1">
+                    {group.label}
+                  </h3>
+                )}
+                <div className="bg-white dark:bg-[#181626] border border-slate-200/90 dark:border-[#2D283E] rounded-2xl divide-y divide-slate-100 dark:divide-[#252236] overflow-hidden shadow-2xs">
+                  {defs.map(renderIndexRow)}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Danger Zone card */}
+          {isSectionVisible(sectionDefs.find(d => d.id === 'danger')!) && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5 px-1">
+                <AlertTriangle size={13} className="text-rose-500" />
+                <h3 className="text-xs font-bold text-rose-500 uppercase tracking-wider">
+                  Danger Zone
+                </h3>
+              </div>
+              <div className="border border-rose-300/80 dark:border-rose-900/60 bg-rose-50/20 dark:bg-rose-950/10 rounded-2xl divide-y divide-rose-100/80 dark:divide-rose-950/30 overflow-hidden shadow-2xs">
+                {renderIndexRow(sectionDefs.find(d => d.id === 'danger')!)}
+              </div>
+            </div>
+          )}
+
+          {/* Admin card (superadmin only) */}
+          {isSectionVisible(sectionDefs.find(d => d.id === 'admin')!) && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 px-1">
+                <h3 className="text-xs font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <ShieldCheck size={14} />
+                  Administration
+                </h3>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 lowercase font-mono">
+                  admin only
+                </span>
+              </div>
+              <div className="bg-white dark:bg-[#181626] border border-purple-200/90 dark:border-purple-900/50 rounded-2xl divide-y divide-slate-100 dark:divide-[#252236] overflow-hidden shadow-2xs">
+                {renderIndexRow(sectionDefs.find(d => d.id === 'admin')!)}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* SECTION 1: PREFERENCES (Appearance, Audio, Density, Materiality) */}
-      {(isMatch('appearance') || isMatch('density') || isMatch('sound') || isMatch('filter')) && (
+      {activeSection === 'preferences' && (isMatch('appearance') || isMatch('density') || isMatch('sound') || isMatch('filter')) && (
         <div className="space-y-2 select-none">
           <div className="flex items-center justify-between px-1">
             <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
@@ -1215,7 +1439,7 @@ export function SettingsTab({
       )}
 
       {/* SECTION 2: ACCOUNT & IDENTITY (Display Name, Username, Telegram ID) */}
-      {(isMatch('profile') || isMatch('telegram')) && (
+      {activeSection === 'account' && (isMatch('profile') || isMatch('telegram')) && (
         <div className="space-y-2 select-none">
           <div className="flex items-center justify-between px-1">
             <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
@@ -1309,7 +1533,7 @@ export function SettingsTab({
       )}
 
       {/* SUBSCRIPTION & BILLING (Cashfree one-time Pro payments; auto-renew = Coming soon) */}
-      {isMatch('subscription') && (
+      {activeSection === 'subscription' && isMatch('subscription') && (
         <div className="space-y-2 select-none">
           <div className="px-1">
             <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
@@ -1321,7 +1545,7 @@ export function SettingsTab({
       )}
 
       {/* SECTION 3: WATCHLIST & EXPORTS */}
-      {(isMatch('export-csv') || isMatch('export-json')) && (
+      {activeSection === 'watchlist' && (isMatch('export-csv') || isMatch('export-json')) && (
         <div className="space-y-2 select-none">
           <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider px-1">
             Watchlist &amp; Data
@@ -1374,7 +1598,7 @@ export function SettingsTab({
       )}
 
       {/* SECTION 4: ADVANCED & DEVELOPER ENGINE (Strictly Admin & Operator Only) */}
-      {isSuperAdmin && (isMatch('security-audit') || isMatch('diagnostics') || isMatch('logs') || isMatch('storage') || isMatch('server-keys')) && (
+      {activeSection === 'admin' && isSuperAdmin && (isMatch('security-audit') || isMatch('diagnostics') || isMatch('logs') || isMatch('storage') || isMatch('server-keys') || isMatch('seo-suite')) && (
         <div className="space-y-2">
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-2">
@@ -1386,37 +1610,18 @@ export function SettingsTab({
                 admin only
               </span>
             </div>
-            
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={lockAdminSession}
-                className="text-[11px] text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 transition-colors font-medium px-1.5 py-0.5 rounded hover:bg-rose-50 dark:hover:bg-rose-950/20 cursor-pointer"
-                title="Lock admin session"
-              >
-                Lock Session
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsAdvancedExpanded(!isAdvancedExpanded)}
-                className="text-[11px] text-slate-500 hover:text-purple-600 dark:hover:text-purple-300 flex items-center gap-1 cursor-pointer font-medium"
-              >
-                <span>{showAdvancedSection ? 'Collapse' : 'Show controls'}</span>
-                <ChevronDown size={13} className={cn("transition-transform duration-200", showAdvancedSection ? "rotate-180" : "")} />
-              </button>
-            </div>
+
+            <button
+              type="button"
+              onClick={lockAdminSession}
+              className="text-[11px] text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 transition-colors font-medium px-1.5 py-0.5 rounded hover:bg-rose-50 dark:hover:bg-rose-950/20 cursor-pointer"
+              title="Lock admin session"
+            >
+              Lock Session
+            </button>
           </div>
 
-          <AnimatePresence initial={false}>
-            {showAdvancedSection && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={springSnappy}
-                className="overflow-hidden"
-              >
-                <div className="bg-white dark:bg-[#181626] border border-purple-200/90 dark:border-purple-900/50 rounded-2xl divide-y divide-slate-100 dark:divide-[#252236] overflow-hidden shadow-2xs">
+          <div className="bg-white dark:bg-[#181626] border border-purple-200/90 dark:border-purple-900/50 rounded-2xl divide-y divide-slate-100 dark:divide-[#252236] overflow-hidden shadow-2xs">
                   
                   {/* 4.1 20-Point Launch Security & Penetration Test */}
                   {isMatch('security-audit') && (
@@ -1528,21 +1733,61 @@ export function SettingsTab({
                     </button>
                   )}
 
+                  {/* 4.6 Super SEO Suite (Admin Exclusive) */}
+                  {isMatch('seo-suite') && (
+                    <button
+                      type="button"
+                      onClick={() => onNavigate ? onNavigate('seo-suite') : setActiveSheet('admin')}
+                      className="w-full p-3.5 flex items-center justify-between text-left hover:bg-purple-50/40 dark:hover:bg-purple-950/20 transition-colors cursor-pointer text-xs"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+                          <Sparkles size={16} />
+                        </div>
+                        <div>
+                          {renderSearchBreadcrumb('Advanced Engine')}
+                          <span className="font-semibold text-slate-900 dark:text-white">Super SEO Suite</span>
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400">Page audits, EEAT, snippets &amp; anti-slop engine</div>
+                        </div>
+                      </div>
+                      <ChevronRight size={14} className="text-slate-400" />
+                    </button>
+                  )}
+
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
       )}
 
       {/* SECTION 5: HELP & SUPPORT */}
-      {isMatch('help') && (
+      {activeSection === 'help' && (isMatch('help') || isMatch('guides')) && (
         <div className="space-y-2 select-none">
           <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider px-1">
             Help &amp; Support
           </h3>
 
           <div className="bg-white dark:bg-[#181626] border border-slate-200/90 dark:border-[#2D283E] rounded-2xl divide-y divide-slate-100 dark:divide-[#252236] overflow-hidden shadow-2xs">
+            {/* User Guides & Tutorials (moved from More sheet) */}
+            {isMatch('guides') && (
+              <motion.button
+                type="button"
+                whileTap={buttonTap}
+                transition={springSnappy}
+                onClick={() => setHelpGuideOpen(true)}
+                className="w-full min-h-[48px] p-3.5 flex items-center justify-between text-left hover:bg-slate-50 dark:hover:bg-[#201E2E] transition-colors cursor-pointer text-xs"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                    <HelpCircle size={16} />
+                  </div>
+                  <div>
+                    {renderSearchBreadcrumb('Help & Support')}
+                    <span className="font-semibold text-slate-900 dark:text-white">User Guides &amp; Tutorials</span>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400">SEBI LODR &amp; disclosure guides</div>
+                  </div>
+                </div>
+                <ChevronRight size={14} className="text-slate-400" />
+              </motion.button>
+            )}
             <motion.button
               type="button"
               whileTap={buttonTap}
@@ -1567,7 +1812,7 @@ export function SettingsTab({
       )}
 
       {/* SECTION 6: ABOUT & LEGAL */}
-      {isMatch('legal') && (
+      {activeSection === 'about' && (isMatch('legal') || isMatch('sebi')) && (
         <div className="space-y-2 select-none">
           <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider px-1">
             About &amp; Legal
@@ -1597,6 +1842,32 @@ export function SettingsTab({
               <ChevronRight size={14} className="text-slate-400" />
             </motion.button>
 
+            {/* SEBI & Legal Disclaimer (moved from More sheet) */}
+            {isMatch('sebi') && (
+              <motion.button
+                type="button"
+                whileTap={buttonTap}
+                transition={springSnappy}
+                onClick={() => {
+                  setLegalModalTab('sebi');
+                  setLegalModalOpen(true);
+                }}
+                className="w-full min-h-[48px] p-3.5 flex items-center justify-between text-left hover:bg-slate-50 dark:hover:bg-[#201E2E] transition-colors cursor-pointer text-xs"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                    <Scale size={16} />
+                  </div>
+                  <div>
+                    {renderSearchBreadcrumb('About & Legal')}
+                    <span className="font-semibold text-slate-900 dark:text-white">SEBI &amp; Legal Disclaimer</span>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400">Investment risks &amp; regulatory disclosures</div>
+                  </div>
+                </div>
+                <ChevronRight size={14} className="text-slate-400" />
+              </motion.button>
+            )}
+
             <div className="p-3.5 flex items-center justify-between text-xs">
               <span className="font-semibold text-slate-900 dark:text-white">Version</span>
               <span className="font-mono text-slate-400 text-[11px]">v{APP_VERSION}</span>
@@ -1611,7 +1882,7 @@ export function SettingsTab({
       )}
 
       {/* SECTION 7: DANGER ZONE (Quarantine the Destructive: Red Border, Bottom of the Page) */}
-      {(isMatch('clear-cache') || isMatch('delete-account') || isMatch('sign-out')) && (
+      {activeSection === 'danger' && (isMatch('clear-cache') || isMatch('delete-account') || isMatch('sign-out')) && (
         <div className="space-y-2 pt-2 select-none">
           <div className="flex items-center gap-1.5 px-1">
             <AlertTriangle size={13} className="text-rose-500" />
@@ -2699,6 +2970,23 @@ export function SettingsTab({
         isOpen={supportModalOpen} 
         onClose={() => setSupportModalOpen(false)} 
       />
+
+      {/* Embedded Alerts & Triggers Modal (moved from More sheet) */}
+      {alertRulesOpen && (
+        <AlertRulesModal
+          isOpen={alertRulesOpen}
+          onClose={() => setAlertRulesOpen(false)}
+        />
+      )}
+
+      {/* Embedded User Guides Modal (moved from More sheet) */}
+      {helpGuideOpen && (
+        <HelpModal
+          isOpen={helpGuideOpen}
+          onClose={() => setHelpGuideOpen(false)}
+          onOpenSettings={() => setActiveSection('preferences')}
+        />
+      )}
 
       {/* Embedded Legal, Privacy & SEBI Modal */}
       {legalModalOpen && (

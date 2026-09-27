@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Activity, Settings, List, Star,
-  CalendarDays, Zap, Sparkles, HelpCircle, Scale,
+  CalendarDays, Zap, Sparkles, Scale,
   User, Bell, ShieldAlert, Building2, BookOpen, ShieldCheck,
-  AlertTriangle, X, WifiOff, Newspaper, Home, MoreHorizontal,
-  Flame, SlidersHorizontal, Database, ChevronRight, Layers, MessageSquare,
+  AlertTriangle, X, WifiOff, Newspaper, Home,
+  Flame, Layers,
   Search, Sun, Moon, RotateCcw
 } from 'lucide-react';
 import { MarketClock } from './ui/MarketClock';
@@ -22,7 +22,6 @@ import { useAuth } from '../context/AuthContext';
 import { useIntelModal } from '../context/IntelModalContext';
 import { customFetch } from '../api';
 import { useVisibilityInterval } from '../hooks/useVisibilityInterval';
-import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { 
@@ -207,19 +206,12 @@ export function Layout({
   };
 
   const handleTabClick = (tabId: string) => {
-    if (tabId === 'more') {
-      setIsMoreSheetOpen(true);
-      return;
-    }
     if (tabId === 'companies') {
       window.location.href = '/companies';
       return;
     }
     onTabChange(tabId);
   };
-
-  const [isMoreSheetOpen, setIsMoreSheetOpen] = useState(false);
-  useBodyScrollLock(isMoreSheetOpen);
 
   const renderNavIcon = (itemId: string, isActive: boolean) => {
     let iconElement: React.ReactNode = null;
@@ -291,13 +283,13 @@ export function Layout({
           )} 
         />
       );
-    } else if (itemId === 'more') {
+    } else if (itemId === 'settings') {
       iconElement = (
-        <MoreHorizontal 
+        <Settings
           className={cn(
-            "w-4 h-4 sm:w-4.5 sm:h-4.5 transition-colors", 
+            "w-4 h-4 sm:w-4.5 sm:h-4.5 transition-colors",
             isActive ? "text-white" : "text-slate-400 group-hover:text-slate-200"
-          )} 
+          )}
         />
       );
     } else if (itemId === 'seo-suite') {
@@ -341,7 +333,7 @@ export function Layout({
     { id: 'watchlists', label: 'My Watchlist', shortLabel: 'Watchlist', icon: Star },
     { id: 'results-calendar', label: 'Earnings Calendar', shortLabel: 'Earnings', icon: CalendarDays },
     { id: 'news', label: 'Market News', shortLabel: 'News', icon: Newspaper },
-    { id: 'more', label: 'More', shortLabel: 'More', icon: MoreHorizontal },
+    { id: 'settings', label: 'Settings', shortLabel: 'Settings', icon: Settings },
   ].filter(i => i.id !== 'watchlists' || canUseWatchlist);
 
   // Mobile Bottom Bar: Clean 5 tabs strictly adhering to touch-friendly mobile design
@@ -350,7 +342,7 @@ export function Layout({
     { id: 'dashboard', label: 'Filings', shortLabel: 'Filings', icon: Flame },
     { id: 'watchlists', label: 'Watchlist', shortLabel: 'Watchlist', icon: Star },
     { id: 'results-calendar', label: 'Earnings', shortLabel: 'Earnings', icon: CalendarDays },
-    { id: 'more', label: 'More', shortLabel: 'More', icon: MoreHorizontal },
+    { id: 'settings', label: 'Settings', shortLabel: 'Settings', icon: Settings },
   ].filter(i => i.id !== 'watchlists' || canUseWatchlist);
 
   return (
@@ -824,304 +816,6 @@ export function Layout({
           })}
         </div>
       </nav>
-
-      {/* More Bottom Sheet / Drawer Modal */}
-      <AnimatePresence>
-        {isMoreSheetOpen && (
-          <div 
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center overscroll-contain"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="more-options-title"
-          >
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsMoreSheetOpen(false)}
-              className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs overscroll-contain"
-            />
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={springSnappy}
-              className="relative w-full max-w-lg bg-white dark:bg-[#181624] rounded-t-3xl sm:rounded-2xl border border-slate-200 dark:border-[#2D283E] shadow-2xl overflow-hidden z-10 p-5 space-y-4 overscroll-contain"
-            >
-              <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#2D283E] pb-3">
-                <div className="flex items-center gap-2">
-                  <SlidersHorizontal size={18} className="text-slate-500 dark:text-slate-400" />
-                  <h3 id="more-options-title" className="text-base font-black text-slate-900 dark:text-white font-display">
-                    More Options & Tools
-                  </h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsMoreSheetOpen(false)}
-                  aria-label="Close options sheet"
-                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 select-none">
-                {/* Market News */}
-                <motion.button
-                  type="button"
-                  whileTap={buttonTap}
-                  transition={springSnappy}
-                  onClick={() => {
-                    onTabChange('news');
-                    setIsMoreSheetOpen(false);
-                  }}
-                  className="min-h-[48px] p-3 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-[#201E2E] dark:hover:bg-[#2A263D] border border-slate-200/80 dark:border-[#352F48] flex items-center justify-between text-left cursor-pointer transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-600 flex items-center justify-center">
-                      <Newspaper size={16} />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-slate-900 dark:text-white">Market News Feed</div>
-                      <div className="text-[10px] text-slate-400">Live Indian business & macro news</div>
-                    </div>
-                  </div>
-                  <ChevronRight size={14} className="text-slate-400" />
-                </motion.button>
-
-
-                {/* Alert Rules & Triggers */}
-                <motion.button
-                  type="button"
-                  whileTap={buttonTap}
-                  transition={springSnappy}
-                  onClick={() => {
-                    setAlertRulesModalOpen(true);
-                    setIsMoreSheetOpen(false);
-                  }}
-                  className="min-h-[48px] p-3 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-[#201E2E] dark:hover:bg-[#2A263D] border border-slate-200/80 dark:border-[#352F48] flex items-center justify-between text-left cursor-pointer transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center">
-                      <Bell size={16} />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-slate-900 dark:text-white">Alerts & Triggers</div>
-                      <div className="text-[10px] text-slate-400">Keyword & filing filters</div>
-                    </div>
-                  </div>
-                  <ChevronRight size={14} className="text-slate-400" />
-                </motion.button>
-
-                {/* Settings & Preferences */}
-                <motion.button
-                  type="button"
-                  whileTap={buttonTap}
-                  transition={springSnappy}
-                  onClick={() => {
-                    onTabChange('settings');
-                    setIsMoreSheetOpen(false);
-                  }}
-                  className="min-h-[48px] p-3 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-[#201E2E] dark:hover:bg-[#2A263D] border border-slate-200/80 dark:border-[#352F48] flex items-center justify-between text-left cursor-pointer transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-slate-500/10 text-slate-600 dark:text-slate-300 flex items-center justify-center">
-                      <Settings size={16} />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-slate-900 dark:text-white">Settings & Preferences</div>
-                      <div className="text-[10px] text-slate-400">Telegram, audio & theme</div>
-                    </div>
-                  </div>
-                  <ChevronRight size={14} className="text-slate-400" />
-                </motion.button>
-
-                {/* BSE Listed Companies Directory */}
-                <motion.button
-                  type="button"
-                  whileTap={buttonTap}
-                  transition={springSnappy}
-                  onClick={() => {
-                    setIsMoreSheetOpen(false);
-                    if (typeof window !== 'undefined') {
-                      window.location.href = '/companies';
-                    }
-                  }}
-                  className="min-h-[48px] p-3 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-[#201E2E] dark:hover:bg-[#2A263D] border border-slate-200/80 dark:border-[#352F48] flex items-center justify-between text-left cursor-pointer transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
-                      <Building2 size={16} />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-slate-900 dark:text-white">BSE Listed Companies</div>
-                      <div className="text-[10px] text-slate-400">All 26 top companies, profiles &amp; filings</div>
-                    </div>
-                  </div>
-                  <ChevronRight size={14} className="text-slate-400" />
-                </motion.button>
-
-                {/* Help & User Guides */}
-                <motion.button
-                  type="button"
-                  whileTap={buttonTap}
-                  transition={springSnappy}
-                  onClick={() => {
-                    setHelpModalOpen(true);
-                    setIsMoreSheetOpen(false);
-                  }}
-                  className="min-h-[48px] p-3 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-[#201E2E] dark:hover:bg-[#2A263D] border border-slate-200/80 dark:border-[#352F48] flex items-center justify-between text-left cursor-pointer transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-600 flex items-center justify-center">
-                      <HelpCircle size={16} />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-slate-900 dark:text-white">Help & User Guides</div>
-                      <div className="text-[10px] text-slate-400">SEBI LODR & disclosure guides</div>
-                    </div>
-                  </div>
-                  <ChevronRight size={14} className="text-slate-400" />
-                </motion.button>
-
-                {/* Feedback & Support */}
-                <motion.button
-                  type="button"
-                  whileTap={buttonTap}
-                  transition={springSnappy}
-                  onClick={() => {
-                    setSupportModalOpen(true);
-                    setIsMoreSheetOpen(false);
-                  }}
-                  className="min-h-[48px] p-3 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-[#201E2E] dark:hover:bg-[#2A263D] border border-slate-200/80 dark:border-[#352F48] flex items-center justify-between text-left cursor-pointer transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-teal-500/10 text-teal-600 flex items-center justify-center">
-                      <MessageSquare size={16} />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-slate-900 dark:text-white">Feedback & Support</div>
-                      <div className="text-[10px] text-slate-400">Direct assistance, Telegram & feedback</div>
-                    </div>
-                  </div>
-                  <ChevronRight size={14} className="text-slate-400" />
-                </motion.button>
-
-                {/* Admin Exclusive Controls (only visible to unlocked admins) */}
-                {isAdmin && (
-                  <>
-                    {/* Storage & Cloud Sync (Admin Only) */}
-                    <motion.button
-                      type="button"
-                      whileTap={buttonTap}
-                      transition={springSnappy}
-                      onClick={() => {
-                        onTabChange('storage');
-                        setIsMoreSheetOpen(false);
-                      }}
-                      className="min-h-[48px] p-3 rounded-xl bg-purple-50/70 hover:bg-purple-100/80 dark:bg-purple-950/30 dark:hover:bg-purple-950/50 border border-purple-200/80 dark:border-purple-800/80 flex items-center justify-between text-left cursor-pointer transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
-                          <Database size={16} />
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold text-purple-700 dark:text-purple-300">Storage Manager & Sync</div>
-                          <div className="text-[10px] text-slate-400">Firestore database, backups & cache</div>
-                        </div>
-                      </div>
-                      <ChevronRight size={14} className="text-purple-400" />
-                    </motion.button>
-
-                    <motion.button
-                      type="button"
-                      whileTap={buttonTap}
-                      transition={springSnappy}
-                      onClick={() => {
-                        onTabChange('diagnostics');
-                        setIsMoreSheetOpen(false);
-                      }}
-                      className="min-h-[48px] p-3 rounded-xl bg-purple-50/70 hover:bg-purple-100/80 dark:bg-purple-950/30 dark:hover:bg-purple-950/50 border border-purple-200/80 dark:border-purple-800/80 flex items-center justify-between text-left cursor-pointer transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-600 flex items-center justify-center">
-                          <ShieldCheck size={16} />
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold text-purple-700 dark:text-purple-300">System Diagnostics</div>
-                          <div className="text-[10px] text-slate-400">Admin health checks & telemetry</div>
-                        </div>
-                      </div>
-                      <ChevronRight size={14} className="text-purple-400" />
-                    </motion.button>
-
-                    <motion.button
-                      type="button"
-                      whileTap={buttonTap}
-                      transition={springSnappy}
-                      onClick={() => {
-                        onTabChange('logs');
-                        setIsMoreSheetOpen(false);
-                      }}
-                      className="min-h-[48px] p-3 rounded-xl bg-purple-50/70 hover:bg-purple-100/80 dark:bg-purple-950/30 dark:hover:bg-purple-950/50 border border-purple-200/80 dark:border-purple-800/80 flex items-center justify-between text-left cursor-pointer transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-600 flex items-center justify-center">
-                          <Activity size={16} />
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold text-purple-700 dark:text-purple-300">Engine Activity Logs</div>
-                          <div className="text-[10px] text-slate-400">Live background stream & AI</div>
-                        </div>
-                      </div>
-                      <ChevronRight size={14} className="text-purple-400" />
-                    </motion.button>
-
-                    {/* Super SEO Suite (Admin Exclusive) */}
-                    <motion.button
-                      type="button"
-                      whileTap={buttonTap}
-                      transition={springSnappy}
-                      onClick={() => {
-                        onTabChange('seo-suite');
-                        setIsMoreSheetOpen(false);
-                      }}
-                      className="min-h-[48px] p-3 rounded-xl bg-amber-50/70 hover:bg-amber-100/80 dark:bg-amber-950/30 dark:hover:bg-amber-950/50 border border-amber-200/80 dark:border-amber-800/80 flex items-center justify-between text-left cursor-pointer transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center">
-                          <Sparkles size={16} />
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold text-amber-700 dark:text-amber-300">Super SEO Suite (11 Skills)</div>
-                          <div className="text-[10px] text-slate-400">Page audits, EEAT, snippets & anti-slop engine</div>
-                        </div>
-                      </div>
-                      <ChevronRight size={14} className="text-amber-400" />
-                    </motion.button>
-                  </>
-                )}
-              </div>
-
-              {/* Bottom Helpers: Terms & SEBI */}
-              <div className="pt-2 border-t border-slate-100 dark:border-[#2D283E] flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                <span className="text-[11px]">BSENEXUS v2.5.0</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleOpenTermsModal('sebi');
-                    setIsMoreSheetOpen(false);
-                  }}
-                  className="hover:text-slate-900 dark:hover:text-white flex items-center gap-1.5 cursor-pointer py-1"
-                >
-                  <Scale size={14} />
-                  <span>SEBI & Legal Disclaimer</span>
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* Global Modals */}
       {isAuthModalOpen && <AuthModal />}
