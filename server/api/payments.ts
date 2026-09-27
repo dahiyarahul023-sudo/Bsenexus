@@ -19,6 +19,7 @@ import { sanitizeUserId } from '../database/watchlistDao.js';
 import {
   recordPendingOrder,
   getPendingOrdersForUser,
+  getGrantedOrdersForUser,
   tryClaimOrderForGrant,
   markOrderGranted,
   markOrderFailed,
@@ -716,6 +717,42 @@ paymentsRouter.post('/claim', requireAuth, paymentRecoveryLimiter, async (req, r
   } catch (err: any) {
     console.error('[Payments] claim error:', err?.message || err);
     return res.status(200).json({ success: false, error: 'Claim failed. Please try again.' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/payments/history — the signed-in user's COMPLETED payments,
+// newest first. Powers the "Payment History" section where the user can
+// re-open the payment slip (receipt) for any past payment.
+//
+// Only `granted` ledger orders are returned — a mere payment attempt can
+// never appear here. Each entry belongs to the caller (uid from JWT).
+// ---------------------------------------------------------------------------
+paymentsRouter.get('/history', requireAuth, async (req, res) => {
+  try {
+    const uid = getReqUserId(req);
+    if (!uid) {
+      return res.status(401).json({ success: false, error: 'Not signed in.' });
+    }
+    const orders = await getGrantedOrdersForUser(uid);
+    const payments = orders.map((o) => {
+      const plan = (PRO_PLANS as Record<string, { id: string; label: string; amountPaise: number; currency: string; validityDays: number }>)[o.planId];
+      return {
+        orderId: o.orderId,
+        planId: o.planId || null,
+        planLabel: plan ? plan.label : 'Pro',
+        validityDays: plan ? plan.validityDays : null,
+        amountPaise: o.amountPaise,
+        currency: o.currency || 'INR',
+        paidAt: o.grantedAt ? new Date(o.grantedAt).toISOString() : new Date(o.updatedAt).toISOString(),
+        validUntil: o.proExpiresAt || null,
+        grantSource: o.grantSource || null,
+      };
+    });
+    return res.json({ success: true, payments });
+  } catch (err: any) {
+    console.error('[Payments] history error:', err?.message || err);
+    return res.status(200).json({ success: false, error: 'Could not load payment history.' });
   }
 });
 

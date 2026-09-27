@@ -178,6 +178,45 @@ export async function getPendingOrdersForUser(uid: string): Promise<PaymentOrder
 }
 
 /**
+ * All COMPLETED (paid) orders for a user, newest first.
+ * Powers the "Payment History" section — only granted orders appear here,
+ * so a mere attempt can never show up as a payment.
+ * Firestore is queried by uid only (no composite index needed) and status
+ * is filtered in code; local orders are merged in for local-fallback mode.
+ */
+export async function getGrantedOrdersForUser(uid: string): Promise<PaymentOrder[]> {
+  const byId = new Map<string, PaymentOrder>();
+  // Local first — always available.
+  for (const o of Object.values(readLocalOrders())) {
+    if (o.uid === uid && o.status === 'granted') {
+      byId.set(o.orderId, o);
+    }
+  }
+  if (firestoreUsable()) {
+    try {
+      const snap = await withTimeout(
+        adminDb.collection(COLLECTION).where('uid', '==', uid).get(),
+        8000,
+      );
+      if (snap) {
+        snap.forEach((doc: any) => {
+          const o = doc.data() as PaymentOrder;
+          if (o && o.orderId && o.uid === uid && o.status === 'granted') {
+            byId.set(o.orderId, o);
+          } else if (o && o.orderId && byId.has(o.orderId)) {
+            // Firestore has the final word: a non-granted order is not history.
+            byId.delete(o.orderId);
+          }
+        });
+      }
+    } catch (err: any) {
+      noteFirestoreError(err, 'getGrantedOrdersForUser');
+    }
+  }
+  return [...byId.values()].sort((a, b) => (b.grantedAt || b.updatedAt) - (a.grantedAt || a.updatedAt));
+}
+
+/**
  * Atomically claim an order for granting (pending -> granting).
  * Cross-instance safe via a Firestore transaction; falls back to a
  * local check-and-set when Firestore is unavailable (single instance).

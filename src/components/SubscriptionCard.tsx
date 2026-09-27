@@ -8,6 +8,7 @@ import { Crown, CreditCard, BadgeCheck, Info } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { customFetch } from '../api';
 import { verifyProPayment, claimProPayment } from '../utils/cashfree';
+import { PaymentHistory } from './PaymentHistory';
 
 interface SubStatus {
   configured: boolean;
@@ -125,6 +126,7 @@ export function SubscriptionCard() {
   };
 
   return (
+  <>
     <div className="bg-white dark:bg-[#181626] border border-slate-200/90 dark:border-[#2D283E] rounded-2xl p-4 sm:p-5 shadow-2xs">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
@@ -287,5 +289,8 @@ export function SubscriptionCard() {
         </div>
       )}
     </div>
+    {/* Completed payments + downloadable slips (27 Sep 2026) */}
+    <PaymentHistory />
+  </>
   );
 }

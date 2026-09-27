@@ -222,6 +222,37 @@ export function getPendingOrderId(): string | null {
   }
 }
 
+/** One completed payment from /api/payments/history (granted ledger orders only). */
+export interface PaymentHistoryEntry {
+  orderId: string;
+  planId: string | null;
+  planLabel: string;
+  validityDays: number | null;
+  amountPaise: number;
+  currency: string;
+  paidAt: string; // ISO
+  validUntil: number | null; // timestamp
+  grantSource: string | null;
+}
+
+/**
+ * Fetch the signed-in user's completed payments (newest first).
+ * Only PAID-and-granted orders are returned by the server — attempts
+ * never appear here.
+ */
+export async function fetchPaymentHistory(): Promise<{ ok: boolean; payments: PaymentHistoryEntry[]; error?: string }> {
+  try {
+    const res = await customFetch('/api/payments/history');
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.success) {
+      return { ok: false, payments: [], error: data?.error || 'Could not load payment history.' };
+    }
+    return { ok: true, payments: Array.isArray(data.payments) ? data.payments : [] };
+  } catch {
+    return { ok: false, payments: [], error: 'Could not load payment history.' };
+  }
+}
+
 export function clearPendingOrderId(): void {
   try {
     sessionStorage.removeItem('cf_pending_order');
