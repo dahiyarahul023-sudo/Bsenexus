@@ -325,9 +325,20 @@ async function persistUserWatchlists(uid: string, lists: any[]): Promise<void> {
   }
 }
 
-export async function getAllWatchlists(userId?: string): Promise<any[]> {
+export interface GetWatchlistsOptions {
+  /**
+   * When true, never auto-create the starter default watchlists for unknown
+   * users — return [] instead. Read-only alert pipelines (monitor, news
+   * worker) must use this: scanning a user for alerts must not manufacture
+   * 71 default stocks (and persist them) as a side effect.
+   */
+  noCreate?: boolean;
+}
+
+export async function getAllWatchlists(userId?: string, opts?: GetWatchlistsOptions): Promise<any[]> {
   const uid = sanitizeUserId(userId);
   const now = Date.now();
+  const noCreate = opts?.noCreate === true;
 
   // 1. In-memory cache with short TTL (if not marked dirty)
   if (userWatchlistsCache[uid] !== undefined && !userWatchlistsDirty[uid] && (now - userWatchlistsCache[uid].fetchedAt < WATCHLISTS_CACHE_TTL_MS)) {
@@ -372,6 +383,10 @@ export async function getAllWatchlists(userId?: string): Promise<any[]> {
         }
 
         // Truly a brand new user who has never saved anything: create default initial list
+        // (skipped for read-only alert scans — they must not manufacture watchlists)
+        if (noCreate) {
+          return [];
+        }
         const initial = createDefaultWatchlists();
         userWatchlistsCache[uid] = { lists: initial, fetchedAt: Date.now() };
         userWatchlistsDirty[uid] = false;
@@ -410,7 +425,10 @@ export async function getAllWatchlists(userId?: string): Promise<any[]> {
     return JSON.parse(JSON.stringify(sanitized));
   }
 
-  // Fresh default copy
+  // Fresh default copy (skipped for read-only alert scans)
+  if (noCreate) {
+    return [];
+  }
   const initial = createDefaultWatchlists();
   userWatchlistsCache[uid] = { lists: initial, fetchedAt: Date.now() };
   writeLocalJson(localFile, initial);
@@ -739,13 +757,13 @@ export async function getAllActiveWatchlistsAcrossUsers(): Promise<any[]> {
   return allLists;
 }
 
-export async function getActiveWatchlistSymbols(userId?: string): Promise<string[]> {
+export async function getActiveWatchlistSymbols(userId?: string, opts?: GetWatchlistsOptions): Promise<string[]> {
   const symbols: string[] = [];
 
   // If specific non-admin user is requested
   if (userId && userId !== 'admin' && userId !== 'all') {
     const uid = sanitizeUserId(userId);
-    const watchlists = await getAllWatchlists(uid);
+    const watchlists = await getAllWatchlists(uid, opts);
     for (const list of watchlists) {
       if (list.is_active) {
         const listItems = Array.isArray(list.items) ? list.items : [];
@@ -769,7 +787,7 @@ export async function getActiveWatchlistSymbols(userId?: string): Promise<string
 
   for (const uid of knownUids) {
     try {
-      const watchlists = await getAllWatchlists(uid);
+      const watchlists = await getAllWatchlists(uid, opts);
       for (const list of watchlists) {
         if (list.is_active) {
           const listItems = Array.isArray(list.items) ? list.items : [];
@@ -785,14 +803,14 @@ export async function getActiveWatchlistSymbols(userId?: string): Promise<string
   return [...new Set(symbols)];
 }
 
-export async function getActiveWatchlistSymbolMap(userId?: string): Promise<Record<string, { priority: 'HIGH' | 'MEDIUM' | 'LOW', category?: string, scripCode?: string, companyName?: string }>> {
+export async function getActiveWatchlistSymbolMap(userId?: string, opts?: GetWatchlistsOptions): Promise<Record<string, { priority: 'HIGH' | 'MEDIUM' | 'LOW', category?: string, scripCode?: string, companyName?: string }>> {
   const map: Record<string, { priority: 'HIGH' | 'MEDIUM' | 'LOW', category?: string, scripCode?: string, companyName?: string }> = {};
   const weight = { HIGH: 3, MEDIUM: 2, LOW: 1 };
 
   // If specific non-admin user is requested
   if (userId && userId !== 'admin' && userId !== 'all') {
     const uid = sanitizeUserId(userId);
-    const listsToScan: any[] = await getAllWatchlists(uid);
+    const listsToScan: any[] = await getAllWatchlists(uid, opts);
 
     for (const list of listsToScan) {
       if (list.is_active) {
@@ -829,7 +847,7 @@ export async function getActiveWatchlistSymbolMap(userId?: string): Promise<Reco
 
   for (const uid of knownUids) {
     try {
-      const listsToScan: any[] = await getAllWatchlists(uid);
+      const listsToScan: any[] = await getAllWatchlists(uid, opts);
       for (const list of listsToScan) {
         if (list.is_active) {
           const listItems = Array.isArray(list.items) ? list.items : [];

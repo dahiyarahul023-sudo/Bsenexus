@@ -396,9 +396,10 @@ export function matchStockInText(
 // Get combined Watchlist News from all sources for all tracked active stocks
 export async function getWatchlistNews(
   userId?: string,
-  sourceSlug?: string
+  sourceSlug?: string,
+  opts?: { noCreate?: boolean }
 ): Promise<{ items: StockNewsItem[]; symbols: string[] }> {
-  const watchlists = await getAllWatchlists(userId);
+  const watchlists = await getAllWatchlists(userId, opts);
   const activeSymbols: { symbol: string; companyName?: string }[] = [];
   const symbolSet = new Set<string>();
 
@@ -612,10 +613,14 @@ export async function processAutomatedNewsAlerts(): Promise<{ checked: number; d
 
     // User-specific recipients (Strict opt-in: only if explicitly enabled by user)
     // Telegram is PRO-ONLY: skip users whose trial/pack has expired.
+    // The master telegramAlertsEnabled toggle is a kill-switch: when the user
+    // turns Telegram alerts OFF, no bot-initiated message (filings OR news
+    // digests) may go out, even if news alerts were left enabled separately.
     for (const u of allUsers) {
       const userProActive = Boolean(u.tier === 'admin' || (u.proExpiresAt && u.proExpiresAt > Date.now()));
       if (!userProActive) continue;
-      if (u.telegramChatId && u.notificationPreferences?.telegramNewsAlerts === true) {
+      const uNewsPrefs: any = u.notificationPreferences || {};
+      if (u.telegramChatId && uNewsPrefs.telegramNewsAlerts === true && uNewsPrefs.telegramAlertsEnabled !== false) {
         // Avoid duplicate if same as global
         if (u.telegramChatId !== settings.chatId) {
           recipients.push({
@@ -633,9 +638,10 @@ export async function processAutomatedNewsAlerts(): Promise<{ checked: number; d
       return { checked: 0, dispatched: 0 };
     }
 
-    // For each recipient, check their active watchlist
+    // For each recipient, check their active watchlist (read-only: never
+    // manufacture default watchlists as a side effect of the scan)
     for (const rec of recipients) {
-      const { items: matchedNews } = await getWatchlistNews(rec.userId);
+      const { items: matchedNews } = await getWatchlistNews(rec.userId, undefined, { noCreate: true });
 
       for (const news of matchedNews) {
         // Filter by user's selected sources if configured

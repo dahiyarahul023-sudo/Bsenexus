@@ -10,6 +10,7 @@ import { escapeHTML, determinePriority, isSymbolMatch, parseBseDate, isMarketHou
 import { addNotification, initNotificationsFromFirestore } from '../database/notificationDao.js';
 import { evaluateAlertRulesForUser } from '../database/alertRulesDao.js';
 import { classifyMaterialEvent } from './timelineClassifier.js';
+import { doesAnnouncementMatchUserPrefs, isTelegramEligible } from '../utils/alertDecision.js';
 
 export { pruneAndCheckStorageCapacity };
 
@@ -58,10 +59,12 @@ async function getCachedMonitorConfig() {
   // In-app notifications must work for every user — NOT only those with a
   // linked Telegram chat ID. Telegram dispatch stays gated on chat ID
   // separately in the per-user loop below.
+  // noCreate: the scan is read-only — it must never manufacture default
+  // watchlists (71 starter stocks) for users as a side effect.
   const [settings, activeSymbols, activeSymbolMap, allProfiles] = await Promise.all([
     getSettings(),
-    getActiveWatchlistSymbols('all'),
-    getActiveWatchlistSymbolMap('all'),
+    getActiveWatchlistSymbols('all', { noCreate: true }),
+    getActiveWatchlistSymbolMap('all', { noCreate: true }),
     getAllUserProfiles()
   ]);
 
@@ -76,8 +79,8 @@ async function getCachedMonitorConfig() {
           userWatchlistCache.set(u.uid, { symbols: cached.symbols, map: cached.map });
         } else {
           const [symbols, map] = await Promise.all([
-            getActiveWatchlistSymbols(u.uid),
-            getActiveWatchlistSymbolMap(u.uid)
+            getActiveWatchlistSymbols(u.uid, { noCreate: true }),
+            getActiveWatchlistSymbolMap(u.uid, { noCreate: true })
           ]);
           monitorUserWatchlistCache.set(u.uid, { symbols, map, fetchedAt: now });
           userWatchlistCache.set(u.uid, { symbols, map });
@@ -95,87 +98,6 @@ async function getCachedMonitorConfig() {
     lastFetched: now
   };
   return configCache;
-}
-
-function doesAnnouncementMatchUserPrefs(
-  prefs: any, 
-  priority: { level: string; category: string }, 
-  stockPriority: 'HIGH' | 'MEDIUM' | 'LOW' | null,
-  subject: string, 
-  details: string,
-  isWatchlistMatch: boolean = false
-): boolean {
-  if (!prefs) return true;
-
-  // 1. Alert Scope Filter (Watchlist Only vs All Market)
-  const effectiveScope = prefs.telegramAlertScope || prefs.alertScope || 'WATCHLIST_ONLY';
-  if (effectiveScope === 'WATCHLIST_ONLY' && !isWatchlistMatch) {
-    return false;
-  }
-
-  // 2. Alert Priority Filter
-  if (prefs.alertPriority === 'HIGH_ONLY' && priority.level !== 'HIGH' && stockPriority !== 'HIGH') {
-    return false;
-  }
-  if (prefs.alertPriority === 'HIGH_MEDIUM') {
-    const isHighOrMed = (priority.level === 'HIGH' || priority.level === 'MEDIUM' || stockPriority === 'HIGH' || stockPriority === 'MEDIUM');
-    if (!isHighOrMed) {
-      return false;
-    }
-  }
-
-  // 3. Alert Category Filter
-  if (prefs.alertCategory === 'RESULTS_ONLY' && priority.category !== 'RESULTS') {
-    return false;
-  }
-  if (prefs.alertCategory === 'RESULTS_AND_CONCALLS' && priority.category !== 'RESULTS' && priority.category !== 'CONFERENCE_CALL') {
-    return false;
-  }
-  if (prefs.alertCategory === 'RESULTS_AND_MATERIAL' && priority.category !== 'RESULTS' && priority.category !== 'CONFERENCE_CALL' && priority.category !== 'MATERIAL_EVENT' && !isWatchlistMatch) {
-    return false;
-  }
-
-  // 4. Stock priority check if it matched a watchlist item
-  // LOW priority stocks are strictly muted by default from Telegram alerts
-  if (stockPriority === 'LOW' && prefs.stocksLowPriority !== true) return false;
-  if (stockPriority === 'HIGH' && prefs.stocksHighPriority === false) return false;
-  if (stockPriority === 'MEDIUM' && prefs.stocksMediumPriority === false) return false;
-
-  const text = (subject + " " + details).toUpperCase();
-
-  // 5. Specific category toggles
-  if (priority.category === 'RESULTS' && prefs.resultsAndEarnings === false) return false;
-  if (priority.category === 'CONFERENCE_CALL' && prefs.concallsAndInvestorMeets === false) return false;
-
-  if (text.includes('DIVIDEND') || text.includes('BONUS') || text.includes('BUYBACK')) {
-    if (prefs.dividendsAndBonus === false) return false;
-  }
-
-  if (text.includes('ORDER') || text.includes('CAPEX') || text.includes('EXPANSION')) {
-    if (prefs.orderWinsAndExpansion === false) return false;
-  }
-
-  if (text.includes('ACQUISITION') || text.includes('MERGER') || text.includes('TAKEOVER')) {
-    if (prefs.acquisitionsAndMergers === false) return false;
-  }
-
-  if (text.includes('CREDIT RATING') || text.includes('CRISIL') || text.includes('ICRA') || text.includes('CARE')) {
-    if (prefs.creditRatingChanges === false) return false;
-  }
-
-  if (text.includes('INSIDER') || text.includes('SAST') || text.includes('PIT')) {
-    if (prefs.insiderTradingAndSAST === false) return false;
-  }
-
-  if (text.includes('ANNUAL REPORT') || text.includes('SECRETARIAL AUDIT')) {
-    if (prefs.annualReportsAndAudits === false) return false;
-  }
-
-  if (prefs.muteRoutineFilings && (text.includes('LOSS OF SHARE') || text.includes('TRADING WINDOW') || text.includes('NEWSPAPER PUBLICATION') || text.includes('SCRUTINIZER'))) {
-    return false;
-  }
-
-  return true;
 }
 
 export async function processAnnouncements() {
@@ -489,12 +411,14 @@ export async function processAnnouncements() {
           for (const u of allUsers) {
             const rawUserChatId = u.telegramChatId ? String(u.telegramChatId).trim() : '';
 
-            const uPrefs = u.notificationPreferences;
+            // Fail-closed: a profile with no saved preferences behaves like
+            // defaults (WATCHLIST_ONLY scope), never "match everything".
+            const uPrefs = u.notificationPreferences || {};
             // Telegram is a PRO-ONLY feature: skip dispatch when the user's
             // trial/pack has expired (in-app notifications above are unaffected).
             const userProActive = Boolean(u.tier === 'admin' || (u.proExpiresAt && u.proExpiresAt > Date.now()));
             // Respect user toggle to turn OFF/ON Telegram alerts
-            const isUserTelegramActive = userProActive && uPrefs?.telegramAlertsEnabled !== false;
+            const isUserTelegramActive = userProActive && uPrefs.telegramAlertsEnabled !== false;
 
             const cachedUserWl = userWatchlistCache.get(u.uid);
             const userSymbols = cachedUserWl?.symbols || [];
@@ -532,7 +456,14 @@ export async function processAnnouncements() {
               continue;
             }
 
-            const matchesUser = doesAnnouncementMatchUserPrefs(uPrefs, priority, uMatchedStockPriority, subject, details, uWatchlistMatch) || userRuleEval.shouldSendTelegram || userRuleEval.shouldSendInApp;
+            const prefsMatch = doesAnnouncementMatchUserPrefs(uPrefs, priority, uMatchedStockPriority, subject, details, uWatchlistMatch);
+            // Telegram fires ONLY on telegram-eligible matches: the user's own
+            // filter rules, or an alert rule whose telegram channel is ON.
+            // An in-app-only rule match (e.g. the system buyback preset:
+            // ALL_STOCKS scope, telegram off) must never trigger a Telegram
+            // message for companies outside the user's watchlist.
+            const telegramEligible = isTelegramEligible(prefsMatch, userRuleEval.shouldSendTelegram);
+            const matchesUser = telegramEligible || userRuleEval.shouldSendInApp;
             
             const userNotifMuted = Boolean(u.muteInAppNotifications ?? uPrefs?.muteInAppNotifications);
             if (matchesUser) {
@@ -555,8 +486,9 @@ export async function processAnnouncements() {
                 });
               }
 
-              // Deduplicate Telegram dispatch: Skip if user disabled Telegram, no chat ID, or already sent
-              if (isUserTelegramActive && rawUserChatId && !sentTelegramChatIds.has(rawUserChatId)) {
+              // Deduplicate Telegram dispatch: skip if the match is not
+              // telegram-eligible, user disabled Telegram, no chat ID, or already sent
+              if (telegramEligible && isUserTelegramActive && rawUserChatId && !sentTelegramChatIds.has(rawUserChatId)) {
                 sentTelegramChatIds.add(rawUserChatId);
                 dispatchPromises.push((async () => {
                   try {

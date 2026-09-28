@@ -30,6 +30,7 @@ import {
 import { getBseHealth, testBSEConnection, syncWatchlistHistoricalData, syncSingleStockHistoricalData, backfillRecentAnnouncements, getBackupStalenessMetrics } from "../services/bse.js";
 import { getAllStockEntries } from "../utils/stockResolver.js";
 import { invalidateMonitorConfigCache } from "../services/monitor.js";
+import { wantsTelegramEnable } from "../utils/alertDecision.js";
 import { getTelegramHealth, sendToTelegram, getBotUsername } from "../services/telegram.js";
 import { 
   getResultsCalendarData, 
@@ -926,25 +927,6 @@ async function isProLikeUser(uid: string, isAdminUser: boolean): Promise<boolean
   } catch {
     return false;
   }
-}
-
-/**
- * Does this patch attempt to LINK or ENABLE Telegram relative to the existing
- * profile? Change-based so that language-only saves (which echo the current
- * prefs) don't trip the gate. Unlinking (null chat id) never counts.
- */
-function wantsTelegramEnable(
-  patch: { telegramChatId?: string | null; telegramAlertsEnabled?: boolean; telegramAiSummaryEnabled?: boolean; telegramAlertScope?: string; telegramNewsAlerts?: boolean },
-  existingProfile: any
-): boolean {
-  const chatId = patch.telegramChatId;
-  if (typeof chatId === 'string' && chatId.trim().length > 0) return true; // linking a chat id
-  const cur = existingProfile?.notificationPreferences || {};
-  if (patch.telegramAlertsEnabled !== undefined && Boolean(patch.telegramAlertsEnabled) !== Boolean(cur.telegramAlertsEnabled)) return true;
-  if (patch.telegramAiSummaryEnabled !== undefined && Boolean(patch.telegramAiSummaryEnabled) !== Boolean(cur.telegramAiSummaryEnabled)) return true;
-  if (patch.telegramAlertScope !== undefined && patch.telegramAlertScope !== cur.telegramAlertScope) return true;
-  if (patch.telegramNewsAlerts !== undefined && Boolean(patch.telegramNewsAlerts) !== Boolean(cur.telegramNewsAlerts)) return true;
-  return false;
 }
 
 const TELEGRAM_PRO_ERROR = "Telegram alerts are a Pro feature. Upgrade to Pro — one-time plans from ₹59 — to link Telegram and receive instant alerts.";

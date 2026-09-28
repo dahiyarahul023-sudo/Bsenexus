@@ -143,6 +143,7 @@ export function SettingsTab({
   // Telegram Notifications State
   const [tgChatIdInput, setTgChatIdInput] = useState('');
   const [tgAlertsEnabled, setTgAlertsEnabled] = useState(true);
+  const [isTogglingTgAlerts, setIsTogglingTgAlerts] = useState(false);
   const [tgAiSummaryEnabled, setTgAiSummaryEnabled] = useState(true);
   const [tgAlertScope, setTgAlertScope] = useState<'WATCHLIST_ONLY' | 'ALL_MARKET'>('WATCHLIST_ONLY');
   const [tgSummaryLang, setTgSummaryLang] = useState<'hinglish' | 'english'>('english');
@@ -450,6 +451,22 @@ export function SettingsTab({
     } else {
       setUsernameValidationMsg(res?.error || 'Failed to save profile.');
     }
+  };
+
+  // Master Telegram toggle saves INSTANTLY — flipping it must stop/start
+  // alerts on the server right away, not wait for the sheet's Save button.
+  const handleToggleTgAlerts = async () => {
+    if (!user || user.isAnonymous) {
+      setIsAuthModalOpen?.(true);
+      return;
+    }
+    if (isTogglingTgAlerts) return;
+    const next = !tgAlertsEnabled;
+    setTgAlertsEnabled(next); // optimistic
+    setIsTogglingTgAlerts(true);
+    const ok = await updateTelegramPreferences({ alertsEnabled: next });
+    setIsTogglingTgAlerts(false);
+    if (!ok) setTgAlertsEnabled(!next); // roll back — server rejected (e.g. Pro gate)
   };
 
   const handleSaveTelegram = async (e?: React.FormEvent) => {
@@ -2210,7 +2227,8 @@ export function SettingsTab({
                       type="button"
                       role="switch"
                       aria-checked={tgAlertsEnabled}
-                      onClick={() => setTgAlertsEnabled(!tgAlertsEnabled)}
+                      disabled={isTogglingTgAlerts}
+                      onClick={handleToggleTgAlerts}
                       className={cn(
                         "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden",
                         tgAlertsEnabled ? "bg-emerald-600 dark:bg-emerald-500" : "bg-slate-300 dark:bg-slate-700"
