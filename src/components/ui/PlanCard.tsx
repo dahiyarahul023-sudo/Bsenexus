@@ -78,7 +78,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
             {title}
           </h3>
           {tag && (
-            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#7B7B7B] dark:text-zinc-400">
+            <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-emerald-600 dark:text-emerald-400">
               {tag}
             </span>
           )}
@@ -111,7 +111,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
           )}
         </div>
         {sub && (
-          <p className="mt-2 text-[12px] font-medium text-[#7B7B7B] dark:text-zinc-400">
+          <p className="mt-2 text-[12px] font-medium text-emerald-700 dark:text-emerald-300">
             {sub}
           </p>
         )}
@@ -137,7 +137,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
               <Check
                 size={20}
                 strokeWidth={1.5}
-                className="text-[#121212] dark:text-white shrink-0 mt-[1px]"
+                className="text-emerald-600 dark:text-emerald-400 shrink-0 mt-[1px]"
               />
               <span className="text-[13px] leading-relaxed text-[#121212] dark:text-zinc-200">
                 <span className="font-medium">{f.title}</span>
@@ -179,7 +179,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
               {title}
             </span>
             {tag && (
-              <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#7B7B7B] dark:text-zinc-400">
+              <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-emerald-600 dark:text-emerald-400">
                 {tag}
               </span>
             )}
@@ -211,7 +211,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({
             )}
           </span>
           {sub && (
-            <span className="block mt-2 text-[12px] font-medium text-[#7B7B7B] dark:text-zinc-400">
+            <span className="block mt-2 text-[12px] font-medium text-emerald-700 dark:text-emerald-300">
               {sub}
             </span>
           )}
