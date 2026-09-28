@@ -198,7 +198,7 @@ export function SubscriptionCard() {
         <button
           onClick={handlePay}
           disabled={!status?.configured}
-          className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-black rounded-xl shadow-lg shadow-emerald-600/25 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60"
+          className="w-full py-3.5 bg-[#121212] dark:bg-white hover:opacity-85 active:scale-[0.98] text-white dark:text-black text-[15px] font-medium tracking-[-0.01em] rounded-full transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60"
         >
           <CreditCard className="w-4 h-4" />
           <span>

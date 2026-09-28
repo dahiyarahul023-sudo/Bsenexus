@@ -14,9 +14,10 @@
  * deep links) and can be switched in step 1.
  */
 import React, { useState, useEffect } from 'react';
-import { X, ReceiptText, ShieldCheck, Check, ChevronLeft } from 'lucide-react';
+import { X, ReceiptText, ShieldCheck, ChevronLeft } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { startProPayment, formatReceiptDate, PRO_PLAN_LIST, type ProPlanDisplay } from '../utils/cashfree';
+import { PlanCard } from './ui/PlanCard';
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -55,50 +56,6 @@ function ProVsFree() {
         </div>
       ))}
     </div>
-  );
-}
-
-const PlanCard: React.FC<{
-  p: ProPlanDisplay;
-  selected: boolean;
-  onSelect: () => void;
-}> = ({ p, selected, onSelect }) => {
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      aria-pressed={selected}
-      className={`w-full flex items-start gap-3 rounded-2xl px-4 py-4 text-left transition-all border-2 ${
-        selected
-          ? 'border-slate-950 bg-slate-950/[0.03] shadow-sm'
-          : 'border-slate-200 bg-white hover:border-slate-300'
-      }`}
-    >
-      <span
-        className={`shrink-0 mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-          selected ? 'border-slate-950 bg-slate-950' : 'border-slate-300 bg-white'
-        }`}
-      >
-        {selected && <Check size={12} className="text-white" strokeWidth={3} />}
-      </span>
-      <span className="flex-1 min-w-0">
-        <span className="flex items-center gap-2 flex-wrap">
-          <span className="text-[14px] font-bold text-slate-900">{p.label}</span>
-          {p.tag && (
-            <span className="text-[9px] font-black uppercase tracking-wider bg-emerald-600 text-white px-1.5 py-0.5 rounded-md">
-              {p.tag}
-            </span>
-          )}
-        </span>
-        <span className="block text-[12px] font-medium text-slate-500 mt-1">
-          {p.days} days validity · {p.sub}
-        </span>
-      </span>
-      <span className="text-right shrink-0">
-        <span className="block text-[20px] font-black text-slate-900 tracking-tight">₹{p.price}</span>
-        <span className="block text-[10px] font-medium text-slate-400 mt-0.5">one-time</span>
-      </span>
-    </button>
   );
 }
 
@@ -193,11 +150,17 @@ export function ProCheckoutView() {
             </p>
 
             {/* Vertical plan cards */}
-            <div className="space-y-2.5 mb-5">
+            <div className="space-y-3 mb-5">
               {PRO_PLAN_LIST.map((p) => (
                 <PlanCard
                   key={p.id}
-                  p={p}
+                  selectable
+                  title={p.label}
+                  subtitle={`${p.days} days validity`}
+                  price={String(p.price)}
+                  priceSuffix="one-time"
+                  tag={p.tag}
+                  sub={p.sub}
                   selected={p.id === plan.id}
                   onSelect={() => setPlanId(p.id)}
                 />
@@ -212,7 +175,7 @@ export function ProCheckoutView() {
 
             <button
               onClick={() => setStep('pay')}
-              className="mt-5 w-full py-4 rounded-2xl bg-slate-950 text-white text-[15px] font-bold hover:opacity-90 active:scale-[0.98] transition-all"
+              className="mt-5 w-full py-4 rounded-full bg-[#121212] text-white text-[15px] font-medium tracking-[-0.01em] hover:opacity-90 active:scale-[0.98] transition-all"
             >
               Continue — ₹{plan.price}
             </button>
@@ -282,7 +245,7 @@ export function ProCheckoutView() {
             <button
               onClick={handlePay}
               disabled={paying}
-              className="mt-4 w-full py-4 rounded-2xl bg-slate-950 text-white text-[15px] font-bold hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-60"
+              className="mt-4 w-full py-4 rounded-full bg-[#121212] text-white text-[15px] font-medium tracking-[-0.01em] hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-60"
             >
               {paying ? 'Opening…' : `Pay ₹${plan.price}`}
             </button>

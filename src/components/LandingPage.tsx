@@ -25,6 +25,7 @@ import { scrollToElementWithOffset } from '../utils/scrollState';
 import { FollowBseNexusBlock, SocialIconsRow } from './ui/SocialLinks';
 import { CommonQuestionsFAQ } from './ui/CommonQuestionsFAQ';
 import { getPlanDisplay, getLowestPlanPrice } from '../utils/cashfree';
+import { PlanCard } from './ui/PlanCard';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -2291,120 +2292,44 @@ export function LandingPage({
           {/* Pricing Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto mb-12">
             
-            {/* Free Tier Card */}
-            <div className="bg-white dark:bg-[#15141E] rounded-3xl border border-slate-200 dark:border-[#2D283E] p-6 sm:p-8 flex flex-col justify-between shadow-xs">
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-black text-slate-900 dark:text-white">Community Free</h3>
-                    <p className="text-xs text-slate-500">For retail traders & individual investors</p>
-                  </div>
-                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                    Forever Free
-                  </span>
-                </div>
+            <PlanCard
+              title="Community Free"
+              subtitle="For retail traders & individual investors"
+              tag="Forever Free"
+              price="0"
+              priceSuffix="/month"
+              features={[
+                'BSE announcements, updated continuously',
+                'Full coverage across all 5,000+ BSE Equities',
+                'One one-time AI filing summary demo',
+                'Board Meeting & Earnings Calendar',
+              ]}
+              ctaLabel={<span className="inline-flex items-center gap-2">Launch Terminal (Free) <ArrowRight className="w-4 h-4" /></span>}
+              onCta={() => onEnterTerminal('dashboard')}
+              className="h-full"
+            />
 
-                <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-black text-slate-900 dark:text-white font-mono">₹0</span>
-                  <span className="text-xs text-slate-500 font-semibold">/ month</span>
-                </div>
-
-                <ul className="space-y-3 text-xs text-slate-600 dark:text-slate-300">
-                  <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span>BSE announcements, updated continuously</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span>Full coverage across all 5,000+ BSE Equities</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span>One one-time AI filing summary demo</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span>Board Meeting & Earnings Calendar</span>
-                  </li>
-                </ul>
-              </div>
-
-              <div className="pt-8">
-                <button
-                  onClick={() => onEnterTerminal('dashboard')}
-                  className="w-full py-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-900 dark:text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-700"
-                >
-                  <span>Launch Terminal (Free)</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Pro Tier Card */}
-            <div className="bg-white dark:bg-[#1A1926] rounded-3xl border-2 border-emerald-500 p-6 sm:p-8 flex flex-col justify-between shadow-xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 bg-emerald-500 text-slate-950 font-black text-[10px] px-3.5 py-1 rounded-bl-xl uppercase tracking-wider">
-                1-WEEK FREE TRIAL
-              </div>
-
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-                      <span>Pro Intelligence</span>
-                      <Sparkles className="w-4 h-4 text-emerald-500" />
-                    </h3>
-                    <p className="text-xs text-slate-500">For serious traders, research desks & Telegram channels</p>
-                  </div>
-                </div>
-
-                <div className="flex items-baseline gap-2 flex-wrap">
-                  <span className="text-xl line-through text-slate-400 font-mono">₹{monthlyPlan.wasPrice}</span>
-                  <span className="text-4xl font-black text-emerald-600 dark:text-emerald-400 font-mono">₹{monthlyPlan.price}</span>
-                  <span className="text-xs text-slate-500 font-semibold">/month</span>
-                  <span className="text-[10px] text-emerald-700 dark:text-emerald-300 font-bold ml-1 bg-emerald-100 dark:bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-800">
-                    Launch Offer · 60% Off
-                  </span>
-                </div>
-                <p className="-mt-4 text-[11px] text-slate-500 dark:text-slate-400">1st week free — no card required. Then one-time plans from ₹{getLowestPlanPrice()}, cancel anytime.</p>
-
-                <ul className="space-y-3 text-xs text-slate-600 dark:text-slate-300">
-                  <li className="flex items-center gap-2.5 font-semibold text-slate-900 dark:text-slate-100">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span>Everything in Free, plus:</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span>Unlimited Watchlists & Priority Ticker Groups</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span>Broadcast to Personal & Channel Telegram</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span>Unlimited High-Priority Gemini AI Financial Extraction</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span>Filter & Mute Routine Administrative Filings</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span>Export Watchlists & Financial Summaries (CSV / JSON)</span>
-                  </li>
-                </ul>
-              </div>
-
-              <div className="pt-8">
-                <button
-                  onClick={() => setIsProModalOpen(true)}
-                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-black rounded-xl shadow-lg shadow-emerald-600/25 transition-all cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <Zap className="w-4 h-4 fill-white" />
-                  <span>Claim 1-Week Free Trial — ₹0</span>
-                </button>
-              </div>
-            </div>
+            <PlanCard
+              title="Pro Intelligence"
+              subtitle="For serious traders, research desks & Telegram channels"
+              tag="1-Week Free Trial"
+              wasPrice={String(monthlyPlan.wasPrice)}
+              price={String(monthlyPlan.price)}
+              priceSuffix="/month"
+              sub={monthlyPlan.sub}
+              features={[
+                'Everything in Free, plus:',
+                'Unlimited Watchlists & Priority Ticker Groups',
+                'Broadcast to Personal & Channel Telegram',
+                'Unlimited High-Priority Gemini AI Financial Extraction',
+                'Filter & Mute Routine Administrative Filings',
+                'Export Watchlists & Financial Summaries (CSV / JSON)',
+              ]}
+              ctaLabel={<span className="inline-flex items-center gap-2"><Zap className="w-4 h-4" /> Claim 1-Week Free Trial — ₹0</span>}
+              onCta={() => setIsProModalOpen(true)}
+              footnote={<>1st week free — no card required. Then one-time plans from ₹{getLowestPlanPrice()}, cancel anytime.</>}
+              className="h-full"
+            />
 
           </div>
 
