@@ -1461,15 +1461,21 @@ apiRouter.post("/news/telegram/toggle-auto", requireAuth, async (req, res) => {
     if (uid && uid !== 'anonymous') {
       const user = await getUserProfile(uid);
       if (user) {
-        // Telegram is PRO-ONLY: free users cannot enable or configure Telegram news alerts
+        // Telegram is PRO-ONLY for enabling/configuring, but DISABLING must
+        // always be allowed — even for expired/free users (kill-switch rule).
         const proActive = Boolean(user.tier === 'admin' || (user.proExpiresAt && user.proExpiresAt > Date.now()));
-        if (!proActive) {
+        const wantsEnable = enabled === true;
+        if (!proActive && wantsEnable) {
           return res.status(403).json({ success: false, proRequired: true, error: TELEGRAM_PRO_ERROR });
         }
         const prefs = user.notificationPreferences || ({} as any);
         if (enabled !== undefined) prefs.telegramNewsAlerts = enabled === true;
-        if (Array.isArray(sources)) prefs.telegramNewsSources = sources;
-        if (Array.isArray(categories)) prefs.telegramNewsCategories = categories;
+        // Non-Pro users may only turn OFF; source/category configuration
+        // stays a Pro-only action.
+        if (proActive) {
+          if (Array.isArray(sources)) prefs.telegramNewsSources = sources;
+          if (Array.isArray(categories)) prefs.telegramNewsCategories = categories;
+        }
         
         await saveUserProfile(uid, { notificationPreferences: prefs });
         return res.json({

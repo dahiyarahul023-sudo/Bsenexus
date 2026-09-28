@@ -620,7 +620,12 @@ export async function processAutomatedNewsAlerts(): Promise<{ checked: number; d
       const userProActive = Boolean(u.tier === 'admin' || (u.proExpiresAt && u.proExpiresAt > Date.now()));
       if (!userProActive) continue;
       const uNewsPrefs: any = u.notificationPreferences || {};
-      if (u.telegramChatId && uNewsPrefs.telegramNewsAlerts === true && uNewsPrefs.telegramAlertsEnabled !== false) {
+      if (u.telegramChatId && uNewsPrefs.telegramNewsAlerts === true) {
+        // Master toggle is a kill-switch: OFF => no news digest either.
+        if (uNewsPrefs.telegramAlertsEnabled === false) {
+          console.debug(`[TELEGRAM] skip news digest for user ${u.uid}: master toggle OFF`);
+          continue;
+        }
         // Avoid duplicate if same as global
         if (u.telegramChatId !== settings.chatId) {
           recipients.push({
@@ -664,7 +669,7 @@ export async function processAutomatedNewsAlerts(): Promise<{ checked: number; d
           if (sendRes.success) {
             await markNewsAlertSentToTarget(rec.targetId, news.id);
             totalDispatched++;
-            await addLog('INFO', 'TELEGRAM', `Auto-dispatched 24/7 news for ${news.symbol || news.companyName} (${news.source} - ${news.category}) to Chat ${rec.chatId}`);
+            await addLog('INFO', 'TELEGRAM', `Auto-dispatched 24/7 news for ${news.symbol || news.companyName} (${news.source} - ${news.category}) to user ${rec.userId} (Chat ${rec.chatId})`);
           }
         }
       }

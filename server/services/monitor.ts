@@ -27,8 +27,14 @@ let isPolling = false;
 let isCacheInitialized = false;
 
 // Per-User Watchlist Cache with 10-minute TTL to drastically reduce Firestore read volume
-const USER_WATCHLIST_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+// Per-user watchlist snapshot for the monitor loop. Kept SHORT (60s, same as
+// the main config cache): a stock deleted from a watchlist must stop matching
+// for Telegram within a minute, even on a Cloud Run instance that did not
+// handle the delete request (in-memory invalidation is per-instance only).
+const USER_WATCHLIST_CACHE_TTL_MS = 60 * 1000; // 60 seconds
 const monitorUserWatchlistCache = new Map<string, { symbols: string[]; map: any; fetchedAt: number }>();
+// Uids already warned about personal-chat == admin-channel overlap (once per process).
+const warnedAdminOverlap = new Set<string>();
 
 // In-Memory Configuration Cache with ~60s TTL to prevent repeated DB lookups on 15s critical loop
 let configCache: {
@@ -414,6 +420,17 @@ export async function processAnnouncements() {
             // Fail-closed: a profile with no saved preferences behaves like
             // defaults (WATCHLIST_ONLY scope), never "match everything".
             const uPrefs = u.notificationPreferences || {};
+            // Diagnostic: this user's personal chat IS the global admin channel.
+            // The admin channel gets operational broadcasts (BSE outage,
+            // calendar, storage, manual admin sends) independent of the
+            // personal toggle — that is the expected explanation if such a
+            // user reports "messages despite toggle OFF". Warn once.
+            const adminChatIdNorm = settings.chatId ? String(settings.chatId).trim() : '';
+            if (rawUserChatId && adminChatIdNorm && rawUserChatId === adminChatIdNorm
+                && uPrefs.telegramAlertsEnabled === false && !warnedAdminOverlap.has(u.uid)) {
+              warnedAdminOverlap.add(u.uid);
+              console.warn(`[TELEGRAM] user ${u.uid}: personal chat == admin channel and personal toggle is OFF; admin-channel broadcasts will still reach this chat by design`);
+            }
             // Telegram is a PRO-ONLY feature: skip dispatch when the user's
             // trial/pack has expired (in-app notifications above are unaffected).
             const userProActive = Boolean(u.tier === 'admin' || (u.proExpiresAt && u.proExpiresAt > Date.now()));
@@ -489,11 +506,30 @@ export async function processAnnouncements() {
               // Deduplicate Telegram dispatch: skip if the match is not
               // telegram-eligible, user disabled Telegram, no chat ID, or already sent
               if (telegramEligible && isUserTelegramActive && rawUserChatId && !sentTelegramChatIds.has(rawUserChatId)) {
+                // STRICT DELETE RULE — final fresh check before firing. The
+                // match above was computed from a ≤60s snapshot; re-read the
+                // user's watchlist straight from the DAO (its own cache is
+                // only ~2s) when the Telegram eligibility came from a
+                // watchlist match. A stock deleted seconds ago can never
+                // trigger this send. (Custom alert rules with telegram ON are
+                // explicit per-rule opt-ins and are not affected by this.)
+                if (prefsMatch && uWatchlistMatch) {
+                  const freshSymbols = await getActiveWatchlistSymbols(u.uid, { noCreate: true }).catch(() => userSymbols);
+                  const stillWatched = freshSymbols.some(kw => isSymbolMatch(companyName, subject, kw, scrip_cd));
+                  // Opportunistically refresh the snapshot for later items.
+                  monitorUserWatchlistCache.set(u.uid, { symbols: freshSymbols, map: userSymbolMap, fetchedAt: Date.now() });
+                  if (!stillWatched) {
+                    console.debug(`[TELEGRAM] skip user ${u.uid} for ${companyName}: no longer in watchlist (deleted after snapshot)`);
+                    continue;
+                  }
+                }
                 sentTelegramChatIds.add(rawUserChatId);
                 dispatchPromises.push((async () => {
                   try {
                     const userRes = await sendToTelegram(message, rawUserChatId);
                     if (userRes.success && userRes.messageId) {
+                      const viaRule = !prefsMatch && userRuleEval.shouldSendTelegram;
+                      await addLog('SUCCESS', 'TELEGRAM', `Personal alert -> user ${u.uid}: ${companyName} [${priority.category}] via ${viaRule ? 'alert-rule(telegram-on)' : 'watchlist-prefs'}`);
                       const userWantsAiSummary = uPrefs?.telegramAiSummaryEnabled !== false;
                       if (userWantsAiSummary) {
                         const userSummaryLang = (uPrefs as any)?.aiSummaryLang === 'hinglish' ? 'hinglish' : 'english';
@@ -505,6 +541,10 @@ export async function processAnnouncements() {
                     console.warn(`Failed sending user telegram to ${rawUserChatId}:`, userErr?.message);
                   }
                 })());
+              } else if (matchesUser && rawUserChatId && !sentTelegramChatIds.has(rawUserChatId)) {
+                // Skip diagnostics (console only, no Firestore cost): explains
+                // "why didn't I get it" without spamming the activity log.
+                console.debug(`[TELEGRAM] skip user ${u.uid} for ${companyName}: telegramEligible=${telegramEligible} toggleActive=${isUserTelegramActive}`);
               }
             }
           }
