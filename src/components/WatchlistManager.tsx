@@ -23,6 +23,7 @@ import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { useVisibilityInterval } from '../hooks/useVisibilityInterval';
 import { PullToRefreshIndicator } from './ui/PullToRefreshIndicator';
 import { ActionButton } from './ui/ActionButton';
+import { ThinkingPill } from './ui/ThinkingPill';
 import { clusterAnnouncements, AnnouncementCluster } from '../utils/clusterAnnouncements';
 import { motion, AnimatePresence } from 'framer-motion';
 import { springSnappy, springMorph, containerStaggerVariants, itemFadeUpVariants, buttonTap, cardHover } from '../utils/motionTokens';
@@ -4101,6 +4102,10 @@ Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to create unlimi
                   <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
                     {displaySummary(selectedAnnouncement)}
                   </p>
+                ) : isGeneratingSummary ? (
+                  <div className="py-3 flex justify-start animate-in fade-in duration-200">
+                    <ThinkingPill text="Thinking..." />
+                  </div>
                 ) : (
                   <p className="text-xs text-slate-500 italic">
                     AI summary has not been generated for this disclosure yet. Click "Generate AI Summary" above to parse financial metrics.
