@@ -27,6 +27,8 @@ import { CommonQuestionsFAQ } from './ui/CommonQuestionsFAQ';
 import { getPlanDisplay, getLowestPlanPrice } from '../utils/cashfree';
 import { PlanCard } from './ui/PlanCard';
 import ParticleRibbons from './ui/ParticleRibbons';
+import MagneticButton from './ui/MagneticButton';
+import Reveal from './ui/Reveal';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -288,7 +290,9 @@ export function LandingPage({
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#12131C] text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200 selection:bg-emerald-500 selection:text-white">
+    <div className="landing-ambient min-h-screen bg-[#F8FAFC] dark:bg-[#12131C] text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200 selection:bg-emerald-500 selection:text-white">
+      {/* Full-page ambient ribbon animation (fixed canvas behind everything) */}
+      <ParticleRibbons />
       {/* Accessibility: Skip to main content bypass link for keyboard & screen reader users (WCAG 2.4.1) */}
       <a 
         href="#main-content" 
@@ -569,21 +573,24 @@ export function LandingPage({
       </header>
 
       {/* Primary Semantic Main Landmark for Screen Readers & Lighthouse Compliance */}
-      <main id="main-content" role="main" tabIndex={-1} className="focus:outline-none">
+      <main id="main-content" role="main" tabIndex={-1} className="focus:outline-none relative z-[2]">
 
       {/* 3. HERO HEADER SECTION */}
       <section className="relative overflow-hidden pt-8 sm:pt-14 pb-16 sm:pb-24 border-b border-slate-200/80 dark:border-[#2D283E]">
         {/* Subtle grid pattern background */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
-        {/* Flowing light-ribbon animation (canvas) */}
-        <ParticleRibbons />
         <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
             
             {/* Left Hero Copy */}
-            <div className="lg:col-span-7 space-y-6 text-left">
+            <motion.div
+              initial={{ opacity: 0, y: 32, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+              className="lg:col-span-7 space-y-6 text-left"
+            >
               {/* Badge */}
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 text-xs font-bold shadow-2xs">
                 <span className="relative flex h-2 w-2">
@@ -605,33 +612,44 @@ export function LandingPage({
 
               {/* Action Buttons */}
               <div className="flex flex-wrap items-center gap-3.5 pt-2">
-                <motion.button
-                  whileTap={{ scale: 0.96 }}
-                  onClick={() => onEnterTerminal('dashboard')}
-                  className="flex items-center gap-2.5 px-6 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 dark:bg-emerald-700 dark:hover:bg-emerald-600 text-white text-sm font-black shadow-lg shadow-emerald-700/30 transition-all cursor-pointer select-none min-h-[44px] whitespace-nowrap"
-                >
-                  <Zap className="w-4 h-4 fill-white" />
-                  <span>Enter Live Terminal</span>
-                  <ArrowRight className="w-4 h-4" />
-                </motion.button>
+                <MagneticButton>
+                  <span className="cta-glow cta-pulse">
+                    <motion.button
+                      whileTap={{ scale: 0.96 }}
+                      whileHover={{ scale: 1.05 }}
+                      onClick={() => onEnterTerminal('dashboard')}
+                      className="btn-shine flex items-center gap-2.5 px-6 py-3 bg-emerald-700 hover:bg-emerald-800 dark:bg-emerald-700 dark:hover:bg-emerald-600 text-white text-sm font-black shadow-lg shadow-emerald-700/30 transition-colors cursor-pointer select-none min-h-[44px] whitespace-nowrap"
+                    >
+                      <Zap className="w-4 h-4 fill-white" />
+                      <span>Enter Live Terminal</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </motion.button>
+                  </span>
+                </MagneticButton>
 
-                <motion.button
-                  whileTap={{ scale: 0.96 }}
-                  onClick={() => scrollToSection('features')}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white dark:bg-[#1A1926] hover:bg-slate-100 dark:hover:bg-[#252233] text-slate-800 dark:text-slate-200 text-sm font-bold border border-slate-200 dark:border-[#2D283E] transition-all shadow-xs cursor-pointer select-none min-h-[44px] whitespace-nowrap"
-                >
-                  <Sparkles className="w-4 h-4 text-purple-500" />
-                  <span>Explore AI Features</span>
-                </motion.button>
+                <MagneticButton>
+                  <motion.button
+                    whileTap={{ scale: 0.96 }}
+                    whileHover={{ scale: 1.05 }}
+                    onClick={() => scrollToSection('features')}
+                    className="btn-shine flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white dark:bg-[#1A1926] hover:bg-slate-100 dark:hover:bg-[#252233] text-slate-800 dark:text-slate-200 text-sm font-bold border border-slate-200 dark:border-[#2D283E] transition-all shadow-xs cursor-pointer select-none min-h-[44px] whitespace-nowrap"
+                  >
+                    <Sparkles className="w-4 h-4 text-purple-500" />
+                    <span>Explore AI Features</span>
+                  </motion.button>
+                </MagneticButton>
 
-                <motion.button
-                  whileTap={{ scale: 0.96 }}
-                  onClick={() => onEnterTerminal('results-calendar')}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-100 dark:bg-[#222030] hover:bg-slate-200 dark:hover:bg-[#2B273C] text-slate-700 dark:text-slate-300 text-sm font-semibold transition-all cursor-pointer border border-transparent dark:border-[#332E45] select-none min-h-[44px] whitespace-nowrap"
-                >
-                  <Calendar className="w-4 h-4 text-rose-500" />
-                  <span>Earnings Calendar</span>
-                </motion.button>
+                <MagneticButton>
+                  <motion.button
+                    whileTap={{ scale: 0.96 }}
+                    whileHover={{ scale: 1.05 }}
+                    onClick={() => onEnterTerminal('results-calendar')}
+                    className="btn-shine flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-100 dark:bg-[#222030] hover:bg-slate-200 dark:hover:bg-[#2B273C] text-slate-700 dark:text-slate-300 text-sm font-semibold transition-all cursor-pointer border border-transparent dark:border-[#332E45] select-none min-h-[44px] whitespace-nowrap"
+                  >
+                    <Calendar className="w-4 h-4 text-rose-500" />
+                    <span>Earnings Calendar</span>
+                  </motion.button>
+                </MagneticButton>
               </div>
 
               {/* Trust Metric Badges */}
@@ -653,10 +671,15 @@ export function LandingPage({
                   <div className="text-[11px] text-slate-700 dark:text-slate-300 font-medium">Filing Alerts</div>
                 </div>
               </div>
-            </div>
+            </motion.div>
 
             {/* Right Hero Interactive Terminal Card Preview */}
-            <div className="lg:col-span-5">
+            <motion.div
+              initial={{ opacity: 0, y: 40, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.9, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
+              className="lg:col-span-5"
+            >
               <div className="bg-white dark:bg-[#1A1926] rounded-2xl border border-slate-200 dark:border-[#2D283E] shadow-2xl overflow-hidden">
                 {/* Terminal Card Header with semantic h2 */}
                 <div className="px-4 py-3 bg-[#15141E] text-slate-200 flex items-center justify-between border-b border-[#2A263A]">
@@ -782,7 +805,7 @@ export function LandingPage({
                   </AnimatePresence>
                 </div>
               </div>
-            </div>
+            </motion.div>
 
           </div>
         </div>
@@ -849,7 +872,7 @@ export function LandingPage({
       <section id="whats-new" className="py-16 sm:py-24 bg-gradient-to-b from-slate-50 to-white dark:from-[#0B0F17] dark:to-[#0F172A] border-b border-slate-200/80 dark:border-slate-800/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
-          <div className="text-center max-w-3xl mx-auto space-y-3 mb-12 sm:mb-16">
+          <Reveal className="text-center max-w-3xl mx-auto space-y-3 mb-12 sm:mb-16">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 text-xs font-black border border-amber-500/30">
               <Sparkles className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
               <span>MAJOR PLATFORM UPDATE • VERSION 2.0</span>
@@ -860,7 +883,7 @@ export function LandingPage({
             <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">
               Explore the latest suite of institutional tools designed for active Indian equity investors, forensic analysts, and prop desks.
             </p>
-          </div>
+          </Reveal>
 
           {/* 6-Card Bento Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1103,7 +1126,7 @@ export function LandingPage({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10">
-            <div className="space-y-2 max-w-2xl">
+            <Reveal className="space-y-2 max-w-2xl">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 text-xs font-bold border border-emerald-200 dark:border-emerald-800">
                 <Building2 className="w-3.5 h-3.5" />
                 <span>INTERACTIVE FEATURE DEMO</span>
@@ -1114,7 +1137,7 @@ export function LandingPage({
               <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
                 Click across the companies and explore all 5 dossier tabs below. See how BSE Nexus transforms dense disclosures into actionable alpha.
               </p>
-            </div>
+            </Reveal>
 
             {/* Company Selector Pills */}
             <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-2">
@@ -1487,7 +1510,7 @@ export function LandingPage({
       <section id="how-it-works" className="py-16 sm:py-24 bg-white dark:bg-[#0F172A] border-b border-slate-200/80 dark:border-slate-800/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
-          <div className="text-center max-w-3xl mx-auto space-y-3 mb-12 sm:mb-16">
+          <Reveal className="text-center max-w-3xl mx-auto space-y-3 mb-12 sm:mb-16">
             <span className="text-xs font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/80 px-3 py-1 rounded-full border border-emerald-200 dark:border-emerald-800">
               End-to-End Workflow
             </span>
@@ -1497,7 +1520,7 @@ export function LandingPage({
             <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">
               From raw exchange PDF submission to institutional-grade insights on your phone in seconds.
             </p>
-          </div>
+          </Reveal>
 
           {/* 4 Steps Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -1616,7 +1639,7 @@ export function LandingPage({
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
             
             {/* Left: Info */}
-            <div className="lg:col-span-5 space-y-5">
+            <Reveal className="lg:col-span-5 space-y-5">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 text-xs font-bold border border-purple-200 dark:border-purple-800">
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>Feature 01 • Neural Analysis</span>
@@ -1671,7 +1694,7 @@ export function LandingPage({
                   <span>Test AI Summary in Live Feed</span>
                 </button>
               </div>
-            </div>
+            </Reveal>
 
             {/* Right: Interactive AI Demo Card */}
             <div className="lg:col-span-7">
@@ -2223,7 +2246,7 @@ export function LandingPage({
             </div>
 
             {/* Right: Info */}
-            <div className="lg:col-span-5 space-y-5 order-1 lg:order-2">
+            <Reveal className="lg:col-span-5 space-y-5 order-1 lg:order-2">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-xs font-bold border border-blue-200 dark:border-blue-800">
                 <Send className="w-3.5 h-3.5" />
                 <span>Feature 04 • Telegram Broadcast</span>
@@ -2267,7 +2290,7 @@ export function LandingPage({
                   <span>View Pro Features (100% Free)</span>
                 </button>
               </div>
-            </div>
+            </Reveal>
 
           </div>
 
@@ -2278,7 +2301,7 @@ export function LandingPage({
       <section id="pricing" className="py-16 sm:py-24 bg-slate-50 dark:bg-[#0B0F17] border-b border-slate-200/80 dark:border-slate-800/80 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           
-          <div className="text-center max-w-3xl mx-auto space-y-3 mb-12 sm:mb-16">
+          <Reveal className="text-center max-w-3xl mx-auto space-y-3 mb-12 sm:mb-16">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-xs font-bold border border-emerald-200 dark:border-emerald-800">
               <Zap className="w-3.5 h-3.5 fill-emerald-500" />
               <span>Launch Special • 100% Free Access</span>
@@ -2289,7 +2312,7 @@ export function LandingPage({
             <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">
               We are currently giving 100% free access to all Pro features — including unlimited watchlists, Telegram alerts, and AI financial breakdowns. No credit card required.
             </p>
-          </div>
+          </Reveal>
 
           {/* Pricing Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto mb-12">
@@ -2614,7 +2637,7 @@ export function LandingPage({
       </main>
 
       {/* 11. FOOTER */}
-      <footer className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] text-slate-600 dark:text-slate-400 text-xs py-12">
+      <footer className="relative z-[2] border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] text-slate-600 dark:text-slate-400 text-xs py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
           
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8">

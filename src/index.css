@@ -377,3 +377,65 @@ body {
 
 
 
+
+/* ---------- Landing ambient full-page animation ---------- */
+/* In dark mode, landing sections go transparent so the fixed ribbon canvas
+   shows through the whole page (cards keep their own surfaces). */
+.dark .landing-ambient main > section,
+.dark .landing-ambient > footer {
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+/* Primary CTA: rotating conic glow border */
+@keyframes cta-border-spin {
+  to { transform: rotate(360deg); }
+}
+.cta-glow {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  padding: 2px;
+  display: inline-block;
+}
+.cta-glow::before {
+  content: "";
+  position: absolute;
+  inset: -60%;
+  background: conic-gradient(from 0deg, #10b981, #a3e635, #2dd4bf, #fbbf24, #10b981);
+  animation: cta-border-spin 3.2s linear infinite;
+}
+.cta-glow > * {
+  position: relative;
+  border-radius: 10px;
+}
+
+/* Primary CTA: breathing glow pulse */
+@keyframes cta-pulse {
+  0%, 100% { box-shadow: 0 8px 24px rgba(16, 185, 129, 0.35); }
+  50% { box-shadow: 0 8px 44px rgba(163, 230, 53, 0.55); }
+}
+.cta-pulse {
+  animation: cta-pulse 2.6s ease-in-out infinite;
+}
+
+/* Shine sweep across buttons on hover */
+.btn-shine {
+  position: relative;
+  overflow: hidden;
+}
+.btn-shine::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -80%;
+  width: 55%;
+  height: 100%;
+  background: linear-gradient(105deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  transform: skewX(-20deg);
+  transition: left 0.65s ease;
+  pointer-events: none;
+}
+.btn-shine:hover::after {
+  left: 135%;
+}
