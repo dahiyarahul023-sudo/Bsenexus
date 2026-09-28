@@ -5043,6 +5043,14 @@ ${AI_STUDIO_REDIRECT_SCRIPT}
 </html>`;
 }
 
+// Lightweight health check for uptime monitors (e.g. UptimeRobot 5-min pings)
+// to keep the Cloud Run instance warm and avoid cold starts.
+// Public by design: no auth, no DB, no external calls — just 200 + tiny JSON.
+app.get(['/health', '/healthz'], (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ ok: true, uptime: Math.floor(process.uptime()) });
+});
+
 // Explicit SEO & AI Crawler Handlers (GEO / AEO Standards)
 app.get('/robots.txt', (_req, res) => {
   res.type('text/plain; charset=utf-8');
