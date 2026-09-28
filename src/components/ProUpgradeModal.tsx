@@ -6,7 +6,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { ActionButton } from './ui/ActionButton';
-import { hasUsedTrial } from '../utils/cashfree';
+import { hasUsedTrial, getPlanDisplay, getLowestPlanPrice } from '../utils/cashfree';
 
 export function ProUpgradeModal() {
   const { 
@@ -35,6 +35,9 @@ export function ProUpgradeModal() {
 
   const [isActivating, setIsActivating] = useState(false);
   const [activatedSuccess, setActivatedSuccess] = useState(false);
+  // Pricing comes from the single source of truth (src/config/plans.ts) —
+  // never hardcode plan prices in this component.
+  const monthlyPlan = getPlanDisplay('pro_monthly');
 
   if (!isProModalOpen) return null;
 
@@ -113,8 +116,8 @@ export function ProUpgradeModal() {
 
           {/* Pricing Tag */}
           <div className="mt-5 inline-flex items-baseline gap-2 bg-black/20 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/20">
-            <span className="text-base line-through text-white/60">₹499/mo</span>
-            <span className="text-3xl font-black text-white">{showPayMode ? '₹199' : '₹0'}</span>
+            <span className="text-base line-through text-white/60">₹{monthlyPlan.wasPrice}/mo</span>
+            <span className="text-3xl font-black text-white">{showPayMode ? `₹${monthlyPlan.price}` : '₹0'}</span>
             {!showPayMode && <span className="text-[11px] text-white/60 font-semibold">/mo</span>}
             <span className="text-[11px] bg-emerald-400 text-slate-950 font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
               {showPayMode ? 'Launch Offer · 60% Off' : '1 Week Free with Google'}
@@ -177,7 +180,7 @@ export function ProUpgradeModal() {
                   <ArrowRight size={15} className="ml-1" />
                 </ActionButton>
                 <p className="text-[10px] text-slate-400 text-center mt-2">
-                  Plans from ₹59 · Choose in checkout · One-time payment via Cashfree
+                  Plans from ₹{getLowestPlanPrice()} · Choose in checkout · One-time payment via Cashfree
                 </p>
               </>
             ) : activatedSuccess ? (
@@ -202,7 +205,7 @@ export function ProUpgradeModal() {
             
             <div className="text-left text-[10px] text-slate-400 dark:text-slate-500 mt-3 p-2.5 rounded-xl bg-slate-50/80 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/80 space-y-1">
               <p className="text-slate-600 dark:text-slate-300 font-medium leading-relaxed">
-                <span className="font-bold text-slate-900 dark:text-white">Free trial:</span> No card required upfront &bull; After the free week, Pro continues with one-time plans from ₹59 (launch offer) &bull; Cancel anytime in Settings.
+                <span className="font-bold text-slate-900 dark:text-white">Free trial:</span> No card required upfront &bull; After the free week, Pro continues with one-time plans from ₹{getLowestPlanPrice()} (launch offer) &bull; Cancel anytime in Settings.
               </p>
               <p className="text-[9px] text-slate-400/80 leading-relaxed">
                 7-day free trial &bull; Cancel anytime in Settings.

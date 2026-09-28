@@ -33,47 +33,17 @@ export interface StartPaymentResult {
 }
 
 /**
- * Client-side display catalogue for the 4 sellable plans.
- * Prices/durations here are DISPLAY ONLY — the server (PRO_PLANS) decides
- * the real amount at create-order time. Keep in sync with server/api/payments.ts.
+ * Plan display catalogue — moved to src/config/plans.ts (single source of
+ * truth, zero imports). Re-exported here so existing imports keep working.
  */
-export interface ProPlanDisplay {
-  id: string;
-  label: string;
-  price: number; // ₹
-  days: number;
-  tag?: string; // small highlight under the price, e.g. "Most Popular"
-  sub: string; // honest sub-line (real savings vs monthly, or trial note)
-}
-
-export const PRO_PLAN_LIST: ProPlanDisplay[] = [
-  { id: 'pro_weekly', label: 'Pro Weekly', price: 59, days: 7, sub: '7 days · try Pro out' },
-  { id: 'pro_monthly', label: 'Pro Monthly', price: 199, days: 30, tag: 'Most Popular', sub: 'Was ₹499 · 60% launch offer' },
-  { id: 'pro_halfyearly', label: 'Pro 6-Month', price: 999, days: 180, sub: 'Save ₹195 vs monthly' },
-  { id: 'pro_yearly', label: 'Pro Yearly', price: 1799, days: 365, sub: 'Save ₹589 vs monthly' },
-];
-
-export function getPlanDisplay(planId?: string | null): ProPlanDisplay {
-  return PRO_PLAN_LIST.find((p) => p.id === planId) || PRO_PLAN_LIST[1];
-}
-
-export function isValidPlanId(planId?: string | null): boolean {
-  return Boolean(planId && PRO_PLAN_LIST.some((p) => p.id === planId));
-}
-
-/** Derive the plan display from a server-generated order id (BN_<code>_...). */
-const ORDER_CODE_TO_PLAN: Record<string, string> = {
-  W: 'pro_weekly',
-  M: 'pro_monthly',
-  H: 'pro_halfyearly',
-  Y: 'pro_yearly',
-};
-
-export function getPlanDisplayFromOrderId(orderId?: string | null): ProPlanDisplay {
-  const m = /^BN_([WMHY])_/.exec(orderId || '');
-  const pid = m ? ORDER_CODE_TO_PLAN[m[1]] : 'pro_monthly';
-  return getPlanDisplay(pid);
-}
+export {
+  PRO_PLAN_LIST,
+  getPlanDisplay,
+  getLowestPlanPrice,
+  isValidPlanId,
+  getPlanDisplayFromOrderId,
+  type ProPlanDisplay,
+} from '../config/plans';
 
 /**
  * Create a Cashfree order on our server, then open the Cashfree checkout.

@@ -7,7 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { Crown, CreditCard, BadgeCheck, Info } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { customFetch } from '../api';
-import { verifyProPayment, claimProPayment } from '../utils/cashfree';
+import { verifyProPayment, claimProPayment, getLowestPlanPrice } from '../utils/cashfree';
 import { PaymentHistory } from './PaymentHistory';
 
 interface SubStatus {
@@ -206,7 +206,7 @@ export function SubscriptionCard() {
               ? 'Payments coming online…'
               : status?.isPro && status?.lastPaymentAt
                 ? 'Extend Pro'
-                : 'Upgrade to Pro — from ₹59'}
+                : `Upgrade to Pro — from ₹${getLowestPlanPrice()}`}
           </span>
         </button>
       )}

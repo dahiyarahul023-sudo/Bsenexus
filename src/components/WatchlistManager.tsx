@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { customFetch } from '../api';
+import { getLowestPlanPrice } from '../utils/cashfree';
 import { useAuth } from '../context/AuthContext';
 import { useIntelModal } from '../context/IntelModalContext';
 import { 
@@ -720,7 +721,9 @@ export function WatchlistManager() {
         alert('🔒 Google Sign-In Required: Sign in with Google to activate your 1-Week Free Pro trial to broadcast to Telegram!');
       } else {
         setIsProModalOpen(true);
-        alert('🔒 Direct Telegram Broadcasting is a Pro feature.\n\nYour 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹59) to dispatch instant alerts to Telegram!');
+        alert(`🔒 Direct Telegram Broadcasting is a Pro feature.
+
+Your 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to dispatch instant alerts to Telegram!`);
       }
       return;
     }
@@ -769,7 +772,7 @@ export function WatchlistManager() {
     const demoAlreadyUsed = (profile as any)?.freeSummaryUsed === true;
     if (!isProOrAdmin && demoAlreadyUsed) {
       setIsProModalOpen(true);
-      alert("🔒 You've used your one free AI summary demo. Upgrade to Pro (one-time plans from ₹59) for 100 AI summaries/day!");
+      alert(`🔒 You've used your one free AI summary demo. Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) for 100 AI summaries/day!`);
       return;
     }
 
@@ -965,10 +968,14 @@ export function WatchlistManager() {
     if (!isProOrAdmin && watchlists.length >= 1) {
       if (!user && !profile) {
         setIsAuthModalOpen(true);
-        alert('🔒 Creating multiple watchlists is a Pro feature.\n\nSign In to activate your 1-Week Free Pro Trial or Upgrade to Pro (one-time plans from ₹59)!');
+        alert(`🔒 Creating multiple watchlists is a Pro feature.
+
+Sign In to activate your 1-Week Free Pro Trial or Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()})!`);
       } else {
         setIsProModalOpen(true);
-        alert('🔒 Free accounts are limited to 1 Watchlist.\n\nUpgrade to Pro (one-time plans from ₹59) to create unlimited custom watchlists, priority buckets, and industry sectors!');
+        alert(`🔒 Free accounts are limited to 1 Watchlist.
+
+Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to create unlimited custom watchlists, priority buckets, and industry sectors!`);
       }
       return;
     }
@@ -1783,7 +1790,7 @@ export function WatchlistManager() {
         </div>
         <h2 className="text-lg font-black text-slate-900 dark:text-white">Watchlists are a Pro feature</h2>
         <p className="text-sm text-slate-600 dark:text-slate-400 max-w-xs leading-relaxed">
-          Track unlimited stocks with priority tiers and instant Telegram alerts. Upgrade to Pro — one-time plans from ₹59.
+          Track unlimited stocks with priority tiers and instant Telegram alerts. Upgrade to Pro — one-time plans from ₹{getLowestPlanPrice()}.
         </p>
         <button
           onClick={() => setIsProModalOpen(true)}

@@ -9,6 +9,7 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useAuth } from '../../context/AuthContext';
 import { customFetch } from '../../api';
+import { getLowestPlanPrice } from '../../utils/cashfree';
 import { 
   INDIAN_MARKET_HOLIDAYS, 
   getUpcomingMarketHolidays, 
@@ -161,10 +162,14 @@ export function MarketClock({ className }: { className?: string }) {
     if (!canBroadcast) {
       if (!user && !profile) {
         setIsAuthModalOpen(true);
-        alert('🔒 Holiday Telegram Broadcasting is reserved for Pro & Admin users.\n\nSign In to activate your 1-Week Free Pro Trial or Upgrade to Pro (one-time plans from ₹59)!');
+        alert(`🔒 Holiday Telegram Broadcasting is reserved for Pro & Admin users.
+
+Sign In to activate your 1-Week Free Pro Trial or Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()})!`);
       } else {
         setIsProModalOpen(true);
-        alert('🔒 Market Holiday Telegram Broadcast is a Pro & Admin feature (one-time plans from ₹59).\n\nUpgrade to Pro to broadcast official exchange circulars and trading schedules to your Telegram channel!');
+        alert(`🔒 Market Holiday Telegram Broadcast is a Pro & Admin feature (one-time plans from ₹${getLowestPlanPrice()}).
+
+Upgrade to Pro to broadcast official exchange circulars and trading schedules to your Telegram channel!`);
       }
       return;
     }

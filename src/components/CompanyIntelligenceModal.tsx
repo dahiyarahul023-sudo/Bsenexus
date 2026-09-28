@@ -11,6 +11,7 @@ import { springSnappy, springBouncy, springSmoothPill, buttonTap, itemFadeUpVari
 import { ShareActionMenu } from './ui/motion/ShareActionMenu';
 import { RollingNumber } from './ui/motion/RollingNumber';
 import { customFetch } from '../api';
+import { getLowestPlanPrice } from '../utils/cashfree';
 import { getSafePdfUrl } from '../utils/pdfHelper';
 import { formatFullDateTime, formatShortDateTime, formatTimeOnly, formatDateOnly } from '../utils/timeFormat';
 import { clsx, type ClassValue } from 'clsx';
@@ -128,7 +129,7 @@ export function CompanyIntelligenceModal({
 
     if (!isProOrAdmin) {
       setIsProModalOpen(true);
-      showToast('🔒 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹59) for unlimited Gemini AI 360° Analysis!', 'info');
+      showToast(`🔒 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) for unlimited Gemini AI 360° Analysis!`, 'info');
       return;
     }
 
@@ -153,7 +154,7 @@ export function CompanyIntelligenceModal({
 
       if (res.status === 403 || data?.proRequired) {
         setIsProModalOpen(true);
-        showToast(data?.error || '🔒 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹59) to continue using Gemini AI.', 'info');
+        showToast(data?.error || `🔒 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to continue using Gemini AI.`, 'info');
         return;
       }
 

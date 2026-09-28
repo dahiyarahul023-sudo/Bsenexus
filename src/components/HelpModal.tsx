@@ -8,6 +8,7 @@ import { customFetch } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { ActionButton } from './ui/ActionButton';
+import { getLowestPlanPrice } from '../utils/cashfree';
 
 interface HelpModalProps {
   isOpen: boolean;
@@ -71,8 +72,8 @@ export function HelpModal({ isOpen, onClose, onOpenSettings }: HelpModalProps) {
         ...prev,
         { role: 'user', text: q },
         { role: 'model', text: isPaidPro
-          ? '🔒 **Pro Upgrade Required**: Your Pro subscription has expired. Please renew Pro (one-time plans from ₹59) to continue asking the AI Assistant.'
-          : '🔒 **Pro Upgrade Required**: Your 1-Week Free Pro trial has ended. Please upgrade to Pro (one-time plans from ₹59) to continue asking the AI Assistant.' }
+          ? `🔒 **Pro Upgrade Required**: Your Pro subscription has expired. Please renew Pro (one-time plans from ₹${getLowestPlanPrice()}) to continue asking the AI Assistant.`
+          : `🔒 **Pro Upgrade Required**: Your 1-Week Free Pro trial has ended. Please upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to continue asking the AI Assistant.` }
       ]);
       setInputQuestion('');
       setIsProModalOpen(true);
@@ -104,8 +105,8 @@ export function HelpModal({ isOpen, onClose, onOpenSettings }: HelpModalProps) {
       if (res.status === 403 || data?.proRequired) {
         setIsProModalOpen(true);
         setChatMessages([...nextHistory, { role: 'model', text: data.error || (isPaidPro
-          ? '🔒 Your Pro subscription has expired. Please renew Pro (one-time plans from ₹59).'
-          : '🔒 Your 1-Week Free Pro trial has ended. Please upgrade to Pro (one-time plans from ₹59).') }]);
+          ? `🔒 Your Pro subscription has expired. Please renew Pro (one-time plans from ₹${getLowestPlanPrice()}).`
+          : `🔒 Your 1-Week Free Pro trial has ended. Please upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}).`) }]);
         return;
       }
       if (data.success && data.answer) {

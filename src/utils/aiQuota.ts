@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { UserProfile } from '../types';
 import { customFetch } from '../api';
+import { getLowestPlanPrice } from './cashfree';
 
 export interface AiQuotaStatus {
   tier: 'guest' | 'free' | 'pro' | 'admin';
@@ -167,8 +168,8 @@ export function getAiQuotaStatus(
     canGenerate: !demoUsed,
     allowed: !demoUsed,
     message: demoUsed
-      ? 'You\'ve used your one free AI summary demo. Upgrade to Pro (one-time plans from ₹59) for 100 AI summaries/day.'
-      : 'Free plan: 1 AI summary demo (one-time only). Upgrade to Pro (one-time plans from ₹59) for 100/day.'
+      ? `You've used your one free AI summary demo. Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) for 100 AI summaries/day.`
+      : `Free plan: 1 AI summary demo (one-time only). Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) for 100/day.`
   };
 }
 

@@ -153,16 +153,12 @@ export function ProCheckoutView() {
   const email = (user as any)?.email || (profile as any)?.email || 'Your account';
   const today = formatReceiptDate(new Date().toISOString());
 
-  // Only the monthly plan carries the real ₹499 → ₹199 launch anchor.
-  // Longer plans show honest savings vs the monthly rate instead.
-  const savingsLine =
-    plan.id === 'pro_monthly' ? (
-      <p className="text-[11px] font-medium text-emerald-600">Discount −₹300 (60% off)</p>
-    ) : plan.id === 'pro_halfyearly' ? (
-      <p className="text-[11px] font-medium text-emerald-600">You save ₹195 vs monthly</p>
-    ) : plan.id === 'pro_yearly' ? (
-      <p className="text-[11px] font-medium text-emerald-600">You save ₹589 vs monthly</p>
-    ) : null;
+  // Savings line comes from the single source of truth (src/config/plans.ts) —
+  // only the monthly plan carries the real ₹499 → ₹199 launch anchor;
+  // longer plans show honest savings vs the monthly rate instead.
+  const savingsLine = plan.sub ? (
+    <p className="text-[11px] font-medium text-emerald-600">{plan.sub}</p>
+  ) : null;
 
   return (
     <div

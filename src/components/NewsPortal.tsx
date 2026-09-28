@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getLowestPlanPrice } from '../utils/cashfree';
 import { 
   Newspaper, 
   Send, 
@@ -641,7 +642,7 @@ export const NewsPortal: React.FC<NewsPortalProps> = ({
 
     if (!isPro && !isAdmin) {
       setIsProModalOpen(true);
-      setSendError(isPaidPro ? 'Your Pro subscription has expired. Renew Pro (one-time plans from ₹59) to broadcast to Telegram!' : '1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹59) to broadcast to Telegram!');
+      setSendError(isPaidPro ? `Your Pro subscription has expired. Renew Pro (one-time plans from ₹${getLowestPlanPrice()}) to broadcast to Telegram!` : `1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to broadcast to Telegram!`);
       setTimeout(() => setSendError(null), 5000);
       return;
     }
@@ -696,7 +697,7 @@ export const NewsPortal: React.FC<NewsPortalProps> = ({
     const demoAlreadyUsed = (profile as any)?.freeSummaryUsed === true;
     if (!isPro && !isAdmin && demoAlreadyUsed) {
       setIsProModalOpen(true);
-      setSendError("🔒 You've used your one free AI summary demo. Upgrade to Pro (one-time plans from ₹59) for 100 AI summaries/day!");
+      setSendError(`🔒 You've used your one free AI summary demo. Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) for 100 AI summaries/day!`);
       setTimeout(() => setSendError(null), 5000);
       return;
     }
@@ -1396,7 +1397,7 @@ export const NewsPortal: React.FC<NewsPortalProps> = ({
                     onClick={() => { setIsTgPrefModalOpen(false); setIsProModalOpen(true); }}
                     className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-sm transition-colors cursor-pointer"
                   >
-                    Upgrade to Pro — from ₹59
+                    Upgrade to Pro — from ₹{getLowestPlanPrice()}
                   </button>
                 </div>
               )}

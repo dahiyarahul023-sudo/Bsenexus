@@ -10,6 +10,7 @@ import {
   LayoutGrid, List, Bookmark, SlidersHorizontal, Sliders
 } from 'lucide-react';
 import { useDeveloperMode } from '../utils/developerMode';
+import { getLowestPlanPrice } from '../utils/cashfree';
 import { CustomDropdown } from './ui/CustomDropdown';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -537,7 +538,7 @@ export function Announcements({
         showToast('🔒 Google Sign-In Required: Sign in with Google to activate your 1-Week Free Pro trial to broadcast to Telegram!', 'info');
       } else {
         setIsProModalOpen(true);
-        showToast(isPaidPro ? '🔒 Direct Telegram Broadcasting is a Pro feature (your Pro subscription has expired. Renew Pro — one-time plans from ₹59).' : '🔒 Direct Telegram Broadcasting is a Pro feature (1-week trial ended. Upgrade to Pro — one-time plans from ₹59).', 'info');
+        showToast(isPaidPro ? `🔒 Direct Telegram Broadcasting is a Pro feature (your Pro subscription has expired. Renew Pro — one-time plans from ₹${getLowestPlanPrice()}).` : `🔒 Direct Telegram Broadcasting is a Pro feature (1-week trial ended. Upgrade to Pro — one-time plans from ₹${getLowestPlanPrice()}).`, 'info');
       }
       return;
     }
@@ -594,7 +595,7 @@ export function Announcements({
     const demoAlreadyUsed = (profile as any)?.freeSummaryUsed === true;
     if (!isProOrAdmin && demoAlreadyUsed) {
       setIsProModalOpen(true);
-      showToast('🔒 You\'ve used your one free AI summary demo. Upgrade to Pro (one-time plans from ₹59) for 100 AI summaries/day!', 'info');
+      showToast(`🔒 You've used your one free AI summary demo. Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) for 100 AI summaries/day!`, 'info');
       return;
     }
     if (!isProOrAdmin && !demoAlreadyUsed) {

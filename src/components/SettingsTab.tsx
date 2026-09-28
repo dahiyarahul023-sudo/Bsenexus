@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getLowestPlanPrice } from '../utils/cashfree';
 import { 
   User, Send, Sparkles, Sliders, 
   Sun, Moon, KeyRound, AlertTriangle, 
@@ -895,7 +896,7 @@ export function SettingsTab({
     },
     {
       id: 'subscription', title: 'Subscription & Billing',
-      subtitle: isPro ? 'Pro active · plans & payments' : 'Free plan · Pro from ₹59',
+      subtitle: isPro ? 'Pro active · plans & payments' : `Free plan · Pro from ₹${getLowestPlanPrice()}`,
       icon: Crown, iconClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
       registryIds: ['subscription'],
       badge: isPro ? (
@@ -2151,7 +2152,7 @@ export function SettingsTab({
                       onClick={() => { setActiveSheet(null); setIsProModalOpen(true); }}
                       className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-sm transition-colors cursor-pointer"
                     >
-                      Upgrade to Pro — from ₹59
+                      Upgrade to Pro — from ₹{getLowestPlanPrice()}
                     </button>
                     {profile?.telegramChatId && (
                       <button

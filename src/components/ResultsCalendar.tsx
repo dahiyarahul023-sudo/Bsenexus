@@ -10,6 +10,7 @@ import {
   History, BellRing, LayoutGrid, List, Bell
 } from 'lucide-react';
 import { customFetch } from '../api';
+import { getLowestPlanPrice } from '../utils/cashfree';
 import { useAuth } from '../context/AuthContext';
 import { useIntelModal } from '../context/IntelModalContext';
 import { useAiQuota, syncQuotaFromResponse } from '../utils/aiQuota';
@@ -546,7 +547,7 @@ export function ResultsCalendar() {
     const demoAlreadyUsed = (profile as any)?.freeSummaryUsed === true;
     if (!isProOrAdmin && demoAlreadyUsed) {
       setIsProModalOpen(true);
-      alert("🔒 You've used your one free AI summary demo. Upgrade to Pro (one-time plans from ₹59) for 100 AI summaries/day!");
+      alert(`🔒 You've used your one free AI summary demo. Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) for 100 AI summaries/day!`);
       return;
     }
 
@@ -624,7 +625,11 @@ export function ResultsCalendar() {
 
     if (!isProOrAdmin) {
       setIsProModalOpen(true);
-      alert(isPaidPro ? '🔒 Direct Telegram Broadcasting is a Pro & Admin feature.\n\nYour Pro subscription has expired. Renew Pro (one-time plans from ₹59) to dispatch alerts to Telegram!' : '🔒 Direct Telegram Broadcasting is a Pro & Admin feature.\n\nYour 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹59) to dispatch alerts to Telegram!');
+      alert(isPaidPro ? `🔒 Direct Telegram Broadcasting is a Pro & Admin feature.
+
+Your Pro subscription has expired. Renew Pro (one-time plans from ₹${getLowestPlanPrice()}) to dispatch alerts to Telegram!` : `🔒 Direct Telegram Broadcasting is a Pro & Admin feature.
+
+Your 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to dispatch alerts to Telegram!`);
       return;
     }
 
@@ -754,7 +759,9 @@ export function ResultsCalendar() {
 
     if (!isProOrAdmin) {
       setIsProModalOpen(true);
-      alert('🔒 Telegram Broadcasting is a Pro feature.\n\nYour 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹59) to broadcast to Telegram!');
+      alert(`🔒 Telegram Broadcasting is a Pro feature.
+
+Your 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to broadcast to Telegram!`);
       return;
     }
 
@@ -801,7 +808,9 @@ export function ResultsCalendar() {
 
     if (!isProOrAdmin) {
       setIsProModalOpen(true);
-      alert('🔒 Telegram Broadcasting is a Pro feature.\n\nYour 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹59) to broadcast to Telegram!');
+      alert(`🔒 Telegram Broadcasting is a Pro feature.
+
+Your 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to broadcast to Telegram!`);
       return;
     }
 

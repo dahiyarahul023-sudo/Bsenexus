@@ -63,42 +63,9 @@ const paymentRecoveryLimiter = rateLimit({
   message: { success: false, error: 'Too many recovery attempts. Please wait a minute and try again.' },
 });
 
-// ---------------------------------------------------------------------------
-// Plan catalogue — single source of truth for sellable plans.
-// amountPaise is in the smallest currency unit. validityDays = Pro duration.
-// ---------------------------------------------------------------------------
-export const PRO_PLANS = {
-  pro_weekly: {
-    id: 'pro_weekly',
-    label: 'Pro Weekly',
-    amountPaise: 5900, // ₹59
-    currency: 'INR',
-    validityDays: 7,
-  },
-  pro_monthly: {
-    id: 'pro_monthly',
-    label: 'Pro Monthly',
-    amountPaise: 19900, // ₹199
-    currency: 'INR',
-    validityDays: 30,
-  },
-  pro_halfyearly: {
-    id: 'pro_halfyearly',
-    label: 'Pro 6-Month',
-    amountPaise: 99900, // ₹999
-    currency: 'INR',
-    validityDays: 180,
-  },
-  pro_yearly: {
-    id: 'pro_yearly',
-    label: 'Pro Yearly',
-    amountPaise: 179900, // ₹1,799
-    currency: 'INR',
-    validityDays: 365,
-  },
-} as const;
-
-export type PlanId = keyof typeof PRO_PLANS;
+// Plan catalogue — moved to server/config/plans.ts (single source of truth
+// for what is charged; zero imports so tests can import it safely).
+import { PRO_PLANS, type PlanId } from '../config/plans.js';
 
 /**
  * The selected plan is encoded in the order id (BN_<code>_...) so that
