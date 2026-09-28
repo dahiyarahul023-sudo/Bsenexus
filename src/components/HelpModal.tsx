@@ -8,6 +8,7 @@ import { customFetch } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { ActionButton } from './ui/ActionButton';
+import { ThinkingPill } from './ui/ThinkingPill';
 import { getLowestPlanPrice } from '../utils/cashfree';
 
 interface HelpModalProps {
@@ -279,18 +280,11 @@ export function HelpModal({ isOpen, onClose, onOpenSettings }: HelpModalProps) {
                 })}
 
                 {isAskingAi && (
-                  <div className="flex gap-2.5 justify-start items-start">
-                    <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                  <div className="flex gap-2.5 justify-start items-center">
+                    <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
                       <Bot size={14} className="animate-pulse" />
                     </div>
-                    <div className="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700 rounded-2xl px-4 py-3 text-xs text-slate-600 dark:text-slate-300 flex items-center gap-3 shadow-2xs">
-                      <div className="flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce [animation-delay:-0.3s]" />
-                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce [animation-delay:-0.15s]" />
-                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" />
-                      </div>
-                      <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Synthesizing answer with BSE documentation...</span>
-                    </div>
+                    <ThinkingPill text="Thinking..." />
                   </div>
                 )}
               </div>
