@@ -26,6 +26,7 @@ import { FollowBseNexusBlock, SocialIconsRow } from './ui/SocialLinks';
 import { CommonQuestionsFAQ } from './ui/CommonQuestionsFAQ';
 import { getPlanDisplay, getLowestPlanPrice } from '../utils/cashfree';
 import { PlanCard } from './ui/PlanCard';
+import ParticleRibbons from './ui/ParticleRibbons';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -574,7 +575,8 @@ export function LandingPage({
       <section className="relative overflow-hidden pt-8 sm:pt-14 pb-16 sm:pb-24 border-b border-slate-200/80 dark:border-[#2D283E]">
         {/* Subtle grid pattern background */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
-        <div className="absolute top-0 right-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+        {/* Flowing light-ribbon animation (canvas) */}
+        <ParticleRibbons />
         <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
