@@ -4,7 +4,7 @@ import { customFetch } from '../api';
 import { 
   FileText, ExternalLink, Search, Send, Clock, 
   Upload, Sparkles, ArrowUpRight, CheckCircle2, 
-  TrendingUp, Building2, ChevronRight, ChevronDown, Info, X, RefreshCw,
+  Building2, ChevronRight, ChevronDown, Info, X, RefreshCw,
   Layers, Zap, Copy, Check, Flame, Bot, Share2,
   VolumeX, Moon, BarChart2,
   LayoutGrid, List, Bookmark, SlidersHorizontal, Sliders
@@ -42,6 +42,7 @@ import {
   modalBackdropVariants 
 } from '../utils/motionTokens';
 import { AiSummaryViewer } from './AiSummaryViewer';
+import { HeliosPill, heliosCard, heliosDivider, heliosTitle, heliosDesc, heliosMeta } from './ui/helios';
 import { WatchlistStarButton } from './ui/motion/WatchlistStarButton';
 import { ShareActionMenu } from './ui/motion/ShareActionMenu';
 import { RollingNumber } from './ui/motion/RollingNumber';
@@ -1631,7 +1632,7 @@ export function Announcements({
 
             {isLoading && announcements.length === 0 ? (
               /* Semantic Zero-Layout-Shift Skeleton with Real Text & Structure */
-              <div className={viewMode === 'grid' ? "grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-2.5" : "divide-y divide-slate-100 dark:divide-[#242033]"}>
+              <div className={viewMode === 'grid' ? "grid grid-cols-1 sm:grid-cols-2 gap-4 p-4" : "divide-y divide-slate-100 dark:divide-[#242033]"}>
                 {[
                   { name: "RELIANCE INDUSTRIES LTD.", scrip: "500325", sub: "Financial Results For The Quarter And Year Ended March 31 - SEBI LODR Reg 33" },
                   { name: "TATA CONSULTANCY SERVICES LTD.", scrip: "532540", sub: "Outcome of Board Meeting - Audited Results & Final Dividend Declaration" },
@@ -1663,7 +1664,7 @@ export function Announcements({
               variants={containerStaggerVariants}
               initial="hidden"
               animate="visible"
-              className={viewMode === 'grid' ? "grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-2.5" : "divide-y divide-slate-100 dark:divide-[#242033]"}
+              className={viewMode === 'grid' ? "grid grid-cols-1 sm:grid-cols-2 gap-4 p-4" : "divide-y divide-slate-100 dark:divide-[#242033]"}
             >
             {paginatedItems.map((cluster: AnnouncementCluster, cIdx: number) => {
               const item = cluster.primaryItem;
@@ -1681,14 +1682,6 @@ export function Announcements({
               // GRID CARD VIEW (Multi-column desktop & responsive)
               // ==========================================
               if (viewMode === 'grid') {
-                const companyInitials = (item.companyName || 'CA')
-                  .split(' ')
-                  .filter(Boolean)
-                  .slice(0, 2)
-                  .map((w: string) => w[0])
-                  .join('')
-                  .toUpperCase() || 'CA';
-
                 return (
                   <motion.div
                     id={`filing-${item.id || item.newsId}`}
@@ -1697,95 +1690,58 @@ export function Announcements({
                     transition={springSnappy}
                     onClick={() => handleSelectAnnouncement(item)}
                     className={cn(
-                      "p-3.5 rounded-xl border transition-all cursor-pointer relative group flex flex-col justify-between gap-3",
+                      heliosCard,
+                      "p-5 transition-all cursor-pointer relative group flex flex-col gap-3.5",
                       isSelected
-                        ? "bg-slate-100/90 dark:bg-[#25213B] border-slate-400 dark:border-[#4E446B] ring-1 ring-slate-400 dark:ring-[#4E446B] shadow-xs"
-                        : "bg-white dark:bg-[#181624] border-slate-200/90 dark:border-[#2D283E] hover:border-slate-300 dark:hover:border-[#3E3854] hover:shadow-xs",
-                      isFlashActive && 'ring-1 ring-amber-400 dark:ring-amber-500'
+                        ? "ring-2 ring-slate-300 dark:ring-[#4E446B]"
+                        : "hover:shadow-[0_16px_40px_rgba(15,23,42,0.10)] dark:hover:shadow-[0_16px_40px_rgba(0,0,0,0.55)]",
+                      isFlashActive && 'ring-2 ring-amber-400 dark:ring-amber-500'
                     )}
                   >
-                    <div className="space-y-2 flex-1 min-w-0">
-                      {/* Top Row: Monogram Avatar + Company & Time */}
-                      <div className="flex items-center justify-between gap-2.5">
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-[#221F30] border border-slate-200/80 dark:border-[#342E46] text-slate-700 dark:text-slate-300 font-extrabold text-[11px] flex items-center justify-center font-display shrink-0 select-none shadow-2xs">
-                            {companyInitials}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <motion.span 
-                              layoutId={`company-title-${item.id}`}
-                              transition={springStandard}
-                              className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate font-display tracking-tight block" 
-                              title={item.companyName}
-                            >
-                              {item.companyName}
-                            </motion.span>
-                          </div>
-                          {item.scrip_cd && (
-                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-[#221F30] text-slate-600 dark:text-slate-400 border border-slate-200/60 dark:border-[#342E46] shrink-0 whitespace-nowrap select-none">
-                              {item.scrip_cd}
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 flex items-center gap-1 shrink-0 font-medium whitespace-nowrap bg-slate-50 dark:bg-[#201E2E] px-2 py-0.5 rounded-md border border-slate-200/50 dark:border-[#2D283E]">
-                          <Clock size={10} className="text-slate-400" />
-                          {formatFilingRelativeTime(item.bseTime || item.fetched_at)}
-                        </span>
+                    <div className="space-y-3 flex-1 min-w-0">
+                      {/* Helios pill row: status · time · scrip id */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {isResults && <HeliosPill tone="emerald">Results</HeliosPill>}
+                        {isHigh && <HeliosPill tone="rose">High impact</HeliosPill>}
+                        {isConcall && !isResults && <HeliosPill tone="sky">Concall</HeliosPill>}
+                        {cluster.isCluster && <HeliosPill tone="amber">{cluster.count} filings</HeliosPill>}
+                        <HeliosPill tone="slate">{formatFilingRelativeTime(item.bseTime || item.fetched_at)}</HeliosPill>
+                        <span className="flex-1" />
+                        {item.scrip_cd && (
+                          <HeliosPill tone="slate" dot={false} className="font-mono">BSE: {item.scrip_cd}</HeliosPill>
+                        )}
                       </div>
 
-                      {/* Human Title & Priority Badges */}
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-xs sm:text-[13px] font-bold text-slate-900 dark:text-slate-100">
-                          {cleanSub.humanTitle || 'Corporate announcement'}
-                        </span>
-                        {isHigh && (
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0 bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900/60 flex items-center gap-1 whitespace-nowrap select-none">
-                            <Zap size={10} className="fill-rose-500 text-rose-500" />
-                            <span>High impact</span>
-                          </span>
-                        )}
-                        {isResults && (
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/80 flex items-center gap-1 whitespace-nowrap select-none">
-                            <TrendingUp size={10} className="text-emerald-500" />
-                            <span>Results</span>
-                          </span>
-                        )}
-                        {isConcall && !isResults && (
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/80 flex items-center gap-1 whitespace-nowrap select-none">
-                            <Building2 size={10} className="text-sky-500" />
-                            <span>Concall</span>
-                          </span>
-                        )}
-                        {cluster.isCluster && (
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/80 flex items-center gap-1 whitespace-nowrap select-none">
-                            <Layers size={10} className="text-amber-500" />
-                            <span>{cluster.count} Batch</span>
-                          </span>
-                        )}
-                        {item.aiSummary && !isHigh && !isResults && (
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 flex items-center gap-1 whitespace-nowrap select-none">
-                            <Sparkles size={10} className="text-purple-500 fill-purple-500" />
-                            <span>AI Ready</span>
-                          </span>
-                        )}
-                      </div>
+                      <motion.h3
+                        layoutId={`company-title-${item.id}`}
+                        transition={springStandard}
+                        className={heliosTitle}
+                        title={item.companyName}
+                      >
+                        {item.companyName}
+                      </motion.h3>
 
                       {/* Headline */}
-                      <p className="text-xs sm:text-[13px] text-slate-700 dark:text-slate-300 font-normal line-clamp-2 leading-relaxed pt-0.5">
-                        {cleanSub.headline}
+                      <p className={cn(heliosDesc, "line-clamp-2")}>
+                        {cleanSub.humanTitle ? (
+                          <span className="font-semibold text-slate-700 dark:text-slate-200">{cleanSub.humanTitle} — </span>
+                        ) : null}
+                        {cleanSub.headline || 'Corporate announcement'}
                       </p>
                     </div>
 
-                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-1.5 border-t border-slate-100 dark:border-[#262238]">
+                    <div className={heliosDivider} />
+
+                    <div className="flex items-center justify-between gap-2">
                       {item.aiSummary ? (
-                        <span className="text-purple-600 dark:text-purple-400 font-semibold flex items-center gap-1">
-                          <Sparkles size={11} className="text-purple-500 fill-purple-500" />
-                          <span>AI Synthesis Ready</span>
+                        <span className="text-violet-600 dark:text-violet-400 text-xs font-semibold flex items-center gap-1.5">
+                          <Sparkles size={13} className="fill-violet-500 text-violet-500" />
+                          AI digest ready
                         </span>
                       ) : (
-                        <span>Tap for AI digest & PDF</span>
+                        <span className={heliosMeta}>Tap for AI digest & PDF</span>
                       )}
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-2">
                         <ShareActionMenu
                           title={`${item.companyName} (${item.scrip_cd ? `BSE: ${item.scrip_cd}` : 'BSE'})`}
                           headline={cleanSub.headline || item.subject}
@@ -1796,9 +1752,7 @@ export function Announcements({
                           pdfUrl={item.pdfLink || item.ATTACHMENTNAME || item.attachmentName}
                           size="xs"
                         />
-                        <div className="p-1 rounded bg-slate-100 dark:bg-[#201E2E] border border-slate-200/50 dark:border-[#2D283E]">
-                          <ChevronRight size={11} className="group-hover:translate-x-0.5 transition-transform text-slate-500 dark:text-slate-400" />
-                        </div>
+                        <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform text-slate-400 dark:text-slate-500" />
                       </div>
                     </div>
                   </motion.div>
@@ -1849,31 +1803,19 @@ export function Announcements({
                               </span>
                             )}
                           </div>
-                          <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 flex items-center gap-1 shrink-0 font-medium bg-slate-50 dark:bg-[#201E2E] px-2 py-0.5 rounded-md border border-slate-200/50 dark:border-[#2D283E]">
-                            <Clock size={10} className="text-slate-400" />
-                            {formatFilingRelativeTime(item.bseTime || item.fetched_at)}
-                          </span>
+                          <HeliosPill tone="slate" className="font-mono">{formatFilingRelativeTime(item.bseTime || item.fetched_at)}</HeliosPill>
                         </div>
 
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-xs sm:text-[13px] font-bold text-slate-900 dark:text-slate-100">
                             {cleanSub.humanTitle || 'Corporate announcement'}
                           </span>
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-[#252233] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#38324E] flex items-center gap-1 whitespace-nowrap select-none">
-                            <Layers size={10} className="text-slate-400" />
-                            <span>{cluster.count} Filings ({cluster.timeSpanLabel})</span>
-                          </span>
+                          <HeliosPill tone="amber">{cluster.count} filings \u00b7 {cluster.timeSpanLabel}</HeliosPill>
                           {isHigh && (
-                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0 bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900/60 flex items-center gap-1 whitespace-nowrap select-none">
-                              <Zap size={10} className="fill-rose-500 text-rose-500" />
-                              <span>High impact</span>
-                            </span>
+                            <HeliosPill tone="rose">High impact</HeliosPill>
                           )}
                           {isResults && (
-                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/80 flex items-center gap-1 whitespace-nowrap select-none">
-                              <TrendingUp size={10} className="text-emerald-500" />
-                              <span>Results</span>
-                            </span>
+                            <HeliosPill tone="emerald">Results</HeliosPill>
                           )}
                         </div>
 
@@ -1934,10 +1876,7 @@ export function Announcements({
                             </span>
                           )}
                         </div>
-                        <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 flex items-center gap-1 shrink-0 font-medium bg-slate-50 dark:bg-[#201E2E] px-2 py-0.5 rounded-md border border-slate-200/50 dark:border-[#2D283E]">
-                          <Clock size={10} className="text-slate-400" />
-                          {formatFilingRelativeTime(item.bseTime || item.fetched_at)}
-                        </span>
+                        <HeliosPill tone="slate" className="font-mono">{formatFilingRelativeTime(item.bseTime || item.fetched_at)}</HeliosPill>
                       </div>
 
                       {/* Human Title & Category Badges */}
@@ -1946,28 +1885,16 @@ export function Announcements({
                           {cleanSub.humanTitle || 'Corporate announcement'}
                         </span>
                         {isHigh && (
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0 bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900/60 flex items-center gap-1 whitespace-nowrap select-none">
-                            <Zap size={10} className="fill-rose-500 text-rose-500" />
-                            <span>High impact</span>
-                          </span>
+                          <HeliosPill tone="rose">High impact</HeliosPill>
                         )}
                         {isResults && (
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/80 flex items-center gap-1 whitespace-nowrap select-none">
-                            <TrendingUp size={10} className="text-emerald-500" />
-                            <span>Results</span>
-                          </span>
+                          <HeliosPill tone="emerald">Results</HeliosPill>
                         )}
                         {isConcall && !isResults && (
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/80 flex items-center gap-1 whitespace-nowrap select-none">
-                            <Building2 size={10} className="text-sky-500" />
-                            <span>Concall</span>
-                          </span>
+                          <HeliosPill tone="sky">Concall</HeliosPill>
                         )}
                         {item.aiSummary && !isHigh && !isResults && (
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 flex items-center gap-1 shrink-0 whitespace-nowrap select-none">
-                            <Sparkles size={10} className="text-purple-500 fill-purple-500" />
-                            <span>AI Ready</span>
-                          </span>
+                          <HeliosPill tone="violet">AI Ready</HeliosPill>
                         )}
                         {item.is_sent === 1 && (
                           <span className="w-1.5 h-1.5 rounded-full bg-sky-500 shrink-0 inline-block" title="Dispatched to Telegram" />

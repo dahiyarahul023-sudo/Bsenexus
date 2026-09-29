@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { StockNewsItem, Watchlist } from '../types';
 import { clsx, type ClassValue } from 'clsx';
+import { HeliosPill, heliosCard, heliosDesc } from './ui/helios';
 import { twMerge } from 'tailwind-merge';
 import { springSnappy, containerStaggerVariants, itemFadeUpVariants, buttonTap } from '../utils/motionTokens';
 import { useDeveloperMode } from '../utils/developerMode';
@@ -120,14 +121,6 @@ function getCategoryBadge(category?: string) {
   }
 }
 
-function sourceBadgeColor(source: string) {
-  if (source.includes('Economic Times')) return 'text-amber-700 bg-amber-50 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800';
-  if (source.includes('LiveMint')) return 'text-orange-700 bg-orange-50 dark:bg-orange-950/60 dark:text-orange-300 border-orange-200 dark:border-orange-800';
-  if (source.includes('Moneycontrol')) return 'text-blue-700 bg-blue-50 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-800';
-  if (source.includes('Business Standard')) return 'text-rose-700 bg-rose-50 dark:bg-rose-950/60 dark:text-rose-300 border-rose-200 dark:border-rose-800';
-  return 'text-slate-700 bg-slate-100 dark:bg-[#201E2E] dark:text-slate-300 border-slate-200 dark:border-[#2D283E]';
-}
-
 // ----------------------------------------------------
 // Modern, Streamlined News Card Item
 // Gesture-enabled: Swipe Right -> Telegram, Swipe Left -> Gemini AI
@@ -167,6 +160,10 @@ const NewsCardItem: React.FC<NewsCardProps> = React.memo(({
   };
 
   const catBadge = getCategoryBadge(item.category);
+  const catTone: 'emerald' | 'sky' | 'rose' | 'slate' =
+    catBadge.label === 'Earnings' ? 'emerald' :
+    catBadge.label === 'Corporate' ? 'sky' :
+    catBadge.label === 'Regulatory' ? 'rose' : 'slate';
   const cleanTitle = sanitizeNewsText(item.title);
   const cleanSnippet = sanitizeNewsText(item.snippet);
 
@@ -177,25 +174,27 @@ const NewsCardItem: React.FC<NewsCardProps> = React.memo(({
       data-news-card="true"
       style={{ touchAction: 'pan-y', pointerEvents: 'auto' }}
       className={cn(
-        "news-touch-scroll news-card-item touch-pan-y pointer-events-auto relative bg-white dark:bg-[#1A1926] border border-slate-200/90 dark:border-[#2D283E] rounded-xl transition-colors shadow-2xs group hover:border-slate-300 dark:hover:border-[#3D3754]",
-        viewMode === 'grid' ? "p-3.5 flex flex-col justify-between" : "p-3 sm:p-3.5"
+        "news-touch-scroll news-card-item touch-pan-y pointer-events-auto relative group transition-all",
+        heliosCard,
+        "hover:shadow-[0_16px_40px_rgba(15,23,42,0.10)] dark:hover:shadow-[0_16px_40px_rgba(0,0,0,0.55)]",
+        viewMode === 'grid' ? "p-5 flex flex-col justify-between gap-3.5" : "p-4 sm:p-5"
       )}
     >
       <div className="space-y-2.5">
-          {/* Header Row: Source, Symbol, Category & Timestamp (Clean & Uncluttered) */}
-          <div className="flex items-center justify-between gap-1.5 text-[10px]">
+          {/* Header Row: Source, Symbol, Category & Timestamp */}
+          <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className={cn("px-1.5 py-0.5 rounded font-bold border text-[10px]", sourceBadgeColor(item.source))}>
+              <HeliosPill tone="slate" dot={false}>
                 {item.source}
-              </span>
+              </HeliosPill>
               {item.symbol && (
-                <span className="px-1.5 py-0.5 rounded font-mono font-black bg-amber-100 dark:bg-amber-950/80 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-800">
+                <HeliosPill tone="amber" dot={false} className="font-mono">
                   {item.symbol}
-                </span>
+                </HeliosPill>
               )}
-              <span className={cn("px-1.5 py-0.5 rounded font-bold border", catBadge.color)}>
+              <HeliosPill tone={catTone}>
                 {catBadge.label}
-              </span>
+              </HeliosPill>
             </div>
 
             {/* Time & Sentiment */}
@@ -217,7 +216,7 @@ const NewsCardItem: React.FC<NewsCardProps> = React.memo(({
           </div>
 
           {/* Headline (Crisp, Sanitized & Direct) */}
-          <h3 className="text-xs sm:text-[13.5px] font-bold text-slate-900 dark:text-white leading-snug hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+          <h3 className="text-[15px] font-extrabold text-slate-900 dark:text-white leading-snug tracking-tight hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
             <a 
               href={item.link} 
               target="_blank" 
@@ -230,7 +229,7 @@ const NewsCardItem: React.FC<NewsCardProps> = React.memo(({
 
           {/* Snippet */}
           {cleanSnippet && (
-            <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2 leading-relaxed font-normal">
+            <p className={cn(heliosDesc, "line-clamp-2")}>
               {cleanSnippet}
             </p>
           )}
@@ -1314,7 +1313,7 @@ export const NewsPortal: React.FC<NewsPortalProps> = ({
             className={cn(
               "news-cards-grid touch-pan-y pointer-events-auto",
               viewMode === 'grid' 
-                ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5 p-3 sm:p-3.5 items-start" 
+                ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4 items-start" 
                 : "divide-y divide-slate-100 dark:divide-[#2D283E]"
             )}
           >

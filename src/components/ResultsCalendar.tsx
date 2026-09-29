@@ -29,6 +29,7 @@ import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { useSwipeGesture } from '../hooks/useSwipeGesture';
 import { PullToRefreshIndicator } from './ui/PullToRefreshIndicator';
+import { HeliosPill, heliosCard } from './ui/helios';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -1896,19 +1897,11 @@ Your 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${g
                   onClick={() => handleSelectItem(item)}
                   className={cn(
                     viewMode === 'grid'
-                      ? "p-3 rounded-xl border border-slate-200/90 dark:border-[#2D283E] shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between gap-3 cursor-pointer relative group bg-white dark:bg-[#1A1926]"
-                      : "p-2.5 sm:p-3 transition-all flex flex-col md:flex-row md:items-center justify-between gap-2.5 cursor-pointer relative group",
+                      ? cn(heliosCard, "p-4 transition-all flex flex-col gap-3.5 cursor-pointer relative group hover:shadow-[0_16px_40px_rgba(15,23,42,0.10)] dark:hover:shadow-[0_16px_40px_rgba(0,0,0,0.55)]")
+                      : "p-2.5 sm:p-3 transition-all flex flex-col md:flex-row md:items-center justify-between gap-2.5 cursor-pointer relative group rounded-2xl hover:bg-slate-50/80 dark:hover:bg-[#1E1B2C]/60",
                     activeActionMenuId === item.id ? "z-30" : "z-0",
-                    isFlashing && "ring-1 ring-slate-400 dark:ring-[#5C537C] scale-[1.005]",
-                    isSelected
-                      ? "bg-slate-100/70 dark:bg-[#252233] border-l-4 border-l-slate-900 dark:border-l-slate-300"
-                      : isDeclared
-                      ? "bg-white dark:bg-[#1A1926] hover:bg-slate-50/80 dark:hover:bg-[#201E2E] border-l-4 border-l-emerald-500 dark:border-l-emerald-400"
-                      : isToday && !isDeclared
-                      ? "bg-amber-50/20 dark:bg-amber-950/20 hover:bg-amber-50/40 dark:hover:bg-amber-950/30 border-l-4 border-l-amber-500 dark:border-l-amber-400"
-                      : isUpcoming
-                      ? "bg-white dark:bg-[#1A1926] hover:bg-slate-50/80 dark:hover:bg-[#201E2E] border-l-4 border-l-sky-500/70 dark:border-l-sky-400/70"
-                      : "bg-white dark:bg-[#1A1926] hover:bg-slate-50/80 dark:hover:bg-[#201E2E] border-l-4 border-l-slate-300 dark:border-l-slate-700"
+                    isFlashing && "ring-2 ring-slate-400 dark:ring-[#5C537C]",
+                    isSelected && "ring-2 ring-slate-300 dark:ring-[#4E446B]"
                   )}
                 >
                 {/* Visual zap indicator on click */}
@@ -1994,9 +1987,9 @@ Your 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${g
                           <Building2 size={12} />
                         </button>
 
-                        <span className="text-[9.5px] font-mono px-1.5 py-0.2 bg-slate-100 dark:bg-[#222030] text-slate-600 dark:text-slate-400 rounded border border-slate-200/70 dark:border-[#2D283E]">
+                        <HeliosPill tone="slate" dot={false} className="font-mono">
                           {item.scripCode}
-                        </span>
+                        </HeliosPill>
                       </div>
                     </div>
 
@@ -2004,23 +1997,15 @@ Your 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${g
                     {viewMode === 'grid' && (
                       <div className="shrink-0">
                         {isDeclared && item.resultDeclarationTime ? (
-                          <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/80 flex items-center gap-1">
-                            <CheckCircle2 size={9} className="text-emerald-500" />
-                            <span>Declared</span>
-                          </span>
+                          <HeliosPill tone="emerald">Declared</HeliosPill>
                         ) : isToday ? (
-                          <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/80 flex items-center gap-1">
-                            <Clock size={9} className="text-amber-500" />
-                            <span>Today</span>
-                          </span>
+                          <HeliosPill tone="amber" pulseDot>Today</HeliosPill>
                         ) : isUpcoming ? (
-                          <span className="text-[9.5px] font-mono font-bold px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300 border border-sky-200/80 dark:border-sky-800/80">
+                          <HeliosPill tone="sky" dot={false} className="font-mono">
                             {item.daysLeft === 1 ? 'Tomorrow' : `In ${item.daysLeft}d`}
-                          </span>
+                          </HeliosPill>
                         ) : (
-                          <span className="text-[9.5px] font-mono px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 dark:bg-[#201E2E] dark:text-slate-400 border border-slate-200/70 dark:border-[#2D283E]">
-                            Past
-                          </span>
+                          <HeliosPill tone="slate" dot={false}>Past</HeliosPill>
                         )}
                       </div>
                     )}

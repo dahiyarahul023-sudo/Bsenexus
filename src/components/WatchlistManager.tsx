@@ -28,6 +28,7 @@ import { clusterAnnouncements, AnnouncementCluster } from '../utils/clusterAnnou
 import { motion, AnimatePresence } from 'framer-motion';
 import { springSnappy, springMorph, containerStaggerVariants, itemFadeUpVariants, buttonTap, cardHover } from '../utils/motionTokens';
 import { ShareActionMenu } from './ui/motion/ShareActionMenu';
+import { HeliosPill, heliosCard, heliosDivider, heliosTitle, heliosMeta } from './ui/helios';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -2527,109 +2528,63 @@ Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to create unlimi
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredMyCompanies.map((c) => {
-                const initials = (c.name || c.symbol)
-                  .split(' ')
-                  .map(w => w[0])
-                  .filter(Boolean)
-                  .slice(0, 2)
-                  .join('')
-                  .toUpperCase();
-
-                const priorityColor =
-                  c.priority === 'HIGH' ? 'bg-rose-500' :
-                  c.priority === 'MEDIUM' ? 'bg-amber-500' :
-                  'bg-slate-400';
+                const priorityTone: 'rose' | 'amber' | 'slate' =
+                  c.priority === 'HIGH' ? 'rose' :
+                  c.priority === 'MEDIUM' ? 'amber' :
+                  'slate';
+                const priorityLabel =
+                  c.priority === 'HIGH' ? 'High priority' :
+                  c.priority === 'MEDIUM' ? 'Medium priority' :
+                  'Low priority';
 
                 return (
                   <div
                     id={`stock-card-${c.symbol}`}
                     key={c.symbol}
                     onClick={() => handleOpenIntel(c.scripCode, c.symbol, c.name)}
-                    className="group bg-white dark:bg-[#1A1926] border border-slate-200/90 dark:border-[#2D283E] hover:border-slate-400 dark:hover:border-[#3E3854] rounded-xl p-3.5 shadow-2xs hover:shadow-xs transition-all cursor-pointer flex flex-col justify-between gap-3 relative"
+                    className={cn(
+                      heliosCard,
+                      "group p-5 transition-all cursor-pointer flex flex-col gap-3.5 relative",
+                      "hover:shadow-[0_16px_40px_rgba(15,23,42,0.10)] dark:hover:shadow-[0_16px_40px_rgba(0,0,0,0.55)]"
+                    )}
                   >
-                    {/* Top Row: Avatar + Name + Ticker + Priority */}
-                    <div className="flex items-start justify-between gap-2.5">
-                      <div className="flex items-start gap-2.5 min-w-0">
-                        {/* Company Avatar / Icon */}
-                        <div className="relative w-9 h-9 rounded-lg bg-slate-100 dark:bg-[#222030] border border-slate-200/80 dark:border-[#332D46] flex items-center justify-center font-bold text-xs text-slate-700 dark:text-slate-200 shrink-0 select-none">
-                          {initials}
-                          <span
-                            className={cn(
-                              "absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-[#1A1926]",
-                              priorityColor
-                            )}
-                            title={`Priority: ${c.priority}`}
-                          />
-                        </div>
-
-                        {/* Name & Ticker */}
-                        <div className="min-w-0 flex-1">
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white truncate group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                            {c.name}
-                          </h4>
-                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                            <span className="font-mono text-[11px] font-extrabold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-[#222030] px-1.5 py-0.2 rounded border border-slate-200/80 dark:border-[#332D46]">
-                              {c.symbol}
-                            </span>
-                            {c.scripCode && (
-                              <span className="font-mono text-[10px] text-slate-400">
-                                {c.scripCode}
-                              </span>
-                            )}
-                            {c.category && (
-                              <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-[#1E1C2B] px-1.5 py-0.2 rounded border border-slate-200/60 dark:border-[#2D283E]">
-                                {c.category}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Tap Target to open company intel */}
-                      <motion.button
-                        type="button"
-                        whileTap={buttonTap}
-                        transition={springSnappy}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenIntel(c.scripCode, c.symbol, c.name);
-                        }}
-                        className="p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-[#252233] transition-colors shrink-0 cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center select-none"
-                        title="Open 360° Company Intelligence"
-                        aria-label={`Open ${c.name}`}
-                      >
-                        <ArrowUpRight size={16} />
-                      </motion.button>
+                    {/* Helios pill row: priority · symbol */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <HeliosPill tone={priorityTone} title={`Priority: ${c.priority}`}>
+                        {priorityLabel}
+                      </HeliosPill>
+                      {c.hasHighImpactUpdate && (
+                        <HeliosPill tone="rose">High impact</HeliosPill>
+                      )}
+                      <span className="flex-1" />
+                      <HeliosPill tone="slate" dot={false} className="font-mono">{c.symbol}</HeliosPill>
                     </div>
 
-                    {/* Middle Row: Concrete Status Label */}
-                    <div className="flex items-center justify-between gap-2">
-                      <span className={cn(
-                        "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold whitespace-nowrap select-none",
-                        c.hasResultsDeclaredToday
-                          ? "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
-                          : c.updateCount > 0
-                          ? "bg-slate-100 dark:bg-[#222030] text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-[#332D46]"
-                          : "text-slate-500 dark:text-slate-400"
-                      )}>
-                        {c.hasResultsDeclaredToday ? (
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                        ) : null}
-                        <span>{c.concreteStatus}</span>
-                      </span>
-
-                      {c.hasHighImpactUpdate && (
-                        <span className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.2 rounded bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60 whitespace-nowrap select-none">
-                          High impact
-                        </span>
+                    {/* Company name */}
+                    <div className="min-w-0">
+                      <h4 className={cn(heliosTitle, "text-[17px] truncate")}>
+                        {c.name}
+                      </h4>
+                      {(c.scripCode || c.category) && (
+                        <p className={cn(heliosMeta, "mt-1")}>
+                          {[c.scripCode ? `BSE: ${c.scripCode}` : null, c.category].filter(Boolean).join(' · ')}
+                        </p>
                       )}
                     </div>
 
-                    {/* Bottom Row: Update Count + Quick Jump Target */}
-                    <div className="pt-2 border-t border-slate-100 dark:border-[#2D283E]/60 flex items-center justify-between text-xs gap-2">
-                      <div className="flex items-center gap-1.5">
+                    {/* Status */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <HeliosPill tone={c.hasResultsDeclaredToday ? 'emerald' : 'slate'} pulseDot={c.hasResultsDeclaredToday}>
+                        {c.concreteStatus}
+                      </HeliosPill>
+                    </div>
+
+                    <div className={heliosDivider} />
+
+                    {/* Footer: filings · actions */}
+                    <div className="flex items-center justify-between gap-2">
                         {c.updateCount > 0 ? (
                           <motion.button
                             type="button"
@@ -2640,20 +2595,19 @@ Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to create unlimi
                               setSelectedStockFilter(c.symbol);
                               setWatchlistSubTab('updates');
                             }}
-                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-bold bg-slate-100 dark:bg-[#252233] text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-[#352F48] hover:bg-slate-200 dark:hover:bg-[#2F2B40] transition-colors cursor-pointer select-none min-h-[32px] active:scale-[0.96]"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold bg-slate-100 dark:bg-[#252233] text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#2F2B40] transition-colors cursor-pointer select-none min-h-[32px] active:scale-[0.96]"
                             title={`View all ${c.updateCount} filings for ${c.symbol}`}
                           >
                             <span>{c.updateCount} {c.updateCount === 1 ? 'filing' : 'filings'}</span>
                             <ChevronRight size={12} />
                           </motion.button>
                         ) : (
-                          <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 select-none">
+                          <span className={cn(heliosMeta, "select-none")}>
                             0 filings
                           </span>
                         )}
-                      </div>
 
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1">
                         <motion.button
                           type="button"
                           whileTap={buttonTap}
@@ -2665,10 +2619,10 @@ Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to create unlimi
                               priority: c.priority
                             } as any);
                           }}
-                          className="px-2.5 py-1 text-[11px] font-bold rounded-lg text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white bg-slate-50 dark:bg-[#201E2E] border border-slate-200/80 dark:border-[#332D46] cursor-pointer select-none min-h-[32px] flex items-center gap-1 active:scale-[0.96]"
+                          className="px-3 py-1.5 text-[11px] font-bold rounded-full text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white bg-slate-100 dark:bg-[#252233] hover:bg-slate-200 dark:hover:bg-[#2F2B40] cursor-pointer select-none min-h-[32px] flex items-center gap-1 active:scale-[0.96] transition-colors"
                           title="Cycle priority (High / Medium / Low)"
                         >
-                          {c.priority === 'HIGH' ? '🔴 High' : c.priority === 'MEDIUM' ? '🟡 Med' : '⚪ Low'}
+                          {c.priority === 'HIGH' ? 'High' : c.priority === 'MEDIUM' ? 'Med' : 'Low'}
                         </motion.button>
 
                         <motion.button
@@ -2683,6 +2637,21 @@ Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to create unlimi
                           title="Remove from watchlist"
                         >
                           <Trash2 size={13} />
+                        </motion.button>
+
+                        <motion.button
+                          type="button"
+                          whileTap={buttonTap}
+                          transition={springSnappy}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenIntel(c.scripCode, c.symbol, c.name);
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-full hover:bg-slate-100 dark:hover:bg-[#252233] transition-colors shrink-0 cursor-pointer min-h-[32px] min-w-[32px] flex items-center justify-center select-none active:scale-[0.96]"
+                          title="Open 360° Company Intelligence"
+                          aria-label={`Open ${c.name}`}
+                        >
+                          <ArrowUpRight size={15} />
                         </motion.button>
                       </div>
                     </div>
