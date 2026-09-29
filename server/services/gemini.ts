@@ -589,7 +589,10 @@ ${watchlistContext}
 When the user asks how to do something in the app, give direct, actionable steps. Otherwise keep it short and conversational. Be polite, precise, and supportive.`;
 
   if (geminiCircuitBreaker.getState() === 'OPEN') {
-    return "The AI Assistant is currently in protective cooldown due to upstream rate limits. Please try asking again in a few moments, or check Settings to verify your Gemini API key.";
+    // NOTE: this fires when the summary pipeline (not the Guide itself) hit
+    // repeated upstream failures — the key is fine, the AI service is just
+    // overloaded. Never blame the API key here.
+    return "The AI Assistant is taking a short break — the AI service is seeing heavy demand right now. Please try again in a few moments.";
   }
 
   try {
@@ -614,20 +617,35 @@ When the user asks how to do something in the app, give direct, actionable steps
     let response: any = null;
     let lastErr: any = null;
 
+    // 503/429/UNAVAILABLE = transient upstream overload — worth one short
+    // retry before falling through to the next model.
+    const isRetryableUpstream = (e: any) => {
+      const s = String(e?.message || e);
+      return /503|429|UNAVAILABLE|RESOURCE_EXHAUSTED|high demand|overloaded|try again later/i.test(s);
+    };
+
     for (const mName of helpModels) {
-      try {
-        response = await ai.models.generateContent({
-          model: mName,
-          contents: formattedContents,
-          config: {
-            systemInstruction,
-            temperature: 0.4,
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          response = await ai.models.generateContent({
+            model: mName,
+            contents: formattedContents,
+            config: {
+              systemInstruction,
+              temperature: 0.4,
+            }
+          });
+          if (response && response.text) break;
+        } catch (e: any) {
+          lastErr = e;
+          if (attempt === 1 && isRetryableUpstream(e)) {
+            await new Promise(r => setTimeout(r, 2000));
+            continue;
           }
-        });
-        if (response && response.text) break;
-      } catch (e: any) {
-        lastErr = e;
+          break;
+        }
       }
+      if (response && response.text) break;
     }
 
     if (!response || !response.text) {
@@ -636,8 +654,10 @@ When the user asks how to do something in the app, give direct, actionable steps
 
     return response.text.trim() || "I am sorry, I could not generate an answer right now. Please try again.";
   } catch (err: any) {
-    addLog('ERROR', 'GEMINI', `Help AI Chat error: ${err.message}`);
-    return `An error occurred while consulting the AI Assistant: ${err.message}`;
+    // Never show raw API JSON to the user — it leaks internals and confuses.
+    // The raw error is already logged server-side above.
+    addLog('ERROR', 'GEMINI', `Help AI Chat error: ${err?.message || err}`);
+    return "The AI Assistant is busy right now (heavy demand on the AI service). Please try again in a few moments.";
   }
 }
 
