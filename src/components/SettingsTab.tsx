@@ -24,6 +24,7 @@ import { customFetch } from '../api';
 import { useDeveloperMode } from '../utils/developerMode';
 import { APP_VERSION } from '../version';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+import { useFeedDensity, DEFAULT_DENSITY, type FeedDensity } from '../hooks/useFeedDensity';
 import { springSnappy, buttonTap } from '../utils/motionTokens';
 import { SupportModal } from './ui/SupportFloat';
 import { ActionButton } from './ui/ActionButton';
@@ -76,7 +77,6 @@ const SETTINGS_REGISTRY = [
 const DEFAULT_THEME = 'dark';
 const DEFAULT_SOUND = true;
 const DEFAULT_FILTER = false;
-const DEFAULT_DENSITY = 'compact';
 
 export function SettingsTab({ 
   settings, 
@@ -180,15 +180,9 @@ export function SettingsTab({
     }
   });
 
-  // Display density preference from localStorage ('comfortable' | 'compact' | 'dense')
-  const [feedDensity, setFeedDensity] = useState<'comfortable' | 'compact' | 'dense'>(() => {
-    try {
-      const saved = localStorage.getItem('bse_feed_density');
-      return (saved === 'comfortable' || saved === 'dense') ? saved : 'compact';
-    } catch {
-      return 'compact';
-    }
-  });
+  // Display density preference — shared hook (same key every feed reads,
+  // so this segmented control updates all card surfaces instantly).
+  const [feedDensity, setFeedDensity] = useFeedDensity();
 
   // Materiality Impact Filter State
   const [isFilterEnabled, setIsFilterEnabled] = useState<boolean>(Boolean(settings?.isFilterEnabled));
@@ -319,12 +313,8 @@ export function SettingsTab({
     }
   };
 
-  const handleSetDensity = (newDensity: 'comfortable' | 'compact' | 'dense') => {
+  const handleSetDensity = (newDensity: FeedDensity) => {
     setFeedDensity(newDensity);
-    try {
-      localStorage.setItem('bse_feed_density', newDensity);
-      window.dispatchEvent(new Event('storage'));
-    } catch {}
     showSavedPill('density');
   };
 

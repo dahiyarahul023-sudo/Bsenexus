@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, Building2, Search, ExternalLink, ChevronRight, TrendingUp, ShieldCheck, Zap } from 'lucide-react';
 import { SocialIconsRow } from './ui/SocialLinks';
+import { useFeedDensity } from '../hooks/useFeedDensity';
+import { heliosCard } from './ui/helios';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 export interface ListedCompany {
   symbol: string;
@@ -254,6 +262,10 @@ interface CompaniesPageProps {
 }
 
 export const CompaniesPage: React.FC<CompaniesPageProps> = ({ onEnterTerminal }) => {
+  // Shared feed density (Settings screen) — visibly resizes company cards.
+  const [density] = useFeedDensity();
+  const coCardPad = density === 'comfortable' ? 'p-5 sm:p-6' : density === 'dense' ? 'p-3 sm:p-4' : 'p-4 sm:p-5';
+  const coListGap = density === 'comfortable' ? 'space-y-4' : density === 'dense' ? 'space-y-2' : 'space-y-3';
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSector, setSelectedSector] = useState<string>('ALL');
 
@@ -408,7 +420,7 @@ export const CompaniesPage: React.FC<CompaniesPageProps> = ({ onEnterTerminal })
         </div>
 
         {/* Companies List Grid / Table Rows */}
-        <div className="space-y-3">
+        <div className={cn(coListGap)}>
           <div className="hidden md:grid grid-cols-12 gap-4 px-5 py-2.5 text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
             <div className="col-span-4">Company &amp; Ticker</div>
             <div className="col-span-3">Primary Sector</div>
@@ -420,7 +432,7 @@ export const CompaniesPage: React.FC<CompaniesPageProps> = ({ onEnterTerminal })
             <a
               key={company.symbol}
               href={`/company/${company.symbol}`}
-              className="group block bg-white dark:bg-[#111625] hover:bg-emerald-50/40 dark:hover:bg-[#151D2F] border border-slate-200 dark:border-slate-800/90 hover:border-emerald-500/50 dark:hover:border-emerald-500/40 rounded-xl p-4 sm:p-5 transition-all duration-150 shadow-xs hover:shadow-md"
+              className={cn(heliosCard, coCardPad, "group block transition-all duration-150 hover:shadow-[0_16px_40px_rgba(15,23,42,0.10)] dark:hover:shadow-[0_16px_40px_rgba(0,0,0,0.55)]")}
             >
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 items-center">
                 

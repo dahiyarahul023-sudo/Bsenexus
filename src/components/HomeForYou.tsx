@@ -23,6 +23,8 @@ import { cleanBseSubject } from '../utils/cleanBseSubject';
 import { getSafePdfUrl } from '../utils/pdfHelper';
 import { parseMeetingDateTile } from './ResultsCalendar';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+import { useFeedDensity } from '../hooks/useFeedDensity';
+import { HeliosPill, heliosCard } from './ui/helios';
 import { springSnappy, containerStaggerVariants, itemFadeUpVariants, buttonTap } from '../utils/motionTokens';
 import { ActionButton } from './ui/ActionButton';
 import { CommonQuestionsFAQ } from './ui/CommonQuestionsFAQ';
@@ -49,6 +51,10 @@ interface HomeForYouProps {
 }
 
 export function HomeForYou({ onNavigate }: HomeForYouProps) {
+  // Shared feed density (Settings screen) — visibly resizes home cards.
+  const [density] = useFeedDensity();
+  const homeCardPad = density === 'comfortable' ? 'p-5' : density === 'dense' ? 'p-3' : 'p-3.5';
+  const homeGridGap = density === 'comfortable' ? 'gap-3.5' : density === 'dense' ? 'gap-2' : 'gap-2.5';
   const { user, profile, setIsAuthModalOpen } = useAuth();
   const { openIntelModal } = useIntelModal();
 
@@ -229,7 +235,7 @@ export function HomeForYou({ onNavigate }: HomeForYouProps) {
             <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white font-display">
               New watchlist filings
             </h2>
-            <div className="p-5 rounded-2xl bg-white dark:bg-[#181624] border border-slate-200 dark:border-[#262335] text-center space-y-2">
+            <div className={cn(heliosCard, "p-5 text-center space-y-2")}>
               <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-[#201E2E] flex items-center justify-center mx-auto text-slate-400">
                 <Bookmark size={18} />
               </div>
@@ -267,7 +273,7 @@ export function HomeForYou({ onNavigate }: HomeForYouProps) {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div className={cn("grid grid-cols-1 sm:grid-cols-2", homeGridGap)}>
               {watchlistFilings.map((filing, idx) => {
                 const cleanSubj = cleanBseSubject(filing.subject || filing.details || '');
                 const relTime = formatFilingRelativeTime(filing.bseTimestamp || filing.fetched_at || Date.now());
@@ -276,16 +282,14 @@ export function HomeForYou({ onNavigate }: HomeForYouProps) {
                   <div
                     key={filing.id || idx}
                     onClick={() => setSelectedFiling(filing)}
-                    className="p-3.5 rounded-xl bg-white dark:bg-[#181624] border border-slate-200 dark:border-[#262335] hover:border-slate-300 dark:hover:border-slate-700 transition-colors cursor-pointer flex flex-col justify-between gap-2"
+                    className={cn(heliosCard, homeCardPad, "transition-all cursor-pointer flex flex-col justify-between gap-2 hover:shadow-[0_12px_28px_rgba(15,23,42,0.09)] dark:hover:shadow-[0_12px_28px_rgba(0,0,0,0.5)]")}
                   >
                     <div className="space-y-1">
                       <div className="flex items-center justify-between gap-2 text-xs">
                         <span className="font-bold text-slate-900 dark:text-white truncate">
                           {filing.companyName}
                         </span>
-                        <span className="text-[11px] text-slate-400 font-mono shrink-0">
-                          {relTime}
-                        </span>
+                        <HeliosPill tone="slate">{relTime}</HeliosPill>
                       </div>
                       <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2 leading-relaxed">
                         {cleanSubj.headline}
@@ -293,9 +297,7 @@ export function HomeForYou({ onNavigate }: HomeForYouProps) {
                     </div>
 
                     <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-100 dark:border-[#262335]">
-                      <span className="font-mono text-slate-500 dark:text-slate-400">
-                        BSE: {filing.scrip_cd}
-                      </span>
+                      <HeliosPill tone="slate" dot={false} className="font-mono">BSE: {filing.scrip_cd}</HeliosPill>
                       <span className="text-slate-500 dark:text-slate-400 flex items-center gap-0.5">
                         <span>Details</span>
                         <ChevronRight size={12} />
@@ -308,7 +310,7 @@ export function HomeForYou({ onNavigate }: HomeForYouProps) {
           </section>
         ) : (
           /* Populated but Quiet Watchlist: Single calm summary */
-          <div className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#181624] border border-slate-200/90 dark:border-[#262335] space-y-2 shadow-2xs">
+          <div className={cn(heliosCard, density === 'comfortable' ? "p-5 sm:p-6" : density === 'dense' ? "p-4" : "p-5", "space-y-2")}>
             <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
               <CheckCircle2 size={16} className="shrink-0" />
               <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white font-display">
@@ -338,7 +340,7 @@ export function HomeForYou({ onNavigate }: HomeForYouProps) {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div className={cn("grid grid-cols-1 sm:grid-cols-2", homeGridGap)}>
               {upcomingResults.map((item, idx) => {
                 const tile = parseMeetingDateTile(item.meetingDate);
                 const isToday = item.daysLeft === 0;
@@ -348,7 +350,7 @@ export function HomeForYou({ onNavigate }: HomeForYouProps) {
                   <div
                     key={item.id || idx}
                     onClick={() => setSelectedResult(item)}
-                    className="p-3.5 rounded-xl bg-white dark:bg-[#181624] border border-slate-200 dark:border-[#262335] hover:border-slate-300 dark:hover:border-slate-700 transition-colors cursor-pointer flex items-center justify-between gap-3"
+                    className={cn(heliosCard, homeCardPad, "transition-all cursor-pointer flex items-center justify-between gap-3 hover:shadow-[0_12px_28px_rgba(15,23,42,0.09)] dark:hover:shadow-[0_12px_28px_rgba(0,0,0,0.5)]")}
                   >
                     <div className="flex items-center gap-3 min-w-0 flex-1">
                       {/* Date block */}
@@ -379,9 +381,7 @@ export function HomeForYou({ onNavigate }: HomeForYouProps) {
                       </div>
                     </div>
 
-                    <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 shrink-0">
-                      {daysLabel}
-                    </span>
+                    <HeliosPill tone={isToday ? "emerald" : "slate"} pulseDot={isToday} className="shrink-0">{daysLabel}</HeliosPill>
                   </div>
                 );
               })}
@@ -406,11 +406,11 @@ export function HomeForYou({ onNavigate }: HomeForYouProps) {
               </button>
             </div>
 
-            <div className="space-y-2.5">
+            <div className={cn("flex flex-col", homeGridGap)}>
               {topNews.map((news, idx) => (
                 <div
                   key={news.id || idx}
-                  className="p-3.5 rounded-xl bg-white dark:bg-[#181624] border border-slate-200 dark:border-[#262335] hover:border-slate-300 dark:hover:border-slate-700 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                  className={cn(heliosCard, homeCardPad, "transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:shadow-[0_12px_28px_rgba(15,23,42,0.09)] dark:hover:shadow-[0_12px_28px_rgba(0,0,0,0.5)]")}
                 >
                   <div className="space-y-1 min-w-0 flex-1">
                     <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white line-clamp-1">
@@ -424,7 +424,7 @@ export function HomeForYou({ onNavigate }: HomeForYouProps) {
                   </div>
 
                   <div className="flex items-center gap-2 text-[11px] text-slate-400 shrink-0">
-                    <span>{news.source || 'News'}</span>
+                    <HeliosPill tone="slate" dot={false}>{news.source || 'News'}</HeliosPill>
                     {news.link && (
                       <a
                         href={news.link}

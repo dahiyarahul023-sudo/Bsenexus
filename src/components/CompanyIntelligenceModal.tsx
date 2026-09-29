@@ -24,6 +24,7 @@ import { CompanyHubSkeleton } from './ui/DesignedSkeletons';
 import { HonestProgressBar } from './ui/HonestProgressBar';
 import { TimeoutRetryState } from './ui/TimeoutRetryState';
 import { ActionButton } from './ui/ActionButton';
+import { heliosCard, HeliosPill } from './ui/helios';
 
 import { QuarterlyResultsLedger } from './QuarterlyResultsLedger';
 import { AiSummaryViewer } from './AiSummaryViewer';
@@ -567,7 +568,7 @@ export function CompanyIntelligenceModal({
 
                       {/* Latest Material Update Card */}
                       {latestFiling && (
-                        <div className="p-4 bg-white dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/60 rounded-xl space-y-3 shadow-2xs">
+                        <div className={cn(heliosCard, "p-4 space-y-3")}>
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                               Latest material update
@@ -641,7 +642,7 @@ export function CompanyIntelligenceModal({
 
                       {/* Disclosure Trend — 12-week filing activity */}
                       {activityTrend && (
-                        <div className="p-3.5 bg-white dark:bg-slate-800/80 border border-slate-200/90 dark:border-slate-700/60 rounded-xl space-y-2.5">
+                        <div className={cn(heliosCard, "p-3.5 space-y-2.5")}>
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                               <TrendingUp size={13} className="text-emerald-500" />
@@ -757,7 +758,7 @@ export function CompanyIntelligenceModal({
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                             {quarterlyResults.slice(0, 2).map((qr: any, qIdx: number) => (
-                              <div key={qIdx} className="p-3 bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60 rounded-xl space-y-1 text-xs">
+                              <div key={qIdx} className={cn(heliosCard, "p-3 space-y-1 text-xs")}>
                                 <div className="flex items-center justify-between">
                                   <span className="font-bold text-slate-900 dark:text-white">
                                     {qr.quarter || `Quarter ended ${formatDateOnly(qr.date)}`}
@@ -849,7 +850,7 @@ export function CompanyIntelligenceModal({
                               isMeeting ? "bg-amber-500" : "bg-slate-400"
                             )} />
 
-                            <div className="p-3.5 bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60 rounded-xl space-y-2 hover:border-slate-300 dark:hover:border-slate-600 transition-all shadow-2xs">
+                            <div className={cn(heliosCard, "p-3.5 space-y-2 transition-all hover:shadow-[0_16px_40px_rgba(15,23,42,0.10)] dark:hover:shadow-[0_16px_40px_rgba(0,0,0,0.55)]")}>
                               <div className="flex items-start justify-between gap-3">
                                 <div className="space-y-1 min-w-0 flex-1">
                                   <div className="flex items-center gap-2 flex-wrap">
@@ -936,7 +937,7 @@ export function CompanyIntelligenceModal({
                       {recentFilings.map((filing: any, fIdx: number) => (
                         <div 
                           key={fIdx}
-                          className="p-3 bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 rounded-xl text-xs flex items-center justify-between gap-3 shadow-2xs hover:border-slate-300 dark:hover:border-slate-600 transition-all"
+                          className={cn(heliosCard, "p-3 text-xs flex items-center justify-between gap-3 transition-all hover:shadow-[0_16px_40px_rgba(15,23,42,0.10)] dark:hover:shadow-[0_16px_40px_rgba(0,0,0,0.55)]")}
                         >
                           <div className="min-w-0 flex-1 space-y-0.5">
                             <p className="font-bold text-slate-900 dark:text-white line-clamp-1">

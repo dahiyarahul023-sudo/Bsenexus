@@ -21,6 +21,7 @@ import { useAuth } from '../context/AuthContext';
 import { useIntelModal } from '../context/IntelModalContext';
 import { useAiQuota, syncQuotaFromResponse } from '../utils/aiQuota';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+import { useFeedDensity } from '../hooks/useFeedDensity';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { useVisibilityInterval } from '../hooks/useVisibilityInterval';
 import { PullToRefreshIndicator } from './ui/PullToRefreshIndicator';
@@ -187,22 +188,30 @@ export function Announcements({
   });
   const [isNewDividerDismissed, setIsNewDividerDismissed] = useState<boolean>(false);
 
-  // Creative Feature 2: Density toggle (Comfortable | Compact | Dense Bloomberg mode)
-  const [density, setDensity] = useState<'comfortable' | 'compact' | 'dense'>(() => {
-    try {
-      const saved = localStorage.getItem('nexus_feed_density');
-      return (saved === 'comfortable' || saved === 'dense') ? saved : 'compact';
-    } catch {
-      return 'compact';
-    }
-  });
+  // Feed display density — shared with the Settings screen's segmented
+  // control (same localStorage key). Changing it in Settings resizes these
+  // cards instantly via the hook's event sync.
+  const [density] = useFeedDensity();
 
-  const handleSetDensity = (newDensity: 'comfortable' | 'compact' | 'dense') => {
-    setDensity(newDensity);
-    try {
-      localStorage.setItem('nexus_feed_density', newDensity);
-    } catch {}
-  };
+  // Density-driven sizing: Comfortable = roomy, Compact = balanced,
+  // Dense = tight. The Settings density control visibly resizes every card.
+  const gridWrapClass =
+    density === 'comfortable'
+      ? 'grid grid-cols-1 sm:grid-cols-2 gap-5 p-5'
+      : density === 'dense'
+        ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 p-3'
+        : 'grid grid-cols-1 sm:grid-cols-2 gap-4 p-4';
+  const gridCardPad = density === 'comfortable' ? 'p-6' : density === 'dense' ? 'p-4' : 'p-5';
+  const gridCardGap = density === 'comfortable' ? 'gap-4' : density === 'dense' ? 'gap-2.5' : 'gap-3.5';
+  const gridTitleSize = density === 'comfortable' ? 'text-[19px]' : density === 'dense' ? 'text-[15px]' : 'text-[17px]';
+  const listWrapClass =
+    density === 'comfortable'
+      ? 'flex flex-col gap-4 p-4'
+      : density === 'dense'
+        ? 'flex flex-col gap-2 p-2.5'
+        : 'flex flex-col gap-3 p-3.5';
+  const listCardPad = density === 'comfortable' ? 'p-4' : density === 'dense' ? 'p-3' : 'p-3.5';
+  const listTitleSize = density === 'comfortable' ? 'text-[15px]' : density === 'dense' ? 'text-[13px]' : 'text-sm';
 
   // Creative Feature 3: Market-hours aware UI & After-Hours Summary Mode
   const [isMarketHours, setIsMarketHours] = useState<boolean>(() => {
@@ -924,7 +933,7 @@ export function Announcements({
     const detectedNoiseType = detectFilingType(item.subject);
 
     return (
-      <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 sm:space-y-5 overscroll-contain">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 sm:space-y-5 overscroll-contain bg-slate-100/70 dark:bg-[#12111C]">
         {/* Watchlist Quick Toast inside Drawer */}
         {watchlistToast && (
           <div className="p-2.5 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs font-bold rounded-xl shadow-xs flex items-center justify-between gap-2 animate-in fade-in zoom-in-95 duration-150">
@@ -946,12 +955,12 @@ export function Announcements({
         <div className="border-b border-slate-200/90 dark:border-[#2D283E] pb-4 space-y-2 relative">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 font-mono flex items-center gap-1">
-                <span>{item.scrip_cd ? `BSE: ${item.scrip_cd}` : 'BSE Listed'}</span>
-              </span>
-              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-[#252233] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#352F48] select-none whitespace-nowrap">
+              <HeliosPill tone="slate" dot={false} className="font-mono">
+                {item.scrip_cd ? `BSE: ${item.scrip_cd}` : 'BSE Listed'}
+              </HeliosPill>
+              <HeliosPill tone="slate" dot={false} className="font-mono">
                 {cleanSub.regulation || 'Reg 30 (LODR)'}
-              </span>
+              </HeliosPill>
             </div>
             <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">
               {formatDateOnly(item.bseTime || item.fetched_at)}
@@ -1006,7 +1015,7 @@ export function Announcements({
         )}
 
         {/* Disclosed Timing Box */}
-        <div className="bg-slate-50 dark:bg-[#15141E] rounded-xl p-3 space-y-1.5 border border-slate-200/90 dark:border-[#2D283E] text-xs font-medium">
+        <div className={cn(heliosCard, "p-3 space-y-1.5 text-xs font-medium")}>
           <div className="flex items-center justify-between">
             <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
               <Clock size={13} className="text-slate-500 dark:text-slate-400" />
@@ -1023,7 +1032,7 @@ export function Announcements({
           <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1.5">
             Announcement
           </span>
-          <div className="bg-slate-50 dark:bg-[#15141E] p-3.5 rounded-xl border border-slate-200/90 dark:border-[#2D283E] space-y-1.5">
+          <div className={cn(heliosCard, "p-3.5 space-y-1.5")}>
             <div className="text-xs font-bold text-slate-900 dark:text-white">
               {cleanSub.humanTitle || 'Corporate announcement'}
             </div>
@@ -1632,7 +1641,7 @@ export function Announcements({
 
             {isLoading && announcements.length === 0 ? (
               /* Semantic Zero-Layout-Shift Skeleton with Real Text & Structure */
-              <div className={viewMode === 'grid' ? "grid grid-cols-1 sm:grid-cols-2 gap-4 p-4" : "divide-y divide-slate-100 dark:divide-[#242033]"}>
+              <div className={viewMode === 'grid' ? gridWrapClass : listWrapClass}>
                 {[
                   { name: "RELIANCE INDUSTRIES LTD.", scrip: "500325", sub: "Financial Results For The Quarter And Year Ended March 31 - SEBI LODR Reg 33" },
                   { name: "TATA CONSULTANCY SERVICES LTD.", scrip: "532540", sub: "Outcome of Board Meeting - Audited Results & Final Dividend Declaration" },
@@ -1645,9 +1654,9 @@ export function Announcements({
                     key={`feed-skeleton-${idx}`}
                     className={cn(
                       "p-3.5 space-y-2.5",
-                      viewMode === 'grid' 
-                        ? "rounded-xl border border-slate-200/80 dark:border-[#2D283E] bg-white dark:bg-[#181624]" 
-                        : "bg-white dark:bg-[#181624] px-4 py-3.5"
+                      viewMode === 'grid'
+                        ? cn(heliosCard, gridCardPad)
+                        : cn(heliosCard, listCardPad)
                     )}
                   >
                     <div className="flex items-center justify-between gap-3">
@@ -1664,7 +1673,7 @@ export function Announcements({
               variants={containerStaggerVariants}
               initial="hidden"
               animate="visible"
-              className={viewMode === 'grid' ? "grid grid-cols-1 sm:grid-cols-2 gap-4 p-4" : "divide-y divide-slate-100 dark:divide-[#242033]"}
+              className={viewMode === 'grid' ? gridWrapClass : listWrapClass}
             >
             {paginatedItems.map((cluster: AnnouncementCluster, cIdx: number) => {
               const item = cluster.primaryItem;
@@ -1691,7 +1700,9 @@ export function Announcements({
                     onClick={() => handleSelectAnnouncement(item)}
                     className={cn(
                       heliosCard,
-                      "p-5 transition-all cursor-pointer relative group flex flex-col gap-3.5",
+                      gridCardPad,
+                      gridCardGap,
+                      "transition-all cursor-pointer relative group flex flex-col",
                       isSelected
                         ? "ring-2 ring-slate-300 dark:ring-[#4E446B]"
                         : "hover:shadow-[0_16px_40px_rgba(15,23,42,0.10)] dark:hover:shadow-[0_16px_40px_rgba(0,0,0,0.55)]",
@@ -1715,7 +1726,7 @@ export function Announcements({
                       <motion.h3
                         layoutId={`company-title-${item.id}`}
                         transition={springStandard}
-                        className={heliosTitle}
+                        className={cn(heliosTitle, gridTitleSize)}
                         title={item.companyName}
                       >
                         {item.companyName}
@@ -1760,14 +1771,6 @@ export function Announcements({
               }
 
               if (cluster.isCluster) {
-                const companyInitials = (item.companyName || 'CA')
-                  .split(' ')
-                  .filter(Boolean)
-                  .slice(0, 2)
-                  .map((w: string) => w[0])
-                  .join('')
-                  .toUpperCase() || 'CA';
-
                 return (
                   <motion.div
                     id={`filing-${cluster.id || item.id || `cluster-${cIdx}`}`}
@@ -1776,56 +1779,60 @@ export function Announcements({
                     transition={springSnappy}
                     onClick={() => handleSelectAnnouncement(item)}
                     className={cn(
-                      "p-3.5 transition-all cursor-pointer relative group",
-                      isSelected 
-                        ? 'bg-slate-100/90 dark:bg-[#242036]' 
-                        : 'hover:bg-slate-50/90 dark:hover:bg-[#1E1B2C]/70'
+                      heliosCard,
+                      listCardPad,
+                      "transition-all cursor-pointer relative group flex flex-col gap-2.5",
+                      isSelected
+                        ? "ring-2 ring-slate-300 dark:ring-[#4E446B]"
+                        : "hover:shadow-[0_12px_28px_rgba(15,23,42,0.09)] dark:hover:shadow-[0_12px_28px_rgba(0,0,0,0.5)]",
+                      isFlashActive && 'ring-2 ring-amber-400 dark:ring-amber-500'
                     )}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-[#221F30] border border-slate-200/80 dark:border-[#342E46] text-slate-700 dark:text-slate-300 font-extrabold text-[11px] flex items-center justify-center font-display shrink-0 select-none shadow-2xs mt-0.5">
-                        {companyInitials}
-                      </div>
+                    {/* Helios pill row */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {isResults && <HeliosPill tone="emerald">Results</HeliosPill>}
+                      {isHigh && <HeliosPill tone="rose">High impact</HeliosPill>}
+                      {isConcall && !isResults && <HeliosPill tone="sky">Concall</HeliosPill>}
+                      <HeliosPill tone="amber">{cluster.count} filings · {cluster.timeSpanLabel}</HeliosPill>
+                      <span className="flex-1" />
+                      <HeliosPill tone="slate">{formatFilingRelativeTime(item.bseTime || item.fetched_at)}</HeliosPill>
+                    </div>
 
-                      <div className="space-y-1.5 flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                            <motion.span 
-                              layoutId={`company-title-${item.id}`}
-                              transition={springStandard}
-                              className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate font-display tracking-tight"
-                            >
-                              {item.companyName}
-                            </motion.span>
-                            {item.scrip_cd && (
-                              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-[#252233] text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-[#352F48]">
-                                {item.scrip_cd}
-                              </span>
-                            )}
-                          </div>
-                          <HeliosPill tone="slate" className="font-mono">{formatFilingRelativeTime(item.bseTime || item.fetched_at)}</HeliosPill>
-                        </div>
+                    <div className="min-w-0">
+                      <motion.span
+                        layoutId={`company-title-${item.id}`}
+                        transition={springStandard}
+                        className={cn("font-extrabold text-slate-900 dark:text-white tracking-tight truncate block font-display", listTitleSize)}
+                        title={item.companyName}
+                      >
+                        {item.companyName}
+                      </motion.span>
+                      <p className="text-[13px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed mt-0.5">
+                        {cleanSub.humanTitle ? (
+                          <span className="font-semibold text-slate-700 dark:text-slate-200">{cleanSub.humanTitle} \u2014 </span>
+                        ) : null}
+                        {cleanSub.headline || 'Corporate announcement'}
+                      </p>
+                    </div>
 
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-xs sm:text-[13px] font-bold text-slate-900 dark:text-slate-100">
-                            {cleanSub.humanTitle || 'Corporate announcement'}
+                    <div className={heliosDivider} />
+
+                    <div className="flex items-center justify-between gap-2">
+                      {item.scrip_cd ? (
+                        <HeliosPill tone="slate" dot={false} className="font-mono">BSE: {item.scrip_cd}</HeliosPill>
+                      ) : (
+                        <span />
+                      )}
+                      <div className="flex items-center gap-2">
+                        {item.aiSummary ? (
+                          <span className="text-violet-600 dark:text-violet-400 text-xs font-semibold flex items-center gap-1.5">
+                            <Sparkles size={13} className="fill-violet-500 text-violet-500" />
+                            AI digest ready
                           </span>
-                          <HeliosPill tone="amber">{cluster.count} filings \u00b7 {cluster.timeSpanLabel}</HeliosPill>
-                          {isHigh && (
-                            <HeliosPill tone="rose">High impact</HeliosPill>
-                          )}
-                          {isResults && (
-                            <HeliosPill tone="emerald">Results</HeliosPill>
-                          )}
-                        </div>
-
-                        <p className="text-xs sm:text-[13px] text-slate-700 dark:text-slate-300 font-normal line-clamp-2 leading-relaxed">
-                          {cleanSub.headline}
-                        </p>
-                      </div>
-
-                      <div className="p-1 rounded bg-slate-100 dark:bg-[#201E2E] border border-slate-200/50 dark:border-[#2D283E] shrink-0 mt-0.5">
-                        <ChevronRight size={12} className={cn("transition-transform", isSelected ? "text-slate-900 dark:text-white translate-x-0.5" : "text-slate-400 group-hover:text-slate-600 group-hover:translate-x-0.5")} />
+                        ) : (
+                          <span className={heliosMeta}>Tap for AI digest</span>
+                        )}
+                        <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform text-slate-400 dark:text-slate-500" />
                       </div>
                     </div>
                   </motion.div>
@@ -1833,81 +1840,62 @@ export function Announcements({
               }
 
               // ==========================================
-              // STANDARD CLEAN ONE-TAP FILING ROW
+              // STANDARD HELIOS FILING CARD (list view — mobile default)
               // ==========================================
-              const companyInitials = (item.companyName || 'CA')
-                .split(' ')
-                .filter(Boolean)
-                .slice(0, 2)
-                .map((w: string) => w[0])
-                .join('')
-                .toUpperCase() || 'CA';
-
               return (
-                <motion.div 
+                <motion.div
                   id={`filing-${item.id || item.newsId}`}
                   key={item.id || item.newsId}
                   variants={itemFadeUpVariants}
                   transition={springSnappy}
                   onClick={() => handleSelectAnnouncement(item)}
                   className={cn(
-                    "transition-colors cursor-pointer relative group px-4 py-3.5",
-                    isSelected 
-                      ? 'bg-slate-100/90 dark:bg-[#242036]' 
-                      : 'hover:bg-slate-50/90 dark:hover:bg-[#1E1B2C]/70',
-                    isFlashActive && 'ring-1 ring-slate-400 dark:ring-[#4B4368]'
+                    heliosCard,
+                    listCardPad,
+                    "transition-all cursor-pointer relative group flex flex-col gap-2.5",
+                    isSelected
+                      ? "ring-2 ring-slate-300 dark:ring-[#4E446B]"
+                      : "hover:shadow-[0_12px_28px_rgba(15,23,42,0.09)] dark:hover:shadow-[0_12px_28px_rgba(0,0,0,0.5)]",
+                    isFlashActive && 'ring-2 ring-amber-400 dark:ring-amber-500'
                   )}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-[#221F30] border border-slate-200/80 dark:border-[#342E46] text-slate-700 dark:text-slate-300 font-extrabold text-[11px] flex items-center justify-center font-display shrink-0 select-none shadow-2xs mt-0.5">
-                      {companyInitials}
-                    </div>
+                  {/* Helios pill row: status · time */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {isResults && <HeliosPill tone="emerald">Results</HeliosPill>}
+                    {isHigh && <HeliosPill tone="rose">High impact</HeliosPill>}
+                    {isConcall && !isResults && <HeliosPill tone="sky">Concall</HeliosPill>}
+                    {item.aiSummary && !isHigh && !isResults && <HeliosPill tone="violet">AI Ready</HeliosPill>}
+                    {item.is_sent === 1 && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-sky-500 shrink-0 inline-block" title="Dispatched to Telegram" />
+                    )}
+                    <span className="flex-1" />
+                    <HeliosPill tone="slate">{formatFilingRelativeTime(item.bseTime || item.fetched_at)}</HeliosPill>
+                  </div>
 
-                    <div className="space-y-1.5 flex-1 min-w-0">
-                      {/* Top Row: Company & Time */}
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                          <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate font-display tracking-tight">
-                            {item.companyName}
-                          </span>
-                          {item.scrip_cd && (
-                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-[#252233] text-slate-600 dark:text-slate-400 border border-slate-200/60 dark:border-[#352F48]">
-                              {item.scrip_cd}
-                            </span>
-                          )}
-                        </div>
-                        <HeliosPill tone="slate" className="font-mono">{formatFilingRelativeTime(item.bseTime || item.fetched_at)}</HeliosPill>
-                      </div>
+                  <div className="min-w-0">
+                    <span
+                      className={cn("font-extrabold text-slate-900 dark:text-white tracking-tight truncate block font-display", listTitleSize)}
+                      title={item.companyName}
+                    >
+                      {item.companyName}
+                    </span>
+                    <p className="text-[13px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed mt-0.5">
+                      {cleanSub.humanTitle ? (
+                        <span className="font-semibold text-slate-700 dark:text-slate-200">{cleanSub.humanTitle} \u2014 </span>
+                      ) : null}
+                      {cleanSub.headline || 'Corporate announcement'}
+                    </p>
+                  </div>
 
-                      {/* Human Title & Category Badges */}
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-xs sm:text-[13px] font-bold text-slate-900 dark:text-slate-100">
-                          {cleanSub.humanTitle || 'Corporate announcement'}
-                        </span>
-                        {isHigh && (
-                          <HeliosPill tone="rose">High impact</HeliosPill>
-                        )}
-                        {isResults && (
-                          <HeliosPill tone="emerald">Results</HeliosPill>
-                        )}
-                        {isConcall && !isResults && (
-                          <HeliosPill tone="sky">Concall</HeliosPill>
-                        )}
-                        {item.aiSummary && !isHigh && !isResults && (
-                          <HeliosPill tone="violet">AI Ready</HeliosPill>
-                        )}
-                        {item.is_sent === 1 && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-sky-500 shrink-0 inline-block" title="Dispatched to Telegram" />
-                        )}
-                      </div>
+                  <div className={heliosDivider} />
 
-                      {/* Announcement Subject */}
-                      <p className="text-xs sm:text-[13px] text-slate-700 dark:text-slate-300 font-normal line-clamp-2 leading-relaxed">
-                        {cleanSub.headline}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+                  <div className="flex items-center justify-between gap-2">
+                    {item.scrip_cd ? (
+                      <HeliosPill tone="slate" dot={false} className="font-mono">BSE: {item.scrip_cd}</HeliosPill>
+                    ) : (
+                      <span />
+                    )}
+                    <div className="flex items-center gap-2">
                       <ShareActionMenu
                         title={`${item.companyName} (${item.scrip_cd ? `BSE: ${item.scrip_cd}` : 'BSE'})`}
                         headline={cleanSub.headline || item.subject}
@@ -1918,9 +1906,7 @@ export function Announcements({
                         pdfUrl={item.pdfLink || item.ATTACHMENTNAME || item.attachmentName}
                         size="xs"
                       />
-                      <div className="p-1 rounded bg-slate-100 dark:bg-[#201E2E] border border-slate-200/50 dark:border-[#2D283E]">
-                        <ChevronRight size={12} className={cn("transition-transform", isSelected ? "text-slate-900 dark:text-white translate-x-0.5" : "text-slate-400 group-hover:text-slate-600 group-hover:translate-x-0.5")} />
-                      </div>
+                      <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform text-slate-400 dark:text-slate-500" />
                     </div>
                   </div>
                 </motion.div>

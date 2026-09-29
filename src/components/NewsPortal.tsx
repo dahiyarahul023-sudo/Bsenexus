@@ -48,6 +48,7 @@ import { HonestProgressBar } from './ui/HonestProgressBar';
 import { ShareActionMenu } from './ui/motion/ShareActionMenu';
 import { useVisibilityInterval } from '../hooks/useVisibilityInterval';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+import { useFeedDensity } from '../hooks/useFeedDensity';
 import { customFetch } from '../api';
 import { syncQuotaFromResponse } from '../utils/aiQuota';
 import { useAuth } from '../context/AuthContext';
@@ -149,6 +150,11 @@ const NewsCardItem: React.FC<NewsCardProps> = React.memo(({
   onToggleAi
 }) => {
   const [copiedSummary, setCopiedSummary] = useState(false);
+  // Density sizing lives here (component is outside NewsPortal's scope).
+  const [density] = useFeedDensity();
+  const newsCardPad = density === 'comfortable' ? 'p-5' : density === 'dense' ? 'p-3' : 'p-4';
+  const newsCardGap = density === 'comfortable' ? 'gap-4' : density === 'dense' ? 'gap-2' : 'gap-3';
+  const newsListPad = density === 'comfortable' ? 'p-4' : density === 'dense' ? 'p-2.5' : 'p-3.5';
 
   const handleCopySummary = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -177,7 +183,7 @@ const NewsCardItem: React.FC<NewsCardProps> = React.memo(({
         "news-touch-scroll news-card-item touch-pan-y pointer-events-auto relative group transition-all",
         heliosCard,
         "hover:shadow-[0_16px_40px_rgba(15,23,42,0.10)] dark:hover:shadow-[0_16px_40px_rgba(0,0,0,0.55)]",
-        viewMode === 'grid' ? "p-5 flex flex-col justify-between gap-3.5" : "p-4 sm:p-5"
+        viewMode === 'grid' ? cn("flex flex-col justify-between", newsCardPad, newsCardGap) : newsListPad
       )}
     >
       <div className="space-y-2.5">
@@ -427,6 +433,9 @@ export const NewsPortal: React.FC<NewsPortalProps> = ({
 
   // Lock background scroll when Filter Sheet or Telegram Preferences Modal is open
   useBodyScrollLock(Boolean(isFilterSheetOpen || isTgPrefModalOpen));
+
+  // Shared feed density (Settings screen) — feed container spacing below is density-aware.
+  const [density] = useFeedDensity();
 
   // View Mode: 'grid' (desktop) vs 'list' (default on mobile)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
@@ -1313,8 +1322,10 @@ export const NewsPortal: React.FC<NewsPortalProps> = ({
             className={cn(
               "news-cards-grid touch-pan-y pointer-events-auto",
               viewMode === 'grid' 
-                ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-4 items-start" 
-                : "divide-y divide-slate-100 dark:divide-[#2D283E]"
+                ? cn("grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 items-start",
+                    density === 'comfortable' ? "gap-5 p-5" : density === 'dense' ? "gap-2.5 p-3" : "gap-4 p-4")
+                : cn("flex flex-col",
+                    density === 'comfortable' ? "gap-3 p-3" : density === 'dense' ? "gap-1.5 p-2" : "gap-2.5 p-3")
             )}
           >
             {displayedNews.map((item) => (

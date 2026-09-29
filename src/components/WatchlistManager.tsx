@@ -19,6 +19,7 @@ import { getSafePdfUrl } from '../utils/pdfHelper';
 import { StockPriority, WatchlistStockItem } from '../types';
 import { useAiQuota, syncQuotaFromResponse } from '../utils/aiQuota';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+import { useFeedDensity } from '../hooks/useFeedDensity';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { useVisibilityInterval } from '../hooks/useVisibilityInterval';
 import { PullToRefreshIndicator } from './ui/PullToRefreshIndicator';
@@ -29,6 +30,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { springSnappy, springMorph, containerStaggerVariants, itemFadeUpVariants, buttonTap, cardHover } from '../utils/motionTokens';
 import { ShareActionMenu } from './ui/motion/ShareActionMenu';
 import { HeliosPill, heliosCard, heliosDivider, heliosTitle, heliosMeta } from './ui/helios';
+import { AiSummaryViewer } from './AiSummaryViewer';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -487,6 +489,11 @@ const SwipeableFilingCard: React.FC<{
 };
 
 export function WatchlistManager() {
+  // Shared feed density (Settings screen) — visibly resizes stock cards.
+  const [density] = useFeedDensity();
+  const wlCardPad = density === 'comfortable' ? 'p-6' : density === 'dense' ? 'p-4' : 'p-5';
+  const wlCardGap = density === 'comfortable' ? 'gap-4' : density === 'dense' ? 'gap-2.5' : 'gap-3.5';
+  const wlGridGap = density === 'comfortable' ? 'gap-5' : density === 'dense' ? 'gap-2.5' : 'gap-4';
   const { user, profile, isPro, isAdmin, adminUnlocked, setIsAuthModalOpen, setIsProModalOpen } = useAuth();
   // AI summary language (Settings → Telegram Alerts & AI Summaries); English variant lives in aiSummaryEn
   const summaryLang: 'hinglish' | 'english' = profile?.notificationPreferences?.aiSummaryLang === 'hinglish' ? 'hinglish' : 'english';
@@ -2528,7 +2535,7 @@ Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to create unlimi
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className={cn("grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3", wlGridGap)}>
               {filteredMyCompanies.map((c) => {
                 const priorityTone: 'rose' | 'amber' | 'slate' =
                   c.priority === 'HIGH' ? 'rose' :
@@ -2546,7 +2553,7 @@ Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to create unlimi
                     onClick={() => handleOpenIntel(c.scripCode, c.symbol, c.name)}
                     className={cn(
                       heliosCard,
-                      "group p-5 transition-all cursor-pointer flex flex-col gap-3.5 relative",
+                      cn("group transition-all cursor-pointer flex flex-col relative", wlCardPad, wlCardGap),
                       "hover:shadow-[0_16px_40px_rgba(15,23,42,0.10)] dark:hover:shadow-[0_16px_40px_rgba(0,0,0,0.55)]"
                     )}
                   >
@@ -3496,13 +3503,10 @@ Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to create unlimi
       {/* VIEW 2: DEDICATED WATCHLIST ANNOUNCEMENTS & SUMMARIES FEED */}
       {watchlistSubTab === 'updates' && (
       <div className="space-y-3 pt-0.5 animate-in fade-in duration-150">
-        {/* Watchlist Announcements List */}
-        <div className={cn(
-          "rounded-xl overflow-hidden",
-          viewMode === 'list' ? "bg-white dark:bg-[#1A1926] border border-slate-200/90 dark:border-[#2D283E] shadow-xs" : ""
-        )}>
+        {/* Watchlist Announcements List — independent Helios cards, no shared bordered box */}
+        <div>
           {paginatedWatchlistAnnouncements.length === 0 ? (
-            <div className="p-6 sm:p-8 text-left text-slate-400 space-y-4 bg-white dark:bg-[#1A1926] border border-slate-200/90 dark:border-[#2D283E] rounded-2xl max-w-lg shadow-xs">
+            <div className={cn(heliosCard, "p-6 sm:p-8 text-left text-slate-400 space-y-4 max-w-lg")}>
               <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800/80 flex items-center justify-center text-slate-400 dark:text-slate-500">
                 <FileText size={20} />
               </div>
@@ -3525,8 +3529,10 @@ Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to create unlimi
               animate="visible"
               className={cn(
                 viewMode === 'grid'
-                  ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 items-stretch"
-                  : "divide-y divide-slate-100 dark:divide-[#2D283E]/60"
+                  ? cn("grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 items-stretch",
+                      density === 'comfortable' ? "gap-4" : density === 'dense' ? "gap-2" : "gap-3")
+                  : cn("flex flex-col",
+                      density === 'comfortable' ? "gap-3" : density === 'dense' ? "gap-1.5" : "gap-2.5")
               )}
             >
               {paginatedWatchlistAnnouncements.map((cluster, idx) => {
@@ -3543,14 +3549,6 @@ Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to create unlimi
                     break;
                   }
                 }
-
-                // Conviction 3px Left Edge Strip Color Class
-                const convictionBorderClass = 
-                  matchedStock?.priority === 'HIGH' 
-                    ? "border-l-[3.5px] border-l-rose-500" 
-                    : matchedStock?.priority === 'MEDIUM' 
-                      ? "border-l-[3.5px] border-l-amber-500" 
-                      : "border-l-[3.5px] border-l-slate-300 dark:border-l-slate-600";
 
                 // RENDER CLUSTERED BUNDLE (2+ Filings from same company)
                 if (cluster.isCluster) {
@@ -3575,11 +3573,11 @@ Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to create unlimi
                         onClick={() => setSelectedAnnouncement(item)}
                         isSent={item.is_sent}
                         className={cn(
-                          convictionBorderClass,
+                          heliosCard,
                           viewMode === 'grid'
-                            ? "p-3.5 bg-white dark:bg-[#1A1926] border border-slate-200/90 dark:border-[#2D283E] rounded-xl shadow-2xs hover:shadow-xs hover:border-slate-300 dark:hover:border-[#38324E] transition-all flex flex-col justify-between gap-3 h-full"
-                            : "p-3 hover:bg-slate-50/80 dark:hover:bg-[#222030]/50 transition-colors space-y-2",
-                          isExpanded ? "bg-slate-50/90 dark:bg-[#1E1C2B]" : ""
+                            ? cn("transition-all flex flex-col justify-between h-full hover:shadow-[0_16px_40px_rgba(15,23,42,0.10)] dark:hover:shadow-[0_16px_40px_rgba(0,0,0,0.55)]", wlCardPad, wlCardGap)
+                            : cn("transition-all hover:shadow-[0_12px_28px_rgba(15,23,42,0.09)] dark:hover:shadow-[0_12px_28px_rgba(0,0,0,0.5)]", wlCardPad),
+                          isExpanded ? "ring-2 ring-slate-300 dark:ring-[#4E446B]" : ""
                         )}
                       >
                         {/* Top Row: Company Info & Cluster Badge */}
@@ -3618,37 +3616,24 @@ Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to create unlimi
                                 )}
 
                                 {matchedStock && (
-                                  <span className={cn(
-                                    "text-[9px] font-extrabold px-1.5 py-0.2 rounded border uppercase tracking-wider",
-                                    matchedStock.priority === 'HIGH' ? "bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-800" :
-                                    matchedStock.priority === 'MEDIUM' ? "bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800" :
-                                    "bg-slate-100 dark:bg-[#201E2E] text-slate-700 dark:text-slate-300 border-slate-300 dark:border-[#2D283E]"
-                                  )}>
+                                  <HeliosPill tone={matchedStock.priority === 'HIGH' ? 'rose' : matchedStock.priority === 'MEDIUM' ? 'amber' : 'slate'}>
                                     {matchedStock.priority === 'HIGH' ? 'HIGH' : matchedStock.priority === 'MEDIUM' ? 'RADAR' : 'TRACKING'}
-                                  </span>
+                                  </HeliosPill>
                                 )}
 
                                 {item.scrip_cd && (
-                                  <span className="text-[9px] font-mono px-1 py-0.2 bg-slate-100 dark:bg-[#201E2E] text-slate-500 dark:text-slate-400 rounded border border-slate-200 dark:border-[#2D283E]">
-                                    {item.scrip_cd}
-                                  </span>
+                                  <HeliosPill tone="slate" dot={false} className="font-mono">{item.scrip_cd}</HeliosPill>
                                 )}
 
                                 {cleanSub.regulation && (
-                                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-slate-100 dark:bg-[#252233] text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-[#352F48]">
-                                    {cleanSub.regulation}
-                                  </span>
+                                  <HeliosPill tone="slate" dot={false} className="font-mono">{cleanSub.regulation}</HeliosPill>
                                 )}
 
                                 {isResult && (
-                                  <span className="text-[9px] font-bold px-1.5 py-0.2 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded">
-                                    Results
-                                  </span>
+                                  <HeliosPill tone="emerald">Results</HeliosPill>
                                 )}
                                 {isConcall && (
-                                  <span className="text-[9px] font-bold px-1.5 py-0.2 bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded">
-                                    Concall
-                                  </span>
+                                  <HeliosPill tone="sky">Concall</HeliosPill>
                                 )}
                               </div>
 
@@ -3834,11 +3819,11 @@ Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to create unlimi
                       onClick={() => setSelectedAnnouncement(item)}
                       isSent={item.is_sent}
                       className={cn(
-                        convictionBorderClass,
+                        heliosCard,
                         viewMode === 'grid'
-                          ? "p-3.5 bg-white dark:bg-[#1A1926] border border-slate-200/90 dark:border-[#2D283E] rounded-xl shadow-2xs hover:shadow-xs hover:border-slate-300 dark:hover:border-[#38324E] transition-all flex flex-col justify-between gap-3 h-full"
-                          : "p-3 hover:bg-slate-50/80 dark:hover:bg-[#222030]/60 transition-colors flex items-start justify-between gap-2.5",
-                        selectedAnnouncement?.id === item.id && (viewMode === 'grid' ? "ring-2 ring-purple-500" : "bg-slate-100/70 dark:bg-[#252233]")
+                          ? cn("transition-all flex flex-col justify-between h-full hover:shadow-[0_16px_40px_rgba(15,23,42,0.10)] dark:hover:shadow-[0_16px_40px_rgba(0,0,0,0.55)]", wlCardPad, wlCardGap)
+                          : cn("transition-all hover:shadow-[0_12px_28px_rgba(15,23,42,0.09)] dark:hover:shadow-[0_12px_28px_rgba(0,0,0,0.5)]", wlCardPad),
+                        selectedAnnouncement?.id === item.id && "ring-2 ring-purple-500"
                       )}
                     >
                       <div className={cn(
@@ -3862,37 +3847,24 @@ Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to create unlimi
                             </span>
 
                             {matchedStock && (
-                              <span className={cn(
-                                "text-[9px] font-extrabold px-1.5 py-0.2 rounded border uppercase tracking-wider",
-                                matchedStock.priority === 'HIGH' ? "bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-800" :
-                                matchedStock.priority === 'MEDIUM' ? "bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800" :
-                                "bg-slate-100 dark:bg-[#201E2E] text-slate-700 dark:text-slate-300 border-slate-300 dark:border-[#2D283E]"
-                              )}>
+                              <HeliosPill tone={matchedStock.priority === 'HIGH' ? 'rose' : matchedStock.priority === 'MEDIUM' ? 'amber' : 'slate'}>
                                 {matchedStock.priority === 'HIGH' ? 'HIGH' : matchedStock.priority === 'MEDIUM' ? 'RADAR' : 'TRACKING'}
-                              </span>
+                              </HeliosPill>
                             )}
 
                             {item.scrip_cd && (
-                              <span className="text-[9px] font-mono px-1 py-0.2 bg-slate-100 dark:bg-[#201E2E] text-slate-500 dark:text-slate-400 rounded border border-slate-200 dark:border-[#2D283E]">
-                                {item.scrip_cd}
-                              </span>
+                              <HeliosPill tone="slate" dot={false} className="font-mono">{item.scrip_cd}</HeliosPill>
                             )}
 
                             {singleClean.regulation && (
-                              <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-slate-100 dark:bg-[#252233] text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-[#352F48]">
-                                {singleClean.regulation}
-                              </span>
+                              <HeliosPill tone="slate" dot={false} className="font-mono">{singleClean.regulation}</HeliosPill>
                             )}
 
                             {isResult && (
-                              <span className="text-[9px] font-bold px-1.5 py-0.2 bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800 rounded">
-                                Results
-                              </span>
+                              <HeliosPill tone="emerald">Results</HeliosPill>
                             )}
                             {isConcall && (
-                              <span className="text-[9px] font-bold px-1.5 py-0.2 bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded">
-                                Concall
-                              </span>
+                              <HeliosPill tone="sky">Concall</HeliosPill>
                             )}
                           </div>
 
@@ -3935,10 +3907,7 @@ Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to create unlimi
                             </div>
 
                             {item.aiSummary && (
-                              <span className="flex items-center gap-1 text-purple-600 dark:text-purple-400 font-sans font-semibold">
-                                <Sparkles size={11} className="text-amber-500" />
-                                <span>AI Ready</span>
-                              </span>
+                              <HeliosPill tone="violet">AI Ready</HeliosPill>
                             )}
 
                             {item.is_sent ? (
@@ -4009,9 +3978,9 @@ Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to create unlimi
                     {selectedAnnouncement.companyName}
                   </h3>
                   {selectedAnnouncement.scrip_cd && (
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 bg-slate-200/80 dark:bg-[#201E2E] text-slate-600 dark:text-slate-300 rounded border border-slate-200 dark:border-[#2D283E]">
+                    <HeliosPill tone="slate" dot={false} className="font-mono">
                       {selectedAnnouncement.scrip_cd}
-                    </span>
+                    </HeliosPill>
                   )}
                 </div>
                 <div className="text-xs text-slate-500 font-mono mt-0.5">
@@ -4028,10 +3997,10 @@ Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to create unlimi
             </div>
 
             {/* Modal Content */}
-            <div className="p-6 overflow-y-auto space-y-5 overscroll-contain">
+            <div className="p-6 overflow-y-auto space-y-5 overscroll-contain bg-slate-100/70 dark:bg-[#12111C]">
               <div>
                 <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Subject</div>
-                <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 leading-relaxed bg-slate-50 dark:bg-[#15141F] p-3 rounded-lg border border-slate-100 dark:border-[#2D283E]">
+                <div className={cn(heliosCard, "p-3.5 text-sm font-semibold text-slate-800 dark:text-slate-100 leading-relaxed")}>
                   {selectedAnnouncement.subject}
                 </div>
               </div>
@@ -4039,19 +4008,19 @@ Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to create unlimi
               {selectedAnnouncement.details && (
                 <div>
                   <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Filing Details</div>
-                  <div className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto p-3 bg-slate-50 dark:bg-[#15141F] rounded-lg border border-slate-100 dark:border-[#2D283E]">
+                  <div className={cn(heliosCard, "p-3.5 text-xs text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto")}>
                     {selectedAnnouncement.details}
                   </div>
                 </div>
               )}
 
               {/* AI Summary Breakdown */}
-              <div className="p-4 bg-slate-50 dark:bg-[#15141F] border border-slate-200 dark:border-[#2D283E] rounded-xl space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 font-bold text-xs text-slate-900 dark:text-white">
-                    <Sparkles size={15} className="text-amber-500" />
-                    <span>Gemini AI YoY & Financial Extraction</span>
-                  </div>
+              <div className={cn(heliosCard, "p-4 space-y-2")}>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <HeliosPill tone="violet" dot={false}>
+                    <Sparkles size={15} className="text-purple-500" />
+                    <span>AI Digest</span>
+                  </HeliosPill>
 
                   {!displaySummary(selectedAnnouncement) && (
                     <ActionButton
@@ -4068,9 +4037,7 @@ Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to create unlimi
                 </div>
 
                 {displaySummary(selectedAnnouncement) ? (
-                  <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
-                    {displaySummary(selectedAnnouncement)}
-                  </p>
+                  <AiSummaryViewer summaryText={displaySummary(selectedAnnouncement)!} />
                 ) : isGeneratingSummary ? (
                   <div className="py-3 flex justify-start animate-in fade-in duration-200">
                     <ThinkingPill text="Thinking..." />

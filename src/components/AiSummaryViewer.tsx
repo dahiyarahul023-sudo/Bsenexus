@@ -19,6 +19,13 @@ import { motion } from 'framer-motion';
 import { HonestProgressBar } from './ui/HonestProgressBar';
 import { AiSummarySkeleton } from './ui/DesignedSkeletons';
 import { ActionButton } from './ui/ActionButton';
+import { HeliosPill, heliosCard } from './ui/helios';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 interface AiSummaryViewerProps {
   summaryText: string;
@@ -153,23 +160,17 @@ export const AiSummaryViewer: React.FC<AiSummaryViewerProps> = ({
     return (
       <div 
         key={idx}
-        className="flex items-center justify-between gap-2 p-2 rounded-lg bg-white dark:bg-[#1E1B2C] border border-slate-200/70 dark:border-[#352F48] text-xs"
+        className="flex items-center justify-between gap-2 p-2 rounded-lg bg-slate-50 dark:bg-[#15141E] text-xs"
       >
         <span className="font-semibold text-slate-800 dark:text-slate-200">
           {cleanLine.split('(')[0].trim()}
         </span>
         {cleanLine.includes('(') && (
-          <span className={`font-mono font-bold px-2 py-0.5 rounded text-[11px] shrink-0 flex items-center gap-1 ${
-            isPositive 
-              ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
-              : isNegative
-              ? 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800'
-              : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
-          }`}>
+          <HeliosPill tone={isPositive ? 'emerald' : isNegative ? 'rose' : 'slate'} dot={false} className="font-mono shrink-0">
             {isPositive && <TrendingUp size={11} />}
             {isNegative && <TrendingDown size={11} />}
             <span>({cleanLine.split('(').slice(1).join('(').replace(/\)/g, '')}</span>
-          </span>
+          </HeliosPill>
         )}
       </div>
     );
@@ -180,10 +181,10 @@ export const AiSummaryViewer: React.FC<AiSummaryViewerProps> = ({
       {/* Top Bar with Model Badge & Actions */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-1.5">
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-[10px] font-bold uppercase tracking-wider">
+          <HeliosPill tone="violet" dot={false} className="uppercase tracking-wider">
             <Sparkles size={11} className="text-purple-500" />
             <span>{isHeuristicExtraction ? 'Quick Extraction' : 'Gemini 3.8 Flash Synthesis'}</span>
-          </span>
+          </HeliosPill>
         </div>
 
         <div className="flex items-center gap-1.5">
@@ -250,11 +251,11 @@ export const AiSummaryViewer: React.FC<AiSummaryViewerProps> = ({
         <div className="space-y-3 min-h-[160px]">
           {/* Executive AI Summary Callout */}
           {sections.summary.length > 0 && (
-            <div className="p-3 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200/80 dark:border-purple-900/50">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-purple-900 dark:text-purple-300 mb-1">
+            <div className={cn(heliosCard, "p-4 space-y-2")}>
+              <HeliosPill tone="violet" dot={false}>
                 <Sparkles size={12} className="text-purple-500" />
                 <span>Executive AI Takeaway</span>
-              </div>
+              </HeliosPill>
               <p className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed font-medium">
                 {sections.summary.map(s => s.replace(/\*\*/g, '')).join(' ')}
               </p>
@@ -263,13 +264,13 @@ export const AiSummaryViewer: React.FC<AiSummaryViewerProps> = ({
 
           {/* YoY Growth Card */}
           {sections.yoy.length > 0 && (
-            <div className="p-3 rounded-xl bg-slate-50/80 dark:bg-[#15141E] border border-slate-200/90 dark:border-[#2D283E] space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200">
-                <span className="flex items-center gap-1.5">
+            <div className={cn(heliosCard, "p-4 space-y-2")}>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <HeliosPill tone="emerald" dot={false}>
                   <TrendingUp size={13} className="text-emerald-500" />
                   <span>YoY Growth Breakdown</span>
-                </span>
-                <span className="text-[10px] font-mono text-slate-500 uppercase">Year-on-Year</span>
+                </HeliosPill>
+                <HeliosPill tone="slate" dot={false} className="font-mono">Year-on-Year</HeliosPill>
               </div>
               <div className="grid grid-cols-1 gap-1.5">
                 {sections.yoy.map((line, i) => renderMetricLine(line, i))}
@@ -279,13 +280,13 @@ export const AiSummaryViewer: React.FC<AiSummaryViewerProps> = ({
 
           {/* QoQ Growth Card */}
           {sections.qoq.length > 0 && (
-            <div className="p-3 rounded-xl bg-slate-50/80 dark:bg-[#15141E] border border-slate-200/90 dark:border-[#2D283E] space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200">
-                <span className="flex items-center gap-1.5">
-                  <TrendingUp size={13} className="text-blue-500" />
+            <div className={cn(heliosCard, "p-4 space-y-2")}>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <HeliosPill tone="sky" dot={false}>
+                  <TrendingUp size={13} className="text-sky-500" />
                   <span>QoQ Growth Breakdown</span>
-                </span>
-                <span className="text-[10px] font-mono text-slate-500 uppercase">Quarter-on-Quarter</span>
+                </HeliosPill>
+                <HeliosPill tone="slate" dot={false} className="font-mono">Quarter-on-Quarter</HeliosPill>
               </div>
               <div className="grid grid-cols-1 gap-1.5">
                 {sections.qoq.map((line, i) => renderMetricLine(line, i))}
@@ -295,11 +296,11 @@ export const AiSummaryViewer: React.FC<AiSummaryViewerProps> = ({
 
           {/* Key Positives */}
           {sections.positives.length > 0 && (
-            <div className="p-3 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-900/60 space-y-1.5">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800 dark:text-emerald-300">
+            <div className={cn(heliosCard, "p-4 space-y-1.5")}>
+              <HeliosPill tone="emerald" dot={false}>
                 <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-400" />
                 <span>Key Positives</span>
-              </div>
+              </HeliosPill>
               <ul className="space-y-1">
                 {sections.positives.map((pos, idx) => (
                   <li key={idx} className="text-xs text-slate-800 dark:text-slate-200 flex items-start gap-1.5 leading-relaxed">
@@ -313,11 +314,11 @@ export const AiSummaryViewer: React.FC<AiSummaryViewerProps> = ({
 
           {/* Key Concerns */}
           {sections.concerns.length > 0 && (
-            <div className="p-3 rounded-xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200/80 dark:border-rose-900/60 space-y-1.5">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-rose-800 dark:text-rose-300">
+            <div className={cn(heliosCard, "p-4 space-y-1.5")}>
+              <HeliosPill tone="rose" dot={false}>
                 <AlertTriangle size={13} className="text-rose-600 dark:text-rose-400" />
                 <span>Key Concerns / Risks</span>
-              </div>
+              </HeliosPill>
               <ul className="space-y-1">
                 {sections.concerns.map((con, idx) => (
                   <li key={idx} className="text-xs text-slate-800 dark:text-slate-200 flex items-start gap-1.5 leading-relaxed">
@@ -331,14 +332,14 @@ export const AiSummaryViewer: React.FC<AiSummaryViewerProps> = ({
 
           {/* Fallback general lines */}
           {sections.general.length > 0 && (
-            <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#15141E] border border-slate-200/90 dark:border-[#2D283E] text-xs leading-relaxed text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+            <div className={cn(heliosCard, "p-3 text-xs leading-relaxed text-slate-700 dark:text-slate-300 whitespace-pre-wrap")}>
               {sections.general.join('\n')}
             </div>
           )}
         </div>
       ) : (
         /* Standard / Heuristic Summary Display */
-        <div className="bg-slate-50 dark:bg-[#15141E] border border-slate-200/90 dark:border-[#2D283E] rounded-xl p-3.5 space-y-2">
+        <div className={cn(heliosCard, "p-3.5 space-y-2")}>
           {summaryText.split('\n').map((para, i) => {
             const trimmed = para.trim();
             if (!trimmed) return <div key={i} className="h-1" />;

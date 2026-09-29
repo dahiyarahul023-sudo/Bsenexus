@@ -26,6 +26,7 @@ import { QuarterlyResultsLedger } from './QuarterlyResultsLedger';
 import { CommonQuestionsFAQ } from './ui/CommonQuestionsFAQ';
 import { ShareActionMenu } from './ui/motion/ShareActionMenu';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+import { useFeedDensity } from '../hooks/useFeedDensity';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { useSwipeGesture } from '../hooks/useSwipeGesture';
 import { PullToRefreshIndicator } from './ui/PullToRefreshIndicator';
@@ -133,6 +134,10 @@ export interface ResultCalendarItem {
 
 export function ResultsCalendar() {
   const { user, profile, isAdmin, isPro, isPaidPro, adminUnlocked, setIsAuthModalOpen, setIsProModalOpen } = useAuth();
+  // Shared feed density (Settings screen) — visibly resizes calendar cards.
+  const [density] = useFeedDensity();
+  const calCardPad = density === 'comfortable' ? 'p-5' : density === 'dense' ? 'p-3' : 'p-4';
+  const calCardGap = density === 'comfortable' ? 'gap-4' : density === 'dense' ? 'gap-2.5' : 'gap-3.5';
   // AI summary language (Settings → Telegram Alerts & AI Summaries); English variant lives in aiSummaryEn
   const summaryLang: 'hinglish' | 'english' = profile?.notificationPreferences?.aiSummaryLang === 'hinglish' ? 'hinglish' : 'english';
   const displaySummary = (item: any): string | undefined =>
@@ -1663,16 +1668,16 @@ Your 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${g
         )}
       </AnimatePresence>
 
-      {/* Main Results Table / List */}
+      {/* Main Results Table / List — independent Helios cards, no shared bordered box */}
       <div 
         onTouchStart={swipeHandlers.onTouchStart}
         onTouchMove={swipeHandlers.onTouchMove}
         onTouchEnd={swipeHandlers.onTouchEnd}
-        className="bg-white dark:bg-[#1A1926] border border-slate-200/90 dark:border-[#2D283E] rounded-xl overflow-hidden shadow-xs divide-y divide-slate-100 dark:divide-[#2D283E]/70"
+        className="space-y-3"
       >
         {/* Table Control Header Row */}
         {!loading && filteredAndSortedItems.length > 0 && (
-          <div className="px-3 py-1.5 bg-slate-50/80 dark:bg-[#15141F] border-b border-slate-100 dark:border-[#2D283E] flex items-center justify-between gap-2 text-[11px] text-slate-500">
+          <div className={cn(heliosCard, "px-4 py-2.5 flex items-center justify-between gap-2 text-[11px] text-slate-500")}>
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
@@ -1875,8 +1880,10 @@ Your 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${g
             animate="visible"
             className={cn(
               viewMode === 'grid'
-                ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 p-3 items-start"
-                : "divide-y divide-slate-100 dark:divide-[#2D283E]/70"
+                ? cn("grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 items-start",
+                    density === 'comfortable' ? "gap-4 p-4" : density === 'dense' ? "gap-2 p-2.5" : "gap-3 p-3")
+                : cn("flex flex-col",
+                    density === 'comfortable' ? "gap-3 p-3" : density === 'dense' ? "gap-1.5 p-2" : "gap-2.5 p-3")
             )}
           >
             {paginatedItems.map((item, idx) => {
@@ -1897,8 +1904,8 @@ Your 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${g
                   onClick={() => handleSelectItem(item)}
                   className={cn(
                     viewMode === 'grid'
-                      ? cn(heliosCard, "p-4 transition-all flex flex-col gap-3.5 cursor-pointer relative group hover:shadow-[0_16px_40px_rgba(15,23,42,0.10)] dark:hover:shadow-[0_16px_40px_rgba(0,0,0,0.55)]")
-                      : "p-2.5 sm:p-3 transition-all flex flex-col md:flex-row md:items-center justify-between gap-2.5 cursor-pointer relative group rounded-2xl hover:bg-slate-50/80 dark:hover:bg-[#1E1B2C]/60",
+                      ? cn(heliosCard, calCardPad, calCardGap, "transition-all flex flex-col cursor-pointer relative group hover:shadow-[0_16px_40px_rgba(15,23,42,0.10)] dark:hover:shadow-[0_16px_40px_rgba(0,0,0,0.55)]")
+                      : cn(heliosCard, calCardPad, "transition-all flex flex-col md:flex-row md:items-center justify-between gap-2.5 cursor-pointer relative group hover:shadow-[0_12px_28px_rgba(15,23,42,0.09)] dark:hover:shadow-[0_12px_28px_rgba(0,0,0,0.5)]"),
                     activeActionMenuId === item.id ? "z-30" : "z-0",
                     isFlashing && "ring-2 ring-slate-400 dark:ring-[#5C537C]",
                     isSelected && "ring-2 ring-slate-300 dark:ring-[#4E446B]"
@@ -2410,23 +2417,14 @@ Your 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${g
               {modalTab === 'results' && (
                 <div className="space-y-4 animate-in fade-in duration-150">
                   {/* Results Status Banner */}
-                  <div className={cn(
-                    "p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3",
-                    selectedModalItem.isDeclared
-                      ? "bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800"
-                      : "bg-amber-50/80 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800"
-                  )}>
+                  <div className={cn(heliosCard, "p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3")}>
                     <div className="flex items-start gap-3">
-                      <div className={cn(
-                        "w-3 h-3 rounded-full mt-1 shrink-0",
-                        selectedModalItem.isDeclared ? "bg-emerald-500" : "bg-amber-500 animate-ping"
-                      )} />
-                      <div className="space-y-0.5">
-                        <div className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                      <div className="space-y-1.5">
+                        <HeliosPill tone={selectedModalItem.isDeclared ? "emerald" : "amber"} pulseDot={!selectedModalItem.isDeclared}>
                           {selectedModalItem.isDeclared
                             ? "Financial Result Declared & Verified on BSE"
                             : "Result Declaration Awaiting Submission"}
-                        </div>
+                        </HeliosPill>
                         {selectedModalItem.isDeclared && selectedModalItem.resultDeclarationTime ? (
                           <div className="text-xs text-emerald-700 dark:text-emerald-300 font-mono font-bold flex items-center gap-1">
                             <Clock size={13} className="text-emerald-600" />
@@ -2605,7 +2603,7 @@ Your 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${g
                   </div>
 
                   {/* 1-5 Years Historical BSE Filings Fetcher Card */}
-                  <div className="p-4 bg-slate-100/70 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl space-y-3">
+                  <div className={cn(heliosCard, "p-4 space-y-3")}>
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="flex items-start gap-2.5">
                         <div className="p-2 rounded-lg bg-emerald-600 text-white shadow-2xs shrink-0 mt-0.5">
@@ -2867,15 +2865,15 @@ Your 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${g
                   </div>
 
                   {/* Board Meetings History Timeline */}
-                  <div className="p-4 bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 rounded-xl space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 font-bold text-xs text-slate-800 dark:text-slate-200">
+                  <div className={cn(heliosCard, "p-4 space-y-3")}>
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <HeliosPill tone="sky" dot={false}>
                         <CalendarDays size={15} className="text-blue-500" />
                         <span>Board Meetings &amp; Intimations History</span>
-                      </div>
-                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-200/80 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                      </HeliosPill>
+                      <HeliosPill tone="slate" dot={false} className="font-mono">
                         {boardMeetingsHistory.length} Meetings
-                      </span>
+                      </HeliosPill>
                     </div>
 
                     {loadingHistory ? (
