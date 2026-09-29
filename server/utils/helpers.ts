@@ -404,9 +404,9 @@ export function getISTMarketStatus(): {
   if (isMarketHours) {
     return {
       isMarketHours: true,
-      intervalMs: 30 * 1000, // 30 seconds during active market trading hours
-      statusLabel: 'Live (30s)',
-      cycleLabel: '30s polling cycle',
+      intervalMs: 20 * 1000, // 20 seconds during active market trading hours
+      statusLabel: 'Live (20s)',
+      cycleLabel: '20s polling cycle',
       dayOfWeek,
       hours,
       minutes
@@ -428,7 +428,14 @@ export function isMarketHoursIST(): boolean {
   return getISTMarketStatus().isMarketHours;
 }
 
-export function getPollingIntervalMs(consecutiveFailures: number = 0): number {
+export function getPollingIntervalMs(consecutiveFailures: number = 0, blockBackoffLevel: number = 0): number {
+  // BSE source-block exponential backoff: 20s -> 1min -> 5min. While the source
+  // is flagged blocked we back off instead of hammering BSE's WAF.
+  if (blockBackoffLevel > 0) {
+    const backoffMs = [0, 20 * 1000, 60 * 1000, 5 * 60 * 1000][Math.min(3, blockBackoffLevel)] || 20 * 1000;
+    return backoffMs + 1000 + Math.random() * 2000; // + random 1-3s jitter (non-robotic)
+  }
+
   const { isMarketHours, intervalMs } = getISTMarketStatus();
 
   // If there are failures, apply modest backoff
@@ -439,7 +446,7 @@ export function getPollingIntervalMs(consecutiveFailures: number = 0): number {
     return isMarketHours ? 45000 : 300000;
   }
 
-  // Base interval: 30s during market hours, 5m off-hours (with +/- 1s natural jitter to avoid bot pattern)
-  const jitter = Math.floor(Math.random() * 2000) - 1000;
+  // Base interval: 20s during market hours, 5m off-hours (with random 1-3s jitter to avoid bot pattern)
+  const jitter = 1000 + Math.random() * 2000;
   return Math.max(20000, intervalMs + jitter);
 }

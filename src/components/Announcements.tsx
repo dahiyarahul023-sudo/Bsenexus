@@ -95,6 +95,11 @@ export function Announcements({
     return [];
   });
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  // Subtle "feed delayed" state: BSE is rate-limiting our poller (sourceBlocked
+  // from the server). Shows instead of silently serving stale data.
+  const [feedDelayed, setFeedDelayed] = useState<boolean>(false);
+  // Prefetch-on-intent: announcement ids whose detail JSON is already warming
+  const prefetchedIds = useRef<Set<string>>(new Set());
   const [search, setSearch] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -738,14 +743,23 @@ export function Announcements({
     openIntelModal({ scripCode, symbol: symbol || companyName, companyName: companyName || symbol });
   };
 
-  // Efficient 60s background polling with visibility gating and immediate resume on active
+  // Efficient 30s background polling with visibility gating and immediate resume on active
   useEffect(() => {
     fetchData(true);
   }, []);
 
   useVisibilityInterval(() => {
     fetchData(false);
-  }, 60000);
+  }, 30000);
+
+  // Prefetch an announcement's detail data on hover intent so the detail view
+  // opens instantly. Skips ids already fresh/prefetched.
+  const prefetchAnnouncement = (item: any) => {
+    const id = item?.id || item?.newsId;
+    if (!id || prefetchedIds.current.has(String(id))) return;
+    prefetchedIds.current.add(String(id));
+    customFetch(`/api/announcements/${encodeURIComponent(String(id))}`).catch(() => {});
+  };
 
   useEffect(() => {
     setCurrentPage(1);
@@ -756,9 +770,12 @@ export function Announcements({
       setIsLoading(true);
     }
     try {
-      // 300 items is fast, rich, and prevents browser hanging / memory exhaustion
-      const res = await customFetch('/api/announcements?limit=300');
+      // 300 items is fast, rich, and prevents browser hanging / memory exhaustion.
+      // fetchpriority=high on the first feed request: it drives the initial paint.
+      const res = await customFetch('/api/announcements?limit=300', isInitial ? { fetchpriority: 'high' } as any : {});
       if (res.ok) {
+        // BSE source-block flag (server sets X-BSE-Source-Blocked while backing off)
+        try { setFeedDelayed(res.headers.get('x-bse-source-blocked') === 'true'); } catch { /* non-fatal */ }
         const data = await res.json();
         if (Array.isArray(data)) {
           const uniqueMap = new Map<string, any>();
@@ -1639,6 +1656,14 @@ export function Announcements({
               </div>
             )}
 
+            {/* Subtle source-blocked state: BSE is rate-limiting our feed; retrying automatically */}
+            {feedDelayed && (
+              <div className="px-3.5 py-2 bg-slate-500/10 dark:bg-slate-400/10 border-b border-slate-300/60 dark:border-slate-600/40 flex items-center gap-1.5 text-[11px] font-bold text-slate-600 dark:text-slate-300 animate-in fade-in duration-200">
+                <Info size={12} className="text-slate-400 shrink-0" />
+                <span>Feed delayed — BSE is rate-limiting our connection. Retrying automatically.</span>
+              </div>
+            )}
+
             {isLoading && announcements.length === 0 ? (
               /* Semantic Zero-Layout-Shift Skeleton with Real Text & Structure */
               <div className={viewMode === 'grid' ? gridWrapClass : listWrapClass}>
@@ -1698,6 +1723,7 @@ export function Announcements({
                     variants={itemFadeUpVariants}
                     transition={springSnappy}
                     onClick={() => handleSelectAnnouncement(item)}
+                    onMouseEnter={() => prefetchAnnouncement(item)}
                     className={cn(
                       heliosCard,
                       gridCardPad,
@@ -1778,6 +1804,7 @@ export function Announcements({
                     variants={itemFadeUpVariants}
                     transition={springSnappy}
                     onClick={() => handleSelectAnnouncement(item)}
+                    onMouseEnter={() => prefetchAnnouncement(item)}
                     className={cn(
                       heliosCard,
                       listCardPad,
@@ -1849,6 +1876,7 @@ export function Announcements({
                   variants={itemFadeUpVariants}
                   transition={springSnappy}
                   onClick={() => handleSelectAnnouncement(item)}
+                  onMouseEnter={() => prefetchAnnouncement(item)}
                   className={cn(
                     heliosCard,
                     listCardPad,

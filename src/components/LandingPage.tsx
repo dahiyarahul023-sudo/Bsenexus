@@ -2659,7 +2659,7 @@ export function LandingPage({
                 const day = istDate.getUTCDay();
                 const mins = istDate.getUTCHours() * 60 + istDate.getUTCMinutes();
                 const isMarket = day >= 1 && day <= 5 && mins >= 555 && mins <= 930;
-                const dynamicStatus = isMarket ? "Live (30s)" : "Relaxed (5m)";
+                const dynamicStatus = isMarket ? "Live (20s)" : "Relaxed (5m)";
                 return (
                   <div className="flex items-center gap-2 pt-1 font-mono text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />

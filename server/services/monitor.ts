@@ -142,7 +142,7 @@ export async function processAnnouncements() {
       const settings = await getSettings();
       if (settings.botToken && settings.chatId) {
         const isMarket = isMarketHoursIST();
-        const recoveryMsg = `✅ <b>BSE Live Feed Restored</b>\n\nLive corporate filings feed has successfully reconnected to BSE India. Normal ${isMarket ? 'Live (30s)' : 'Relaxed (5m)'} polling resumed.`;
+        const recoveryMsg = `✅ <b>BSE Live Feed Restored</b>\n\nLive corporate filings feed has successfully reconnected to BSE India. Normal ${isMarket ? 'Live (20s)' : 'Relaxed (5m)'} polling resumed.`;
         await sendToTelegram(recoveryMsg);
         await addLog('INFO', 'SYSTEM', 'Sent BSE Feed Recovery Notice to Telegram');
       }

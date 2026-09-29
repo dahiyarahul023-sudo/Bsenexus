@@ -27,7 +27,7 @@ import { isFirestoreQuotaExceeded, getManualStorageMode, resetAdminPermissionDen
 import { pageRenderCache, staticGuideCache, apiResponseCache } from "./server/utils/renderCache.js";
 import { INDEXNOW_KEY, indexNowQueue } from "./server/services/indexNow.js";
 import { verifyRecaptchaToken } from "./server/security/recaptchaService.js";
-import { getBackupStalenessMetrics } from "./server/services/bse.js";
+import { getBackupStalenessMetrics, getBseBlockBackoffLevel, isBseSourceBlocked } from "./server/services/bse.js";
 
 // Global error handlers to prevent background quota/network exceptions from crashing the process
 process.on('unhandledRejection', (reason: any) => {
@@ -5604,7 +5604,8 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   next(err);
 });
 
-// Background Poller (30s market-hours / 5m off-hours with effective interval logging)
+// Background Poller (20s market-hours / 5m off-hours with effective interval logging;
+// exponential 20s -> 1min -> 5min backoff while the BSE source is flagged blocked)
 let pollerCycleCount = 0;
 let lastPollerStartMs = 0;
 
@@ -5621,14 +5622,16 @@ async function scheduleAnnouncementPoller() {
   } finally {
     const elapsedMs = Date.now() - startMs;
     const failures = getConsecutiveFailures();
-    const targetIntervalMs = getPollingIntervalMs(failures);
+    const blockLevel = getBseBlockBackoffLevel();
+    const targetIntervalMs = getPollingIntervalMs(failures, blockLevel);
     const nextInterval = Math.max(0, targetIntervalMs - elapsedMs);
     const { isMarketHours, statusLabel, hours, minutes } = getISTMarketStatus();
     const backupMetrics = getBackupStalenessMetrics();
     const backupStr = backupMetrics.stalenessSec !== null ? ` | Backup Staleness: ${backupMetrics.stalenessSec}s (${backupMetrics.status})` : '';
+    const blockedStr = isBseSourceBlocked() ? ` | SOURCE BLOCKED (backoff L${blockLevel})` : '';
 
     // Log effective poll interval on each cycle for outside verification
-    const cycleLogMsg = `[POLLER] Cycle #${pollerCycleCount} | Duration: ${elapsedMs}ms | Mode: ${statusLabel} (IST: ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}, Market: ${isMarketHours ? 'YES' : 'NO'}) | Interval: ${effectiveIntervalSec}s (Target: ${targetIntervalMs / 1000}s, Next in: ${(nextInterval / 1000).toFixed(1)}s)${backupStr}`;
+    const cycleLogMsg = `[POLLER] Cycle #${pollerCycleCount} | Duration: ${elapsedMs}ms | Mode: ${statusLabel} (IST: ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}, Market: ${isMarketHours ? 'YES' : 'NO'}) | Interval: ${effectiveIntervalSec}s (Target: ${targetIntervalMs / 1000}s, Next in: ${(nextInterval / 1000).toFixed(1)}s)${backupStr}${blockedStr}`;
     
     // Add to activity logs
     addLog('INFO', 'POLLER', cycleLogMsg).catch(() => {});

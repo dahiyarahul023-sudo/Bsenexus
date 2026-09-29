@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { IntelModalProvider } from './context/IntelModalContext';
 import { ToastProvider, useToast } from './context/ToastContext';
@@ -15,21 +15,34 @@ import { ProCheckoutView } from './components/ProCheckoutView';
 import { ProReceiptView } from './components/ProReceiptView';
 import { AdminPinModal } from './components/AdminPinModal';
 import { HomeForYou } from './components/HomeForYou';
-import { WatchlistManager } from './components/WatchlistManager';
-import { ResultsCalendar } from './components/ResultsCalendar';
-import { NewsPortal } from './components/NewsPortal';
-import { StorageManager } from './components/StorageManager';
-import { AdminDiagnostics } from './components/AdminDiagnostics';
-import { LogsTab } from './components/LogsTab';
-import { SettingsTab } from './components/SettingsTab';
-import { SeoStudio } from './components/seo/SeoStudio';
+// Route-level code splitting: heavy tab/route panels load on first visit,
+// keeping the initial bundle (landing + feed) small for fast first paint.
+// The feed (Announcements) and home stay eager — everything else is lazy.
+const WatchlistManager = lazy(() => import('./components/WatchlistManager').then(m => ({ default: m.WatchlistManager })));
+const ResultsCalendar = lazy(() => import('./components/ResultsCalendar').then(m => ({ default: m.ResultsCalendar })));
+const NewsPortal = lazy(() => import('./components/NewsPortal').then(m => ({ default: m.NewsPortal })));
+const StorageManager = lazy(() => import('./components/StorageManager').then(m => ({ default: m.StorageManager })));
+const AdminDiagnostics = lazy(() => import('./components/AdminDiagnostics').then(m => ({ default: m.AdminDiagnostics })));
+const LogsTab = lazy(() => import('./components/LogsTab').then(m => ({ default: m.LogsTab })));
+const SettingsTab = lazy(() => import('./components/SettingsTab').then(m => ({ default: m.SettingsTab })));
+const SeoStudio = lazy(() => import('./components/seo/SeoStudio').then(m => ({ default: m.SeoStudio })));
+
+// Minimal route-level suspense fallback: matches the app's existing loading
+// language; visible only while a tab's chunk loads on first visit.
+function TabFallback() {
+  return (
+    <div className="flex items-center justify-center py-16" aria-label="Loading section">
+      <div className="h-8 w-8 rounded-full border-2 border-slate-200 dark:border-slate-700 border-t-slate-500 dark:border-t-slate-300 animate-spin" />
+    </div>
+  );
+}
 import { useScrollRestoration } from './hooks/useScrollRestoration';
 import { ScrollRestoredPill } from './components/ui/ScrollRestoredPill';
 import { saveScrollPosition } from './utils/scrollState';
-import { GuidesPage } from './components/GuidesPage';
-import { CompaniesPage } from './components/CompaniesPage';
-import { TrustPage } from './components/TrustPages';
-import { NotFoundPage } from './components/NotFoundPage';
+const GuidesPage = lazy(() => import('./components/GuidesPage').then(m => ({ default: m.GuidesPage })));
+const CompaniesPage = lazy(() => import('./components/CompaniesPage').then(m => ({ default: m.CompaniesPage })));
+const TrustPage = lazy(() => import('./components/TrustPages').then(m => ({ default: m.TrustPage })));
+const NotFoundPage = lazy(() => import('./components/NotFoundPage').then(m => ({ default: m.NotFoundPage })));
 
 function getAppPathRoute(): 'home' | 'pricing' | 'guides' | 'companies' | 'about' | 'contact' | 'privacy' | 'terms' | 'disclaimer' | '404' {
   if (typeof window === 'undefined') return 'home';
@@ -575,13 +588,15 @@ function AppContent() {
   if (currentRoute === 'guides') {
     return (
       <>
-        <GuidesPage
-          onEnterTerminal={(tab) => {
-            setCurrentRoute('home');
-            if (tab) handleTabChange(tab);
-            else setIsAuthModalOpen(true);
-          }}
-        />
+        <Suspense fallback={<TabFallback />}>
+          <GuidesPage
+            onEnterTerminal={(tab) => {
+              setCurrentRoute('home');
+              if (tab) handleTabChange(tab);
+              else setIsAuthModalOpen(true);
+            }}
+          />
+        </Suspense>
         {isAuthModalOpen && <AuthModal />}
         {isProModalOpen && <ProUpgradeModal />}
       </>
@@ -591,13 +606,15 @@ function AppContent() {
   if (currentRoute === 'companies') {
     return (
       <>
-        <CompaniesPage
-          onEnterTerminal={(tab) => {
-            setCurrentRoute('home');
-            if (tab) handleTabChange(tab);
-            else setIsAuthModalOpen(true);
-          }}
-        />
+        <Suspense fallback={<TabFallback />}>
+          <CompaniesPage
+            onEnterTerminal={(tab) => {
+              setCurrentRoute('home');
+              if (tab) handleTabChange(tab);
+              else setIsAuthModalOpen(true);
+            }}
+          />
+        </Suspense>
         {isAuthModalOpen && <AuthModal />}
         {isProModalOpen && <ProUpgradeModal />}
       </>
@@ -613,14 +630,16 @@ function AppContent() {
   ) {
     return (
       <>
-        <TrustPage
-          type={currentRoute}
-          onEnterTerminal={(tab) => {
-            setCurrentRoute('home');
-            if (tab) handleTabChange(tab);
-            else setIsAuthModalOpen(true);
-          }}
-        />
+        <Suspense fallback={<TabFallback />}>
+          <TrustPage
+            type={currentRoute}
+            onEnterTerminal={(tab) => {
+              setCurrentRoute('home');
+              if (tab) handleTabChange(tab);
+              else setIsAuthModalOpen(true);
+            }}
+          />
+        </Suspense>
         {isAuthModalOpen && <AuthModal />}
         {isProModalOpen && <ProUpgradeModal />}
       </>
@@ -630,13 +649,15 @@ function AppContent() {
   if (currentRoute === '404') {
     return (
       <>
-        <NotFoundPage
-          onEnterTerminal={(tab) => {
-            setCurrentRoute('home');
-            if (tab) handleTabChange(tab);
-            else setIsAuthModalOpen(true);
-          }}
-        />
+        <Suspense fallback={<TabFallback />}>
+          <NotFoundPage
+            onEnterTerminal={(tab) => {
+              setCurrentRoute('home');
+              if (tab) handleTabChange(tab);
+              else setIsAuthModalOpen(true);
+            }}
+          />
+        </Suspense>
         {isAuthModalOpen && <AuthModal />}
         {isProModalOpen && <ProUpgradeModal />}
       </>
@@ -759,54 +780,70 @@ function AppContent() {
         )}
         {visitedTabs.has('watchlists') && (
           <div className={activeTab === 'watchlists' ? '' : 'hidden'}>
-            <WatchlistManager />
+            <Suspense fallback={<TabFallback />}>
+              <WatchlistManager />
+            </Suspense>
           </div>
         )}
         {visitedTabs.has('results-calendar') && (
           <div className={activeTab === 'results-calendar' ? '' : 'hidden'}>
-            <ResultsCalendar />
+            <Suspense fallback={<TabFallback />}>
+              <ResultsCalendar />
+            </Suspense>
           </div>
         )}
         {visitedTabs.has('news') && (
           <div className={activeTab === 'news' ? '' : 'hidden'}>
-            <NewsPortal 
-              watchlists={watchlists} 
-              user={user} 
-              onOpenWatchlists={() => handleTabChange('watchlists')}
-              onOpenSettings={() => handleTabChange('settings')}
-            />
+            <Suspense fallback={<TabFallback />}>
+              <NewsPortal 
+                watchlists={watchlists} 
+                user={user} 
+                onOpenWatchlists={() => handleTabChange('watchlists')}
+                onOpenSettings={() => handleTabChange('settings')}
+              />
+            </Suspense>
           </div>
         )}
         {isAdmin && visitedTabs.has('seo-suite') && (
           <div className={activeTab === 'seo-suite' ? '' : 'hidden'}>
-            <SeoStudio />
+            <Suspense fallback={<TabFallback />}>
+              <SeoStudio />
+            </Suspense>
           </div>
         )}
         {isAdmin && visitedTabs.has('storage') && (
           <div className={activeTab === 'storage' ? '' : 'hidden'}>
-            <StorageManager />
+            <Suspense fallback={<TabFallback />}>
+              <StorageManager />
+            </Suspense>
           </div>
         )}
         {isAdmin && visitedTabs.has('diagnostics') && (
           <div className={activeTab === 'diagnostics' ? '' : 'hidden'}>
-            <AdminDiagnostics />
+            <Suspense fallback={<TabFallback />}>
+              <AdminDiagnostics />
+            </Suspense>
           </div>
         )}
         {isAdmin && visitedTabs.has('logs') && (
           <div className={activeTab === 'logs' ? '' : 'hidden'}>
-            <LogsTab logs={logs} onRefreshLogs={fetchLogs} />
+            <Suspense fallback={<TabFallback />}>
+              <LogsTab logs={logs} onRefreshLogs={fetchLogs} />
+            </Suspense>
           </div>
         )}
         {visitedTabs.has('settings') && (
           <div className={activeTab === 'settings' ? '' : 'hidden'}>
-            <SettingsTab 
-              settings={settings} 
-              setSettings={setSettings} 
-              fetchSettings={fetchSettings} 
-              theme={theme} 
-              setTheme={setTheme} 
-              onNavigate={(tab: string) => handleTabChange(tab)}
-            />
+            <Suspense fallback={<TabFallback />}>
+              <SettingsTab 
+                settings={settings} 
+                setSettings={setSettings} 
+                fetchSettings={fetchSettings} 
+                theme={theme} 
+                setTheme={setTheme} 
+                onNavigate={(tab: string) => handleTabChange(tab)}
+              />
+            </Suspense>
           </div>
         )}
       </Layout>

@@ -1,15 +1,66 @@
 import { addLog } from '../database/logDao.js';
 import { isAnnouncementProcessed, saveAnnouncement, saveAnnouncementsBatch, flushLocalDiskSave, getTotalAnnouncementsCount } from '../database/announcementDao.js';
-import { getScripCodeForSymbolOrName, determinePriority, isSymbolMatch } from '../utils/helpers.js';
+import { getScripCodeForSymbolOrName, determinePriority, isSymbolMatch, isMarketHoursIST } from '../utils/helpers.js';
 import { resolveStockDetails } from '../utils/stockResolver.js';
 import { getActiveWatchlistSymbols } from '../database/watchlistDao.js';
 import { invalidateEnrichedCalendarCache } from './resultsCalendarService.js';
 import { bseCircuitBreaker } from '../utils/circuitBreaker.js';
+import { Agent as UndiciAgent } from 'undici';
+
+// ONE persistent HTTP/2 keep-alive session for all BSE polls — never open a
+// fresh TCP/TLS connection per poll. Reused across market-hours and off-hours.
+const bseKeepAliveAgent = new UndiciAgent({
+  keepAliveTimeout: 30_000,
+  keepAliveMaxTimeout: 120_000,
+  connectTimeout: 3_000,
+});
 
 let bseHealth = { status: 'unknown', latency: 0 };
 let lastBseErrorDetails = "No recent errors";
 let lastBackupStalenessSec: number | null = null;
 let lastBackupCheckTime = 0;
+
+// ---- BSE source-block detection (exponential backoff: 20s -> 1min -> 5min) ----
+// A "block" is: HTTP 403 from BSE, or HTTP 200 with "No Record Found!" on a
+// query that should have data (page 1 during market hours on a weekday).
+// While blocked, the poller backs off instead of hammering, and the API
+// surfaces `sourceBlocked` so the UI can show a subtle "feed delayed" state.
+let bseSourceBlocked = false;
+let bseBlockedAtMs = 0;
+let bseLastEscalationMs = 0;
+let bseBlockBackoffLevel = 0; // 0 = not blocked; 1 = 20s; 2 = 60s; 3 = 300s
+
+export function isBseSourceBlocked(): boolean {
+  return bseSourceBlocked;
+}
+
+export function getBseBlockBackoffLevel(): number {
+  return bseSourceBlocked ? bseBlockBackoffLevel : 0;
+}
+
+function markBseBlocked(reason: string) {
+  const now = Date.now();
+  if (!bseSourceBlocked) {
+    bseSourceBlocked = true;
+    bseBlockedAtMs = now;
+    bseLastEscalationMs = now;
+    bseBlockBackoffLevel = 1;
+  } else if (now - bseLastEscalationMs > 15000) {
+    // Escalate at most once per 15s: in-cycle retries must not jump 20s -> 5min instantly
+    bseLastEscalationMs = now;
+    bseBlockBackoffLevel = Math.min(3, bseBlockBackoffLevel + 1);
+  }
+  lastBseErrorDetails = reason;
+  addLog('WARNING', 'POLLER', `BSE source blocked (${reason}); backing off at level ${bseBlockBackoffLevel}`).catch(() => {});
+}
+
+export function clearBseBlock() {
+  if (bseSourceBlocked) {
+    bseSourceBlocked = false;
+    bseBlockBackoffLevel = 0;
+    addLog('INFO', 'POLLER', 'BSE source block cleared; normal polling resumed').catch(() => {});
+  }
+}
 
 export function getBseHealth() {
   return bseHealth;
@@ -98,13 +149,17 @@ async function fetchWithHardenedRetries(url: string, timeoutMs: number = 3000, m
 
       const res = await fetch(url, {
         headers,
-        signal: controller.signal
-      });
+        signal: controller.signal,
+        // Reuse the single persistent keep-alive session for BSE
+        dispatcher: bseKeepAliveAgent,
+      } as any);
       clearTimeout(timer);
 
       if (!res.ok) {
         if (res.status === 403) {
           lastBseErrorDetails = "HTTP 403 Forbidden (BSE Akamai Edge WAF rate limit or cloud IP block)";
+          // 403 is an explicit block signal -> exponential backoff, not hammering
+          markBseBlocked(lastBseErrorDetails);
         } else if (res.status >= 500) {
           lastBseErrorDetails = `HTTP ${res.status} (BSE Server Maintenance / Outage)`;
         } else {
@@ -278,18 +333,46 @@ export async function fetchBSEAnnouncements() {
     }
   }
 
+  // Block-signal check on today's page 1 (before any merges): HTTP 200 with
+  // "No Record Found!" on a query that should have data. During market hours
+  // BSE virtually always has rows; at night/weekends empty is normal.
+  const todayHadRows = Array.isArray(table) && table.length > 0;
+  if (todayHadRows) {
+    clearBseBlock();
+  } else if (table !== null && isMarketHoursIST()) {
+    markBseBlocked("BSE returned 'No Record Found' during market hours (likely rate-limited)");
+  }
+
+  // Delta-only deep walk: page 1 holds the latest ~50 rows. Walk deeper pages
+  // ONLY while every item on the previous page is new (unseen NEWSID) — the
+  // moment a page contains an already-processed item, we've hit the ingested
+  // boundary and stop. Bounded at 3 pages per cycle.
+  if (todayHadRows && Array.isArray(table) && table.length >= 50) {
+    let prevPageAllNew = true;
+    for (const it of table) {
+      if (!it.NEWSID || await isAnnouncementProcessed(it.NEWSID)) { prevPageAllNew = false; break; }
+    }
+    let page = 1;
+    while (prevPageAllNew && page < 3) {
+      page++;
+      const next = await fetchSingleBsePage(page, '', 'AnnSubCategoryGetData', 2500, todayDate) || [];
+      if (next.length === 0) break;
+      table = [...table, ...next];
+      prevPageAllNew = next.length >= 50;
+      if (prevPageAllNew) {
+        for (const it of next) {
+          if (!it.NEWSID || await isAnnouncementProcessed(it.NEWSID)) { prevPageAllNew = false; break; }
+        }
+      }
+    }
+  }
+
   // If today is early morning / late night in India with fewer than 30 filings,
   // also fetch yesterday's filings so that the latest feed is rich and continuous!
   if (table && Array.isArray(table) && table.length < 30) {
     const yesterdayDate = getBseISTDate(1);
     const yestItems = await fetchSingleBsePage(1, '', 'AnnSubCategoryGetData', 2500, yesterdayDate) || [];
     table = [...table, ...yestItems];
-  } else if (table && Array.isArray(table) && table.length >= 45) {
-    // If today's page 1 is near-full (>= 45 items), volume is high; fetch page 2
-    const page2 = await fetchSingleBsePage(2, '', 'AnnSubCategoryGetData', 2500, todayDate) || [];
-    if (page2.length > 0) {
-      table = [...table, ...page2];
-    }
   }
 
   const totalLatency = Date.now() - start;

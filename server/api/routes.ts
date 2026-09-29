@@ -27,7 +27,7 @@ import {
   resetUserWatchlistsToDefault,
   sanitizeUserId
 } from "../database/watchlistDao.js";
-import { getBseHealth, testBSEConnection, syncWatchlistHistoricalData, syncSingleStockHistoricalData, backfillRecentAnnouncements, getBackupStalenessMetrics } from "../services/bse.js";
+import { getBseHealth, testBSEConnection, syncWatchlistHistoricalData, syncSingleStockHistoricalData, backfillRecentAnnouncements, getBackupStalenessMetrics, isBseSourceBlocked } from "../services/bse.js";
 import { getAllStockEntries } from "../utils/stockResolver.js";
 import { invalidateMonitorConfigCache } from "../services/monitor.js";
 import { wantsTelegramEnable } from "../utils/alertDecision.js";
@@ -405,6 +405,12 @@ apiRouter.get("/announcements",
   apiResponseCache.middleware({ ttlMs: 15 * 1000, publicCache: false }),
   async (req, res) => {
     res.setHeader('Cache-Control', 'private, max-age=10, stale-while-revalidate=20');
+    // Surface BSE source-block state so the UI can show a subtle "feed delayed"
+    // indicator instead of silently showing stale data. Header (not body) keeps
+    // the array response shape unchanged for existing clients.
+    if (isBseSourceBlocked()) {
+      res.setHeader('X-BSE-Source-Blocked', 'true');
+    }
     // Cap derived from per-stock policy: 25 filings per tracked stock × up to 100 stocks.
     // DAO serves from in-memory cache (up to 10k items), so this costs no extra Firestore reads.
     const limitParam = Math.min(2500, Math.max(1, parseInt(req.query.limit as string) || 50));

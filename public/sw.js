@@ -1,7 +1,7 @@
 // BSE Nexus - Progressive Web App Service Worker
-// Version: 4.1.0
+// Version: 4.2.0
 
-const CACHE_NAME = 'bse-nexus-v4.1';
+const CACHE_NAME = 'bse-nexus-v4.2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -128,6 +128,36 @@ self.addEventListener('fetch', (event) => {
 
   // 2. API requests
   if (url.pathname.startsWith('/api/')) {
+    // Announcements feed: Stale-While-Revalidate — serve the cached feed
+    // instantly, refresh it in the background for the next read.
+    const isAnnouncementsFeed = url.pathname === '/api/announcements';
+    if (isAnnouncementsFeed && request.method === 'GET' && !request.headers.has('authorization')) {
+      event.respondWith(
+        (async () => {
+          const cache = await caches.open(CACHE_NAME);
+          const cached = await cache.match(request);
+          const networkPromise = fetch(request).then(async (res) => {
+            if (res && res.status === 200) {
+              await cache.put(request, res.clone());
+            }
+            return res;
+          }).catch(() => undefined);
+          if (cached) {
+            // Refresh in background; keep the SW alive until it finishes
+            event.waitUntil(networkPromise.then(() => undefined));
+            return cached;
+          }
+          const net = await networkPromise;
+          if (net) return net;
+          return new Response(JSON.stringify({ error: 'Offline', offline: true }), {
+            status: 503,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        })()
+      );
+      return;
+    }
+
     // SECURITY & PRIVACY RULE:
     // Never cache private user/account data (watchlists, profile, settings, notifications, auth, admin)
     const isPrivateOrAuth = 
