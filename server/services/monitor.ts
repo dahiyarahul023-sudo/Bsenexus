@@ -121,8 +121,9 @@ export async function processAnnouncements() {
     
     if (!announcements) {
       consecutiveFailures++;
-      // Fire outage alert ONLY when both primary AND backup fail and outage is not yet active
-      if (consecutiveFailures >= 5 && !isBseOutageActive) {
+      // Fire outage alert ONLY when all tiers fail for 6 consecutive cycles and cooldown has elapsed
+      const canAlert = (lastAlertTime === 0) || (Date.now() - lastAlertTime > ALERT_COOLDOWN_MS);
+      if (consecutiveFailures >= 6 && !isBseOutageActive && canAlert) {
         const settings = await getSettings();
         if (settings.botToken && settings.chatId) {
           isBseOutageActive = true;

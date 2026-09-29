@@ -255,10 +255,10 @@ export const circuitRegistry = new CircuitBreakerRegistry();
 
 // Standard singleton circuit breakers for key external services:
 export const bseCircuitBreaker = circuitRegistry.getOrCreate('BSE_API', {
-  failureThreshold: 4,
-  timeoutMs: 9000,
-  resetTimeoutMs: 25000,
-  halfOpenSuccessThreshold: 2
+  failureThreshold: 6,
+  timeoutMs: 15000,
+  resetTimeoutMs: 20000,
+  halfOpenSuccessThreshold: 1
 });
 
 export const telegramCircuitBreaker = circuitRegistry.getOrCreate('TELEGRAM_API', {
