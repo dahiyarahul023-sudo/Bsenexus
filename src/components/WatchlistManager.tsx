@@ -18,6 +18,7 @@ import { cleanBseSubject } from '../utils/cleanBseSubject';
 import { getSafePdfUrl } from '../utils/pdfHelper';
 import { StockPriority, WatchlistStockItem } from '../types';
 import { useAiQuota, syncQuotaFromResponse } from '../utils/aiQuota';
+import { mergeAnnouncementFeed } from '../utils/announcementFeed';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { useFeedDensity } from '../hooks/useFeedDensity';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
@@ -895,11 +896,18 @@ Your 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${g
       const res = await customFetch(url);
       if (res.ok) {
         const data = await res.json();
-        setAnnouncements(data);
-        // Cache for instant display on next login (stale-while-revalidate).
-        try {
-          localStorage.setItem('bsenexus_watchlist_feed', JSON.stringify({ ts: Date.now(), items: data }));
-        } catch { /* storage full or unavailable */ }
+        // Merge, never replace: right after a server restart/republish the API
+        // returns only a handful of freshly-polled filings — replacing would
+        // shrink the feed AND poison the 12h on-device cache with thin data.
+        setAnnouncements(prev => {
+          const merged = mergeAnnouncementFeed(prev, data);
+          try {
+            if (merged.length >= prev.length) {
+              localStorage.setItem('bsenexus_watchlist_feed', JSON.stringify({ ts: Date.now(), items: merged }));
+            }
+          } catch { /* storage full or unavailable */ }
+          return merged;
+        });
       }
     } catch (e) {
       console.warn("Error fetching announcements in WatchlistManager:", e);

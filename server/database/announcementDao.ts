@@ -191,8 +191,18 @@ export async function initAnnouncementCache() {
   }
 
   try {
-    // Read only the latest 500 documents on boot to save read quota (reduced from 5000)
-    const snap = await adminDb.collection('announcements').orderBy('fetched_at', 'desc').limit(500).get();
+    // Window-based hydration (not "latest N"): the feed serves a 7-day "what's new"
+    // window, so boot must load exactly that window. "Latest 500" silently under-fills
+    // when the poller wrote to the local fallback (quota mode) — those days are then
+    // missing from Firestore and the feed looks empty after every restart/republish.
+    // Single-field where+orderBy on fetched_at needs no composite index.
+    const WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+    const cutoff = Date.now() - WINDOW_MS;
+    const snap = await adminDb.collection('announcements')
+      .where('fetched_at', '>=', cutoff)
+      .orderBy('fetched_at', 'desc')
+      .limit(2500).get();
+    console.log(`[Announcements] Hydrated ${snap.docs.length} docs from 7-day Firestore window`);
     
     // Map union between memory/disk cache and Firestore items so no stored records are lost
     const mergedMap = new Map<string, any>();

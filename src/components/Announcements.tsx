@@ -29,6 +29,7 @@ import { ActionButton } from './ui/ActionButton';
 import { clusterAnnouncements, AnnouncementCluster } from '../utils/clusterAnnouncements';
 import { detectFilingType, getMutedTypes, saveMutedTypes, getMutedCompanies, saveMutedCompanies } from '../utils/noiseFilter';
 import { getCacheItem, setCacheItem } from '../utils/cache';
+import { mergeAnnouncementFeed } from '../utils/announcementFeed';
 import { 
   springStandard, 
   springSnappy, 
@@ -795,8 +796,14 @@ export function Announcements({
           });
 
           if (isInitial) {
-            setAnnouncements(incomingList);
-            setCacheItem('announcements_feed', incomingList.slice(0, 150));
+            // Merge with the on-device cache, never blindly replace: right after
+            // a server restart/republish the API returns only a handful of
+            // freshly-polled filings — replacing would shrink the feed to those.
+            setAnnouncements(prev => {
+              const merged = mergeAnnouncementFeed(prev, incomingList);
+              setCacheItem('announcements_feed', merged.slice(0, 150));
+              return merged;
+            });
           } else {
             // Stable delta merge: avoids jumpy scroll position on background polling
             setAnnouncements(prev => {

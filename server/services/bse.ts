@@ -29,6 +29,7 @@ let bseSourceBlocked = false;
 let bseBlockedAtMs = 0;
 let bseLastEscalationMs = 0;
 let bseBlockBackoffLevel = 0; // 0 = not blocked; 1 = 20s; 2 = 60s; 3 = 300s
+let bootBackfillDone = false; // one-time deep page walk on the first poll after (re)start
 
 export function isBseSourceBlocked(): boolean {
   return bseSourceBlocked;
@@ -301,6 +302,15 @@ export async function fetchBSEAnnouncements() {
   const start = Date.now();
   const todayDate = getBseISTDate(0);
   let source = 'BSE_PRIMARY';
+
+  // One-time boot backfill: the first poll cycle after a (re)start walks deeper
+  // (up to 10 pages) to fill any gap Firestore hydration missed — e.g. days when
+  // the poller wrote to the ephemeral local fallback during quota mode and the
+  // data never reached Firestore. Later cycles keep the cheap 3-page delta walk.
+  // The walk still stops at the first already-processed NEWSID, so a healthy boot
+  // (full Firestore hydration) costs zero extra requests.
+  const isBootCycle = !bootBackfillDone;
+  const maxDeepPages = isBootCycle ? 10 : 3;
   
   // Primary live endpoint: AnnSubCategoryGetData page 1 returns ~50 latest filings instantly
   let table = await fetchSingleBsePage(1, '', 'AnnSubCategoryGetData', 2500, todayDate);
@@ -346,14 +356,14 @@ export async function fetchBSEAnnouncements() {
   // Delta-only deep walk: page 1 holds the latest ~50 rows. Walk deeper pages
   // ONLY while every item on the previous page is new (unseen NEWSID) — the
   // moment a page contains an already-processed item, we've hit the ingested
-  // boundary and stop. Bounded at 3 pages per cycle.
+  // boundary and stop. Bounded at 3 pages per cycle (10 on the boot cycle).
   if (todayHadRows && Array.isArray(table) && table.length >= 50) {
     let prevPageAllNew = true;
     for (const it of table) {
       if (!it.NEWSID || await isAnnouncementProcessed(it.NEWSID)) { prevPageAllNew = false; break; }
     }
     let page = 1;
-    while (prevPageAllNew && page < 3) {
+    while (prevPageAllNew && page < maxDeepPages) {
       page++;
       const next = await fetchSingleBsePage(page, '', 'AnnSubCategoryGetData', 2500, todayDate) || [];
       if (next.length === 0) break;
@@ -365,7 +375,11 @@ export async function fetchBSEAnnouncements() {
         }
       }
     }
+    if (isBootCycle && page > 1) {
+      await addLog('INFO', 'POLLER', `Boot backfill walked ${page} BSE pages to fill post-restart gap`);
+    }
   }
+  bootBackfillDone = true;
 
   // If today is early morning / late night in India with fewer than 30 filings,
   // also fetch yesterday's filings so that the latest feed is rich and continuous!
