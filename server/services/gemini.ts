@@ -613,7 +613,9 @@ When the user asks how to do something in the app, give direct, actionable steps
       parts: [{ text: userQuestion }]
     });
 
-    const helpModels = ['gemini-3.7-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+    // Lite-first: the smallest/cheapest model answers user Q&A so API quota
+    // and cost stay at minimum. Bigger models are fallbacks only.
+    const helpModels = ['gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-3.7-flash'];
     let response: any = null;
     let lastErr: any = null;
 
