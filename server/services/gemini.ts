@@ -543,48 +543,15 @@ ${watchlistContext ? `
 ${watchlistContext}
 ` : ''}
 
-### Comprehensive Knowledge Base about BSE Nexus:
-1. **What is BSE Nexus?**
-   - A fast market terminal tracking official corporate disclosures, board meetings, and financial filings from BSE India.
-   - Designed for active equity investors, traders, and fund managers.
-
-2. **Watchlist & Priority Tiers (High / Medium / Low)** — Pro feature:
-   - Pro users can create custom watchlists (e.g. "Core Port", "Defense", "PSU Banks", "EV & Auto") — unlimited lists & stocks. Free plan: no watchlists.
-   - Each stock can be assigned a Conviction Priority:
-     - 🔴 **HIGH Priority**: High conviction core holdings (top alerts & Telegram push).
-     - 🟡 **MEDIUM Priority**: Positional & momentum watchlist.
-     - 🟢 **LOW Priority**: Passive observation.
-   - **No Duplicate Overlaps**: If a stock exists in multiple lists with differing priorities, the system intelligently resolves to the highest conviction level (HIGH > MEDIUM > LOW) to ensure clean, accurate notifications without duplicates. Users can also sync a stock's priority across all lists in 1 click.
-
-3. **Results & Earnings Calendar & Historical Results**:
-   - Tracks board meetings scheduled for Quarterly Results, Dividends, Bonus, and Demergers.
-   - Displays real-time status: "Upcoming", "Today - Awaiting Outcome", or "Outcome Declared".
-   - **Previous Results History**: Selecting any stock shows its past quarterly results history, declaration dates, exact submission timestamps (IST), and direct BSE PDF attachments.
-
-4. **AI Earnings Summaries (Gemini Engine)**:
-   - Reads complex 50+ page BSE corporate PDFs in seconds.
-   - Extracts YoY Revenue Growth, Net Profit (PAT) YoY, EBITDA Margin expansion/contraction, and Dividend details.
-
-5. **Telegram Real-time Alerts Setup** (Pro feature — not available on the Free plan):
-   - Step 1: Open Telegram and search for bot **@userinfobot**, type /start to get your numerical Chat ID (e.g. 123456789).
-   - Step 2: In BSE Nexus **Settings** -> **Telegram Configuration**, paste your Chat ID and click "Save & Test Alert".
-   - Users receive instant alerts when their watchlist companies submit price-sensitive announcements.
-   - Users can customize which categories (Results, Concalls, Dividends, Order Wins, Insider Trading) and stock priorities trigger Telegram messages.
-
-6. **Free Tier vs Pro Membership**:
-   - **Free Plan**: live BSE feed, standard tools, ONE one-time AI summary demo (a single disclosure, once ever), no watchlists, no Telegram alerts.
-   - **Pro Plan — one-time packs (no auto-renewal, no subscription)**: Weekly ₹59 (7 days), Monthly ₹199 (30 days), 6-Month ₹999 (180 days), Yearly ₹1,799 (365 days).
-   - **Pro includes**: Unlimited watchlists & stocks, instant AI summaries (100/day), Telegram alerts with AI summary replies, granular Telegram filter routing, data export (CSV).
-   - **Free trial**: 7-day Pro trial, no card required. After it ends, the paywall shows the one-time packs above.
-
-7. **Storage Quota & Free Tier Optimizer (Automatic + Manual)**:
-   - Automatically stores data in Firebase Firestore.
-   - **Continuous Protection**: If Google Cloud free tier daily write limits are approached, the system automatically falls back to fast, secure Local JSON Storage without data loss.
-   - **Manual Mode**: Admin can choose between Automatic Mode, Force Local Storage (zero cloud usage), or Force Firestore Mode in Storage Manager.
-
-8. **Security & Noise Control**:
-   - Set a Master Security PIN to lock Admin controls and Telegram settings.
-   - Mute routine spam filings (loss of share certificates, trading window closures) via Noise Filter.
+### BSE Nexus knowledge base (compressed to save API quota — answer ONLY from this; never invent dates/figures):
+- BSE Nexus = live BSE disclosures, board meetings & filings terminal for Indian equity investors.
+- Watchlists (Pro): unlimited lists/stocks; per-stock priority HIGH/MED/LOW (a stock in multiple lists resolves to the highest priority); Free plan: no watchlists.
+- Results Calendar: board meetings for results/dividends/bonus/demerger; status Upcoming / Today-Awaiting Outcome / Outcome Declared; per-stock past results history with BSE PDFs.
+- AI summaries: 50+ page BSE PDFs distilled to YoY revenue, PAT, EBITDA margin, dividend. Pro: 100/day. Free: ONE one-time demo summary ever.
+- Telegram alerts (Pro): get Chat ID from @userinfobot → Settings → Telegram Configuration → paste → Save & Test. Categories: Results, Concalls, Dividends, Order Wins, Insider Trading. Master toggle in Settings stops everything.
+- Free: live BSE feed + one AI demo; no watchlists, no Telegram. Pro one-time packs (no auto-renewal): Weekly ₹59 (7 days), Monthly ₹199 (30 days), 6-Month ₹999 (180 days), Yearly ₹1,799 (365 days). Pro adds unlimited watchlists, 100 AI summaries/day, Telegram alerts, CSV export. 7-day free Pro trial, no card.
+- Storage: Firestore primary; auto-falls-back to local JSON near quota; admin can force modes in Storage Manager.
+- Security: Master PIN locks admin/Telegram settings; Noise Filter mutes spam filings.
 
 When the user asks how to do something in the app, give direct, actionable steps. Otherwise keep it short and conversational. Be polite, precise, and supportive.`;
 
