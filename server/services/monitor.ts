@@ -299,13 +299,17 @@ export async function processAnnouncements() {
         }
 
         // ALWAYS save to DB and in-memory cache so website UI shows it in real-time
-        saveAnnouncement({
-          newsId, companyName, subject, details, pdfLink, scrip_cd,
-          bseTime: item.News_submission_dt || item.DT_TM || item.NEWS_DT,
-          priority: priority.level,
-          category: priority.category,
-          isWatchlist: isWatchlistMatch
-        }).catch(e => console.error("saveAnnouncement background error:", e.message));
+        try {
+          await saveAnnouncement({
+            newsId, companyName, subject, details, pdfLink, scrip_cd,
+            bseTime: item.News_submission_dt || item.DT_TM || item.NEWS_DT,
+            priority: priority.level,
+            category: priority.category,
+            isWatchlist: isWatchlistMatch
+          });
+        } catch (e: any) {
+          console.error("saveAnnouncement error:", e?.message || e);
+        }
 
         // Evaluate Advanced Alert Rules for System & Admin
         const ruleEval = evaluateAlertRulesForUser({

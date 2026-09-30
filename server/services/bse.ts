@@ -5,36 +5,6 @@ import { resolveStockDetails } from '../utils/stockResolver.js';
 import { getActiveWatchlistSymbols } from '../database/watchlistDao.js';
 import { invalidateEnrichedCalendarCache } from './resultsCalendarService.js';
 import { bseCircuitBreaker } from '../utils/circuitBreaker.js';
-import { Agent as UndiciAgent, ProxyAgent } from 'undici';
-
-// ONE persistent HTTP/2 keep-alive session for all BSE polls — never open a
-// fresh TCP/TLS connection per poll. Reused across market-hours and off-hours.
-const bseKeepAliveAgent = new UndiciAgent({
-  keepAliveTimeout: 30_000,
-  keepAliveMaxTimeout: 120_000,
-  connectTimeout: 3_000,
-});
-
-// ---- Optional egress proxy for BSE API traffic (IP-block avoidance) ----
-// BSE's Akamai WAF sometimes 403-blocks our cloud egress IP. When BSE_PROXY_URL
-// is set (e.g. http://user:pass@proxy-host:1234), EVERY BSE API request in this
-// file routes through that proxy instead of the server's own IP. Unset = direct
-// (current behavior). Configure via AI Studio Secrets / Cloud Run env vars —
-// no code change or redeploy needed beyond setting the variable.
-let bseProxyAgent: ProxyAgent | null = null;
-let bseProxyUrlSeen = '';
-function getBseDispatcher() {
-  const proxyUrl = (process.env.BSE_PROXY_URL || '').trim();
-  if (proxyUrl) {
-    if (!bseProxyAgent || bseProxyUrlSeen !== proxyUrl) {
-      bseProxyAgent = new ProxyAgent(proxyUrl);
-      bseProxyUrlSeen = proxyUrl;
-      addLog('INFO', 'POLLER', 'BSE egress proxy enabled via BSE_PROXY_URL').catch(() => {});
-    }
-    return bseProxyAgent;
-  }
-  return bseKeepAliveAgent;
-}
 
 let bseHealth = { status: 'unknown', latency: 0 };
 let lastBseErrorDetails = "No recent errors";
@@ -42,10 +12,6 @@ let lastBackupStalenessSec: number | null = null;
 let lastBackupCheckTime = 0;
 
 // ---- BSE source-block detection (exponential backoff: 20s -> 1min -> 5min) ----
-// A "block" is: HTTP 403 from BSE, or HTTP 200 with "No Record Found!" on a
-// query that should have data (page 1 during market hours on a weekday).
-// While blocked, the poller backs off instead of hammering, and the API
-// surfaces `sourceBlocked` so the UI can show a subtle "feed delayed" state.
 let bseSourceBlocked = false;
 let bseBlockedAtMs = 0;
 let bseLastEscalationMs = 0;
@@ -70,7 +36,6 @@ function markBseBlocked(reason: string) {
     bseLastEscalationMs = now;
     bseBlockBackoffLevel = 1;
   } else if (now - bseLastEscalationMs > 15000) {
-    // Escalate at most once per 15s: in-cycle retries must not jump 20s -> 5min instantly
     bseLastEscalationMs = now;
     bseBlockBackoffLevel = Math.min(3, bseBlockBackoffLevel + 1);
   }
@@ -94,9 +59,6 @@ export function getLastBseError(): string {
   return lastBseErrorDetails;
 }
 
-// Honest feed-staleness signal for the API/UI: how long since BSE last gave us
-// a usable response. Used to show "Feed delayed — last updated HH:MM" instead
-// of a fake green "Live" dot when the source is unreachable (403/timeout).
 export function getBseFeedStaleness(): { lastSuccessfulFetchMs: number; bootMs: number; blocked: boolean; blockBackoffLevel: number } {
   return {
     lastSuccessfulFetchMs,
@@ -144,7 +106,7 @@ const ROTATING_BROWSER_PROFILES: BrowserProfile[] = [
 ];
 
 let userAgentIndex = 0;
-function getNextBrowserHeaders() {
+function getNextBrowserHeaders(): Record<string, string> {
   const profile = ROTATING_BROWSER_PROFILES[userAgentIndex % ROTATING_BROWSER_PROFILES.length];
   userAgentIndex++;
   return {
@@ -152,7 +114,7 @@ function getNextBrowserHeaders() {
     "Accept": "application/json, text/plain, */*",
     "Accept-Language": "en-US,en;q=0.9",
     "Origin": "https://www.bseindia.com",
-    "Referer": "https://www.bseindia.com/corporates/ann.html",
+    "Referer": "https://www.bseindia.com/",
     "sec-ch-ua": profile.brands,
     "sec-ch-ua-mobile": "?0",
     "sec-ch-ua-platform": profile.platform,
@@ -164,8 +126,8 @@ function getNextBrowserHeaders() {
   };
 }
 
-// Fast adaptive backoffs (500ms, 1500ms, 3000ms) to ensure rapid recovery
-const RETRY_BACKOFF_DELAYS = [500, 1500, 3000];
+// Fast adaptive backoffs to ensure rapid recovery
+const RETRY_BACKOFF_DELAYS = [400, 1000, 2000];
 
 export function getBseISTDate(offsetDays: number = 0): string {
   // IST is UTC + 5:30
@@ -176,7 +138,7 @@ export function getBseISTDate(offsetDays: number = 0): string {
   return `${year}${month}${day}`;
 }
 
-async function fetchWithHardenedRetries(url: string, timeoutMs: number = 3000, maxRetries: number = 2): Promise<any[] | null> {
+async function fetchWithHardenedRetries(url: string, timeoutMs: number = 5000, maxRetries: number = 2): Promise<any[] | null> {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const headers = getNextBrowserHeaders();
@@ -186,16 +148,12 @@ async function fetchWithHardenedRetries(url: string, timeoutMs: number = 3000, m
       const res = await fetch(url, {
         headers,
         signal: controller.signal,
-        // Egress via clean-IP proxy when BSE_PROXY_URL is set (IP-block avoidance),
-        // otherwise the single persistent keep-alive session.
-        dispatcher: getBseDispatcher(),
-      } as any);
+      });
       clearTimeout(timer);
 
       if (!res.ok) {
         if (res.status === 403) {
           lastBseErrorDetails = "HTTP 403 Forbidden (BSE Akamai Edge WAF rate limit or cloud IP block)";
-          // 403 is an explicit block signal -> exponential backoff, not hammering
           markBseBlocked(lastBseErrorDetails);
         } else if (res.status >= 500) {
           lastBseErrorDetails = `HTTP ${res.status} (BSE Server Maintenance / Outage)`;
@@ -230,11 +188,11 @@ async function fetchWithHardenedRetries(url: string, timeoutMs: number = 3000, m
   return null;
 }
 
-async function fetchSingleBsePage(
+export async function fetchSingleBsePage(
   page: number, 
   scripCode: string = '', 
   apiType: string = 'AnnSubCategoryGetData', 
-  timeoutMs: number = 3000,
+  timeoutMs: number = 5000,
   targetDate?: string,
   maxRetries: number = 1
 ) {
@@ -288,6 +246,7 @@ function parseItemTimestamp(item: any): number {
 export async function testBSEConnection() {
   const start = Date.now();
   const todayDate = getBseISTDate(0);
+  const yesterdayDate = getBseISTDate(1);
 
   // Check circuit breaker state first
   const breakerState = bseCircuitBreaker.getState();
@@ -299,13 +258,20 @@ export async function testBSEConnection() {
     };
   }
 
-  // Try primary endpoint first, then fallback endpoints ONLY if null (network/HTTP failure)
-  let table = await fetchSingleBsePage(1, '', 'AnnSubCategoryGetData', 10000, todayDate);
+  // Try primary endpoint (today, strSearch=D)
+  let table = await fetchSingleBsePage(1, '', 'AnnSubCategoryGetData', 6000, todayDate);
+  // Fallback 1: try strSearch=P for today
   if (table === null) {
-    table = await fetchSingleBsePage(1, '', 'AnnGetData', 10000, todayDate);
+    const fallbackPUrl = `https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w?pageno=1&strCat=-1&strPrevDate=${todayDate}&strScrip=&strSearch=P&strToDate=${todayDate}&strType=C&_cb=${Date.now()}`;
+    table = await fetchWithHardenedRetries(fallbackPUrl, 6000, 1);
   }
+  // Fallback 2: try yesterday's filings
   if (table === null) {
-    table = await fetchSingleBsePage(1, '500325', 'AnnSubCategoryGetData', 10000); // Reliance scrip code
+    table = await fetchSingleBsePage(1, '', 'AnnSubCategoryGetData', 6000, yesterdayDate);
+  }
+  // Fallback 3: try a major scrip code (Reliance 500325)
+  if (table === null) {
+    table = await fetchSingleBsePage(1, '500325', 'AnnSubCategoryGetData', 6000);
   }
 
   const latency = Date.now() - start;
@@ -325,43 +291,52 @@ export async function testBSEConnection() {
 
 export async function fetchParallelBackupSource(): Promise<{ items: any[]; source: string; latestTs: number }> {
   const todayDate = getBseISTDate(0);
-  const backupItems = await fetchSingleBsePage(1, '', 'AnnGetData', 3000, todayDate) || [];
+  // Real working backup: AnnSubCategoryGetData with strSearch=P
+  const backupUrl = `https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w?pageno=1&strCat=-1&strPrevDate=${todayDate}&strScrip=&strSearch=P&strToDate=${todayDate}&strType=C&_cb=${Date.now()}`;
+  const backupItems = await fetchWithHardenedRetries(backupUrl, 4000, 1) || [];
   let latestTs = 0;
   for (const it of backupItems) {
     const ts = parseItemTimestamp(it);
     if (ts > latestTs) latestTs = ts;
   }
-  return { items: backupItems, source: 'PARALLEL_BACKUP', latestTs };
+  return { items: backupItems, source: 'PARALLEL_BACKUP_SEARCH_P', latestTs };
 }
 
 export async function fetchBSEAnnouncements() {
   const start = Date.now();
   const todayDate = getBseISTDate(0);
+  const yesterdayDate = getBseISTDate(1);
   let source = 'BSE_PRIMARY';
 
-  // One-time boot backfill: the first poll cycle after a (re)start walks deeper
-  // (up to 10 pages) to fill any gap Firestore hydration missed — e.g. days when
-  // the poller wrote to the ephemeral local fallback during quota mode and the
-  // data never reached Firestore. Later cycles keep the cheap 3-page delta walk.
-  // The walk still stops at the first already-processed NEWSID, so a healthy boot
-  // (full Firestore hydration) costs zero extra requests.
   const isBootCycle = !bootBackfillDone;
   const maxDeepPages = isBootCycle ? 10 : 3;
   
-  // Primary live endpoint: AnnSubCategoryGetData page 1 returns ~50 latest filings instantly
-  let table = await fetchSingleBsePage(1, '', 'AnnSubCategoryGetData', 2500, todayDate);
+  // Primary live endpoint: AnnSubCategoryGetData page 1 returns ~50 latest filings
+  let table = await fetchSingleBsePage(1, '', 'AnnSubCategoryGetData', 5000, todayDate);
   
-  // If primary failed (null), IMMEDIATELY attempt Parallel Backup without long waiting
+  // If primary returned null (network/timeout failure), attempt Fallback 1: strSearch=P
   if (table === null) {
-    source = 'PARALLEL_BACKUP';
-    table = await fetchSingleBsePage(1, '', 'AnnGetData', 3000, todayDate);
+    source = 'BSE_FALLBACK_SEARCH_P';
+    const fallbackPUrl = `https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w?pageno=1&strCat=-1&strPrevDate=${todayDate}&strScrip=&strSearch=P&strToDate=${todayDate}&strType=C&_cb=${Date.now()}`;
+    table = await fetchWithHardenedRetries(fallbackPUrl, 5000, 1);
     if (table) {
-      await addLog('INFO', 'POLLER', `Primary BSE endpoint degraded; successfully switched to PARALLEL_BACKUP in ${Date.now() - start}ms`);
+      await addLog('INFO', 'POLLER', `Primary BSE endpoint degraded; switched to BSE_FALLBACK_SEARCH_P in ${Date.now() - start}ms`);
     }
-  } else {
-    // Primary succeeded: Periodically or asynchronously sample backup to measure staleness vs BSE Primary
+  }
+
+  // If still null, attempt Fallback 2: yesterday's filings
+  if (table === null) {
+    source = 'BSE_FALLBACK_YESTERDAY';
+    table = await fetchSingleBsePage(1, '', 'AnnSubCategoryGetData', 5000, yesterdayDate);
+    if (table) {
+      await addLog('INFO', 'POLLER', `Today's BSE endpoint unreachable; recovered with BSE_FALLBACK_YESTERDAY in ${Date.now() - start}ms`);
+    }
+  }
+
+  // If we have data, periodically sample backup to measure staleness
+  if (table && table.length > 0) {
     const now = Date.now();
-    if (now - lastBackupCheckTime > 60000) { // Check every 60 seconds to conserve requests
+    if (now - lastBackupCheckTime > 60000) {
       lastBackupCheckTime = now;
       fetchParallelBackupSource().then(backupRes => {
         if (backupRes.items.length > 0 && table && table.length > 0) {
@@ -370,18 +345,13 @@ export async function fetchBSEAnnouncements() {
           if (primaryLatestTs > 0 && backupLatestTs > 0) {
             const stalenessSec = Math.max(0, Math.round((primaryLatestTs - backupLatestTs) / 1000));
             lastBackupStalenessSec = stalenessSec;
-            if (stalenessSec > 20) {
-              addLog('WARNING', 'BACKUP_METRICS', `PARALLEL_BACKUP staleness is ${stalenessSec}s (> 20s threshold). Primary latest: ${new Date(primaryLatestTs).toISOString()}, Backup latest: ${new Date(backupLatestTs).toISOString()}`);
-            }
           }
         }
       }).catch(() => {});
     }
   }
 
-  // Block-signal check on today's page 1 (before any merges): HTTP 200 with
-  // "No Record Found!" on a query that should have data. During market hours
-  // BSE virtually always has rows; at night/weekends empty is normal.
+  // Block-signal check on today's page 1: HTTP 200 with data
   const todayHadRows = Array.isArray(table) && table.length > 0;
   if (todayHadRows) {
     clearBseBlock();
@@ -390,9 +360,7 @@ export async function fetchBSEAnnouncements() {
   }
 
   // Delta-only deep walk: page 1 holds the latest ~50 rows. Walk deeper pages
-  // ONLY while every item on the previous page is new (unseen NEWSID) — the
-  // moment a page contains an already-processed item, we've hit the ingested
-  // boundary and stop. Bounded at 3 pages per cycle (10 on the boot cycle).
+  // ONLY while every item on the previous page is new (unseen NEWSID)
   if (todayHadRows && Array.isArray(table) && table.length >= 50) {
     let prevPageAllNew = true;
     for (const it of table) {
@@ -401,7 +369,7 @@ export async function fetchBSEAnnouncements() {
     let page = 1;
     while (prevPageAllNew && page < maxDeepPages) {
       page++;
-      const next = await fetchSingleBsePage(page, '', 'AnnSubCategoryGetData', 2500, todayDate) || [];
+      const next = await fetchSingleBsePage(page, '', 'AnnSubCategoryGetData', 4500, todayDate) || [];
       if (next.length === 0) break;
       table = [...table, ...next];
       prevPageAllNew = next.length >= 50;
@@ -417,18 +385,17 @@ export async function fetchBSEAnnouncements() {
   }
   bootBackfillDone = true;
 
-  // If today is early morning / late night in India with fewer than 30 filings,
-  // also fetch yesterday's filings so that the latest feed is rich and continuous!
+  // If today has fewer than 30 filings (e.g. market just opened or overnight),
+  // merge yesterday's filings so that the feed has complete historical continuity!
   if (table && Array.isArray(table) && table.length < 30) {
-    const yesterdayDate = getBseISTDate(1);
-    const yestItems = await fetchSingleBsePage(1, '', 'AnnSubCategoryGetData', 2500, yesterdayDate) || [];
+    const yestItems = await fetchSingleBsePage(1, '', 'AnnSubCategoryGetData', 4500, yesterdayDate) || [];
     table = [...table, ...yestItems];
   }
 
   const totalLatency = Date.now() - start;
 
   if (table && Array.isArray(table) && table.length > 0) {
-    bseHealth = { status: totalLatency > 3000 ? 'degraded' : 'stable', latency: Math.round(totalLatency) };
+    bseHealth = { status: totalLatency > 4000 ? 'degraded' : 'stable', latency: Math.round(totalLatency) };
     lastSuccessfulFetchMs = Date.now();
     
     // Deduplicate by NEWSID and attach diagnostic metadata
