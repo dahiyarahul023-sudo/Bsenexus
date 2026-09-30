@@ -1,8 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  FileText, CalendarDays, Sparkles, Bell, ArrowUpRight, Check, Clock,
+  ArrowUpRight, Check, Clock,
 } from 'lucide-react';
+import {
+  FilingsIcon, ResultsCalendarIcon, AiSummariesIcon, TelegramAlertsIcon,
+} from './FeatureIcons';
 import { CompanyLogo, type CompanySymbol } from './CompanyLogos';
 import { ActionButton } from './ActionButton';
 
@@ -13,13 +16,13 @@ interface FeatureTabsProps {
 type TabId = 'filings' | 'results' | 'ai' | 'telegram';
 
 const TABS: Array<{
-  id: TabId; icon: React.ElementType; title: string; desc: string;
+  id: TabId; icon: React.ComponentType<{ className?: string }>; title: string; desc: string;
   cta: string; terminalTab: string;
 }> = [
-  { id: 'filings', icon: FileText, title: 'Live Filings Feed', desc: 'Every BSE announcement the second it drops — filtered by your watchlist, searchable by company.', cta: 'Open live feed', terminalTab: 'dashboard' },
-  { id: 'results', icon: CalendarDays, title: 'Results Calendar', desc: 'Earnings dates, board meetings and dividend agendas — never miss a catalyst again.', cta: 'View calendar', terminalTab: 'results-calendar' },
-  { id: 'ai', icon: Sparkles, title: 'AI Summaries', desc: 'Dense PDFs condensed into YoY trends, risks and key numbers in plain English.', cta: 'Try AI digest', terminalTab: 'dashboard' },
-  { id: 'telegram', icon: Bell, title: 'Telegram Alerts', desc: 'Instant filing pings on your phone, tuned to exactly the stocks you track.', cta: 'Set up alerts', terminalTab: 'alerts' },
+  { id: 'filings', icon: FilingsIcon, title: 'Live Filings Feed', desc: 'Every BSE announcement the second it drops — filtered by your watchlist, searchable by company.', cta: 'Open live feed', terminalTab: 'dashboard' },
+  { id: 'results', icon: ResultsCalendarIcon, title: 'Results Calendar', desc: 'Earnings dates, board meetings and dividend agendas — never miss a catalyst again.', cta: 'View calendar', terminalTab: 'results-calendar' },
+  { id: 'ai', icon: AiSummariesIcon, title: 'AI Summaries', desc: 'Dense PDFs condensed into YoY trends, risks and key numbers in plain English.', cta: 'Try AI digest', terminalTab: 'dashboard' },
+  { id: 'telegram', icon: TelegramAlertsIcon, title: 'Telegram Alerts', desc: 'Instant filing pings on your phone, tuned to exactly the stocks you track.', cta: 'Set up alerts', terminalTab: 'alerts' },
 ];
 
 const AUTO_MS = 6000;
@@ -122,8 +125,8 @@ function AiPanel() {
   return (
     <div>
       <div className="flex items-center gap-2.5 mb-4">
-        <div className="w-[38px] h-[38px] rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 flex items-center justify-center text-white">
-          <Sparkles className="w-4 h-4" />
+        <div className="w-[38px] h-[38px] shrink-0">
+          <AiSummariesIcon className="w-full h-full" />
         </div>
         <div>
           <b className="text-[13px] text-slate-900 dark:text-white">AI Digest</b>
@@ -165,7 +168,7 @@ function TelegramPanel() {
   return (
     <div>
       <div className="flex items-center gap-2.5 mb-4">
-        <Bell className="w-5 h-5 text-slate-700 dark:text-slate-200" />
+        <TelegramAlertsIcon className="w-6 h-6 shrink-0" />
         <b className="text-[13px] text-slate-900 dark:text-white">Telegram alerts</b>
         <span className="text-[10px] text-slate-400">(sample)</span>
       </div>
@@ -256,11 +259,11 @@ export function FeatureTabs({ onEnterTerminal }: FeatureTabsProps) {
                     type="button"
                     onClick={() => select(t.id)}
                     aria-pressed={on}
-                    className="w-full text-left block px-1 py-[18px] bg-transparent border-0 border-b border-slate-100 dark:border-white/10 cursor-pointer relative"
+                    className="feat-icon-parent w-full text-left block px-1 py-[18px] bg-transparent border-0 border-b border-slate-100 dark:border-white/10 cursor-pointer relative"
                   >
                     <span className="flex items-center gap-3 text-[15px] font-bold text-slate-900 dark:text-white">
-                      <span className={`w-[34px] h-[34px] rounded-[11px] flex items-center justify-center text-[15px] transition-all duration-200 shrink-0 ${on ? 'bg-slate-900 dark:bg-[#d4f565] text-[#d4f565] dark:text-slate-900 scale-[1.08]' : 'bg-slate-100 dark:bg-white/10 text-slate-500'}`}>
-                        <Icon className="w-4 h-4" />
+                      <span className={`w-[34px] h-[34px] shrink-0 transition-transform duration-200 ${on ? 'scale-[1.12]' : ''}`}>
+                        <Icon className="feat-icon w-full h-full" />
                       </span>
                       {t.title}
                     </span>

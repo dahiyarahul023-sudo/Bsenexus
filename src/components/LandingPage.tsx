@@ -10,6 +10,10 @@ import {
   Share2, Compass, X, MoreVertical
 } from 'lucide-react';
 import { BseNexusLogo } from './ui/BseNexusLogo';
+import {
+  IntelDossierIcon, ResultsLedgerIcon, WatchlistsIcon,
+  AlertRulesIcon, IndicesIcon, QuotaIcon,
+} from './landing/FeatureIcons';
 import { MarketClock } from './ui/MarketClock';
 import { MarketTickerTape } from './ui/MarketTickerTape';
 import { MarketGuide } from '../types';
@@ -604,12 +608,12 @@ export function LandingPage({
             {/* New Feature 1: Company Intelligence Dossier */}
             <motion.div
               whileHover={{ y: -4, transition: { type: 'spring', bounce: 0, duration: 0.3 } }}
-              className="bg-white dark:bg-[#131B2E] p-6 rounded-2xl border-2 border-emerald-500/30 dark:border-emerald-500/30 hover:border-emerald-500 transition-all shadow-sm flex flex-col justify-between group select-none"
+              className="feat-icon-parent bg-white dark:bg-[#131B2E] p-6 rounded-2xl border-2 border-emerald-500/30 dark:border-emerald-500/30 hover:border-emerald-500 transition-all shadow-sm flex flex-col justify-between group select-none"
             >
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-200 dark:border-emerald-800">
-                    <Building2 className="w-5 h-5" />
+                  <div className="w-10 h-10 shrink-0">
+                    <IntelDossierIcon className="feat-icon w-full h-full" />
                   </div>
                   <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 uppercase tracking-wider whitespace-nowrap select-none">
                     ✨ NEW CORE HUB
@@ -642,12 +646,12 @@ export function LandingPage({
             {/* New Feature 2: Quarterly Results Ledger & Historical Sync */}
             <motion.div
               whileHover={{ y: -4, transition: { type: 'spring', bounce: 0, duration: 0.3 } }}
-              className="bg-white dark:bg-[#131B2E] p-6 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-emerald-500/50 transition-all shadow-sm flex flex-col justify-between group select-none"
+              className="feat-icon-parent bg-white dark:bg-[#131B2E] p-6 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-emerald-500/50 transition-all shadow-sm flex flex-col justify-between group select-none"
             >
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-200 dark:border-blue-800">
-                    <BarChart3 className="w-5 h-5" />
+                  <div className="w-10 h-10 shrink-0">
+                    <ResultsLedgerIcon className="feat-icon w-full h-full" />
                   </div>
                   <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 uppercase tracking-wider whitespace-nowrap select-none">
                     ⚡ ENHANCED
@@ -680,12 +684,12 @@ export function LandingPage({
             {/* New Feature 3: Multi-Tier Conviction Watchlists */}
             <motion.div
               whileHover={{ y: -4, transition: { type: 'spring', bounce: 0, duration: 0.3 } }}
-              className="bg-white dark:bg-[#131B2E] p-6 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-emerald-500/50 transition-all shadow-sm flex flex-col justify-between group select-none"
+              className="feat-icon-parent bg-white dark:bg-[#131B2E] p-6 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-emerald-500/50 transition-all shadow-sm flex flex-col justify-between group select-none"
             >
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-950 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-200 dark:border-purple-800">
-                    <Target className="w-5 h-5" />
+                  <div className="w-10 h-10 shrink-0">
+                    <WatchlistsIcon className="feat-icon w-full h-full" />
                   </div>
                   <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 uppercase tracking-wider whitespace-nowrap select-none">
                     🎯 SMART TIERS
@@ -718,12 +722,12 @@ export function LandingPage({
             {/* New Feature 4: Telegram Rules & Audio Chimes */}
             <motion.div
               whileHover={{ y: -4, transition: { type: 'spring', bounce: 0, duration: 0.3 } }}
-              className="bg-white dark:bg-[#131B2E] p-6 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-emerald-500/50 transition-all shadow-sm flex flex-col justify-between group select-none"
+              className="feat-icon-parent bg-white dark:bg-[#131B2E] p-6 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-emerald-500/50 transition-all shadow-sm flex flex-col justify-between group select-none"
             >
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400 flex items-center justify-center border border-rose-200 dark:border-rose-800">
-                    <Volume2 className="w-5 h-5" />
+                  <div className="w-10 h-10 shrink-0">
+                    <AlertRulesIcon className="feat-icon w-full h-full" />
                   </div>
                   <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 uppercase tracking-wider whitespace-nowrap select-none">
                     ⚡ ZERO DELAY
@@ -756,12 +760,12 @@ export function LandingPage({
             {/* New Feature 5: Live Market Indices & Market Session Hours */}
             <motion.div
               whileHover={{ y: -4, transition: { type: 'spring', bounce: 0, duration: 0.3 } }}
-              className="bg-white dark:bg-[#131B2E] p-6 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-emerald-500/50 transition-all shadow-sm flex flex-col justify-between group select-none"
+              className="feat-icon-parent bg-white dark:bg-[#131B2E] p-6 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-emerald-500/50 transition-all shadow-sm flex flex-col justify-between group select-none"
             >
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-200 dark:border-amber-800">
-                    <Activity className="w-5 h-5" />
+                  <div className="w-10 h-10 shrink-0">
+                    <IndicesIcon className="feat-icon w-full h-full" />
                   </div>
                   <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 uppercase tracking-wider whitespace-nowrap select-none">
                     📈 LIVE CLOCK
@@ -794,12 +798,12 @@ export function LandingPage({
             {/* New Feature 6: Storage Quota Optimizer & Offline Failover */}
             <motion.div
               whileHover={{ y: -4, transition: { type: 'spring', bounce: 0, duration: 0.3 } }}
-              className="bg-white dark:bg-[#131B2E] p-6 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-emerald-500/50 transition-all shadow-sm flex flex-col justify-between group select-none"
+              className="feat-icon-parent bg-white dark:bg-[#131B2E] p-6 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-emerald-500/50 transition-all shadow-sm flex flex-col justify-between group select-none"
             >
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="w-10 h-10 rounded-xl bg-teal-100 dark:bg-teal-950 text-teal-600 dark:text-teal-400 flex items-center justify-center border border-teal-200 dark:border-teal-800">
-                    <ShieldCheck className="w-5 h-5" />
+                  <div className="w-10 h-10 shrink-0">
+                    <QuotaIcon className="feat-icon w-full h-full" />
                   </div>
                   <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-teal-100 dark:bg-teal-950 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 uppercase tracking-wider whitespace-nowrap select-none">
                     🛡️ ROBUST

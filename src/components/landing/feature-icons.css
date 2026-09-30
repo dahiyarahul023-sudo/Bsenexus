@@ -1,0 +1,25 @@
+/* Interaction animation for approved v2 feature icons.
+   Hover (cursor) / focus: playful lift + tilt. Active (click/touch): squash, then spring back. */
+.feat-icon {
+  display: block;
+  transform-origin: center;
+  transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform;
+}
+.feat-icon-parent {
+  -webkit-tap-highlight-color: transparent;
+}
+.feat-icon-parent:hover .feat-icon,
+.feat-icon-parent:focus-visible .feat-icon {
+  transform: translateY(-2px) scale(1.12) rotate(-5deg);
+}
+.feat-icon-parent:active .feat-icon {
+  transform: scale(0.86);
+  transition-duration: 0.12s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .feat-icon { transition: none; }
+  .feat-icon-parent:hover .feat-icon,
+  .feat-icon-parent:focus-visible .feat-icon,
+  .feat-icon-parent:active .feat-icon { transform: none; }
+}
