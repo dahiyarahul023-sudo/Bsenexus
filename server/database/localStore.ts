@@ -201,13 +201,49 @@ export function setManualStorageMode(mode: 'AUTO' | 'FORCE_LOCAL' | 'FORCE_FIRES
 
 export function resetQuotaExceededFlag(): void {
   firestoreQuotaExceeded = false;
+  quotaErrorTimestamps = [];
   resetAdminPermissionDenied();
   writeLocalJson(QUOTA_STATE_FILE, { quotaExceeded: false, markedAt: 0 });
 }
 
+// --- Quota confirmation (anti false-trigger) --------------------------------
+// A single RESOURCE_EXHAUSTED can be transient (one heavy query, client-side
+// write queue). Flipping the whole app into local-JSON mode on one error
+// parked the site in fallback for hours and made the admin's manual switch
+// look "required". The global switch now needs confirmation: several quota
+// errors inside a short window. Real daily-quota exhaustion produces errors
+// continuously, so it still trips within seconds.
+export const QUOTA_CONFIRM_THRESHOLD = 3;
+export const QUOTA_CONFIRM_WINDOW_MS = 10 * 60 * 1000;
+let quotaErrorTimestamps: number[] = [];
+
+export function noteQuotaError(now: number = Date.now()): boolean {
+  quotaErrorTimestamps = quotaErrorTimestamps.filter((t) => now - t < QUOTA_CONFIRM_WINDOW_MS);
+  quotaErrorTimestamps.push(now);
+  if (!firestoreQuotaExceeded && quotaErrorTimestamps.length >= QUOTA_CONFIRM_THRESHOLD) {
+    firestoreQuotaExceeded = true;
+    writeLocalJson(QUOTA_STATE_FILE, { quotaExceeded: true, markedAt: now });
+    console.warn(`[Firestore] Quota errors confirmed (${quotaErrorTimestamps.length} within ${QUOTA_CONFIRM_WINDOW_MS / 60000}m). Switching app storage to local fallback until quota recovers.`);
+  }
+  return firestoreQuotaExceeded;
+}
+
 export function setFirestoreQuotaExceeded(exceeded: boolean = true) {
-  firestoreQuotaExceeded = exceeded;
-  writeLocalJson(QUOTA_STATE_FILE, { quotaExceeded: exceeded, markedAt: exceeded ? Date.now() : 0 });
+  if (!exceeded) {
+    firestoreQuotaExceeded = false;
+    quotaErrorTimestamps = [];
+    writeLocalJson(QUOTA_STATE_FILE, { quotaExceeded: false, markedAt: 0 });
+    return;
+  }
+  noteQuotaError();
+}
+
+// Apply a manual mode persisted remotely (Firestore system_config) without
+// re-persisting it. Adopted only when it differs from the local mode, so a
+// restart never wipes a still-valid quota-exceeded state by "re-applying AUTO".
+export function applyRemoteStorageMode(mode: 'AUTO' | 'FORCE_LOCAL' | 'FORCE_FIRESTORE'): void {
+  if (mode === manualStorageMode) return;
+  setManualStorageMode(mode);
 }
 
 export function isFirestoreQuotaExceeded(): boolean {

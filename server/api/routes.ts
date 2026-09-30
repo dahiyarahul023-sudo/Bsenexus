@@ -6,7 +6,7 @@ import { saveFeedback, getAllFeedback, markFeedbackRead } from "../database/feed
 import { getRecentAnnouncements, markAnnouncementSent, getAnnouncementById, processedBloomFilter, sentBloomFilter, isAnnouncementProcessed, isAnnouncementSent, getBloomFilterDiagnostics } from "../database/announcementDao.js";
 import { generateDirectSummary, generateAndSendSummary, askAppHelpAI } from "../services/gemini.js";
 import { escapeHTML } from "../utils/helpers.js";
-import { resumeFirestoreNetwork, pauseFirestoreNetwork } from "../database/firebase.js";
+import { resumeFirestoreNetwork, pauseFirestoreNetwork, persistStorageMode } from "../database/firebase.js";
 import { requireAuth, requireAdmin, requireProOrAdmin, aiRateLimiter, telegramRateLimiter, apiRateLimiter } from "../security/auth.js";
 import { runSecurityAudit, executeSimulatedPenTest } from "../security/hardening.js";
 import {
@@ -1685,6 +1685,9 @@ apiRouter.post("/storage/quota-mode", requireAdmin, async (req, res) => {
     return res.status(400).json({ success: false, error: "Invalid storage mode" });
   }
   setManualStorageMode(mode);
+  // Mirror the choice into Firestore so a republish/restart cannot silently
+  // reset the admin's manual switch back to AUTO.
+  void persistStorageMode(mode);
   if (mode === 'FORCE_FIRESTORE' || mode === 'AUTO') {
     resetAdminPermissionDenied();
     await resumeFirestoreNetwork();

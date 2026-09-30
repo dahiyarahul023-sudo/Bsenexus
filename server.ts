@@ -22,7 +22,7 @@ import { getScripCode, getAllStockEntries } from "./server/utils/stockResolver.j
 import { getCompanyIntelligence } from "./server/services/companyIntelService.js";
 import { MARKET_GUIDES, getMarketGuides, getMarketGuideBySlug } from "./server/services/marketGuidesService.js";
 import type { ServerMarketGuide as MarketGuide } from "./server/services/marketGuidesService.js";
-import { resumeFirestoreNetwork } from "./server/database/firebase.js";
+import { resumeFirestoreNetwork, startStorageRecoveryProbe } from "./server/database/firebase.js";
 import { isFirestoreQuotaExceeded, getManualStorageMode, resetAdminPermissionDenied } from "./server/database/localStore.js";
 import { pageRenderCache, staticGuideCache, apiResponseCache } from "./server/utils/renderCache.js";
 import { INDEXNOW_KEY, indexNowQueue } from "./server/services/indexNow.js";
@@ -6536,6 +6536,9 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", async () => {
     console.log(`Server running on port ${PORT}`);
+    // Restore the admin's durable storage mode and auto-recover from quota
+    // fallback without waiting for a manual switch or Pacific midnight.
+    startStorageRecoveryProbe();
     try { await addLog('INFO', 'SYSTEM', 'BSE Nexus Server Started'); } catch(e) { console.error('DB connect err:', e); }
   });
 }
