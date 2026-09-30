@@ -92,6 +92,8 @@ export function SettingsTab({
     isOwner, 
     isAdmin, 
     isPro, 
+    isPaidProActive,
+    proDaysLeft,
     adminUnlocked,
     logout,
     updateProfileInfo,
@@ -880,6 +882,8 @@ export function SettingsTab({
     adminOnly?: boolean;
     danger?: boolean;
     badge?: React.ReactNode;
+    /** When true, the row gets a distinct "active subscription" layer treatment. */
+    activeLayer?: boolean;
     action?: () => void;
   }
 
@@ -903,11 +907,21 @@ export function SettingsTab({
     },
     {
       id: 'subscription', title: 'Subscription & Billing',
-      subtitle: isPro ? 'Pro active · plans & payments' : `Free plan · Pro from ₹${getLowestPlanPrice()}`,
+      subtitle: isPaidProActive
+        ? (proDaysLeft > 0 ? `Pro active · ${proDaysLeft}d left` : 'Pro active · plans & payments')
+        : isPro
+          ? (proDaysLeft > 0 ? `Pro Trial · ${proDaysLeft}d left` : 'Pro Trial')
+          : `Free plan · Pro from ₹${getLowestPlanPrice()}`,
       icon: Crown, iconClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
       registryIds: ['subscription'],
-      badge: isPro ? (
-        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">PRO</span>
+      // Layer appears ONLY for paid-active subscriptions (server-driven) — never for trial.
+      // Auto-appears on payment grant, auto-removes at proExpiresAt.
+      activeLayer: isPaidProActive,
+      badge: isPaidProActive ? (
+        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold tracking-wide px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.25)]">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          PRO ACTIVE
+        </span>
       ) : undefined,
     },
     {
@@ -989,7 +1003,9 @@ export function SettingsTab({
         "w-full min-h-[52px] p-3.5 flex items-center justify-between text-left transition-colors cursor-pointer text-xs",
         def.danger
           ? "hover:bg-rose-50/60 dark:hover:bg-rose-950/30"
-          : "hover:bg-slate-50 dark:hover:bg-[#201E2E]"
+          : "hover:bg-slate-50 dark:hover:bg-[#201E2E]",
+        // Active-subscription layer: distinct emerald wash + left accent bar.
+        def.activeLayer && "bg-emerald-50/70 dark:bg-emerald-950/25 shadow-[inset_3px_0_0_0_rgb(16_185_129)]"
       )}
     >
       <div className="flex items-center gap-3 min-w-0">

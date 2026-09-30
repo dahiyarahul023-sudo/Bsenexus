@@ -83,6 +83,12 @@ interface AuthContextType {
   /** HARD RULE: user has a successful payment on record (server-set at grant time).
    *  A paid user is NEVER labelled "Trial" anywhere. */
   isPaidPro: boolean;
+  /** PRO badge / active-subscription signal: paid subscription CURRENTLY active
+   *  (server-driven proExpiresAt in the future), or admin/owner. Trial-only
+   *  users are EXCLUDED by design (they see "Pro Trial" wording instead).
+   *  Appears automatically on payment grant; disappears automatically at expiry —
+   *  no manual toggling anywhere. */
+  isPaidProActive: boolean;
   proDaysLeft: number;
   adminUnlocked: boolean;
   loginWithGoogle: (forceRedirect?: boolean) => Promise<{ 
@@ -1245,6 +1251,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // (server/api/payments.ts doGrantProForOrder) and can never come from a trial.
   const isPaidPro = Boolean(profile?.lastPaymentAt || (profile as any)?.proPlanId);
 
+  // PRO badge signal: paid subscription currently active (server-driven
+  // proExpiresAt from the payment grant), or admin/owner. Trial-only users
+  // excluded by design. Auto on at grant, auto off at expiry.
+  const isPaidProActive = Boolean(
+    isAdmin ||
+    (isPaidPro && profile?.proExpiresAt && profile.proExpiresAt > now)
+  );
+
   return (
     <AuthContext.Provider
       value={{
@@ -1256,6 +1270,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAdmin,
         isPro,
         isPaidPro,
+        isPaidProActive,
         proDaysLeft,
         adminUnlocked,
         loginWithGoogle,

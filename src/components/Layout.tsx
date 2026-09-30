@@ -135,6 +135,7 @@ export function Layout({
     profile, 
     isAdmin, 
     isPro, 
+    isPaidProActive,
     adminUnlocked,
     proDaysLeft,
     setIsAuthModalOpen, 
@@ -206,10 +207,6 @@ export function Layout({
   };
 
   const handleTabClick = (tabId: string) => {
-    if (tabId === 'companies') {
-      window.location.href = '/companies';
-      return;
-    }
     onTabChange(tabId);
   };
 
@@ -274,15 +271,6 @@ export function Layout({
           )} 
         />
       );
-    } else if (itemId === 'companies') {
-      iconElement = (
-        <Building2 
-          className={cn(
-            "w-4 h-4 sm:w-4.5 sm:h-4.5 transition-colors", 
-            isActive ? "text-emerald-400" : "text-slate-400 group-hover:text-emerald-400"
-          )} 
-        />
-      );
     } else if (itemId === 'settings') {
       iconElement = (
         <Settings
@@ -329,7 +317,6 @@ export function Layout({
   const navItems: NavItem[] = [
     { id: 'home', label: 'For You', shortLabel: 'For You', icon: Home },
     { id: 'dashboard', label: 'Filings', shortLabel: 'Filings', icon: Flame },
-    { id: 'companies', label: 'Companies', shortLabel: 'Companies', icon: Building2 },
     { id: 'watchlists', label: 'My Watchlist', shortLabel: 'Watchlist', icon: Star },
     { id: 'results-calendar', label: 'Earnings Calendar', shortLabel: 'Earnings', icon: CalendarDays },
     { id: 'news', label: 'Market News', shortLabel: 'News', icon: Newspaper },
@@ -400,6 +387,24 @@ export function Layout({
                 <span className="font-extrabold text-sm sm:text-base tracking-tight text-slate-900 dark:text-white font-display">
                   BSE<span className="text-emerald-500">NEXUS</span>
                 </span>
+                {/* PRO badge — paid subscription active (or admin). Simple monochrome pill;
+                    a one-time gold sheen sweeps across on mount, then it stays simple. */}
+                {isPaidProActive && (
+                  <span
+                    className="relative overflow-hidden inline-flex items-center shrink-0 text-[9px] font-black tracking-[1.2px] px-1.5 py-[3px] rounded-md bg-slate-900/[0.07] text-slate-900 dark:bg-white/10 dark:text-white border border-slate-900/10 dark:border-white/15"
+                    aria-label="Pro subscriber"
+                    title="Pro subscription active"
+                  >
+                    PRO
+                    <motion.span
+                      aria-hidden="true"
+                      initial={{ x: '-140%', opacity: 1 }}
+                      animate={{ x: '240%', opacity: 0 }}
+                      transition={{ duration: 1.3, ease: 'easeInOut', delay: 0.5 }}
+                      className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-amber-300/90 to-transparent"
+                    />
+                  </span>
+                )}
                 
                 {/* Interactive Story Pill Trigger */}
                 <motion.button

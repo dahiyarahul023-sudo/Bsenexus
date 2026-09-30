@@ -270,6 +270,7 @@ function AppContent() {
       return;
     }
     if (newTab === 'companies') {
+      // Legacy: companies now lives under Settings → BSE Listed Companies.
       window.location.href = '/companies';
       return;
     }

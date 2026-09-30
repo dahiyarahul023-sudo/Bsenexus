@@ -50,7 +50,7 @@ function getWatchlistFilename(userId?: string): string {
   return `watchlists_${uid}.json`;
 }
 
-export const DHAN_FO_STOCKS: WatchlistStockItemDao[] = [
+export const FO_TOP25_STOCKS: WatchlistStockItemDao[] = [
   { symbol: "RELIANCE", priority: "HIGH", category: "Conglomerate / Energy" },
   { symbol: "BHARTIARTL", priority: "HIGH", category: "Telecom Bluechip" },
   { symbol: "HDFCBANK", priority: "HIGH", category: "Private Banking Leader" },
@@ -78,60 +78,6 @@ export const DHAN_FO_STOCKS: WatchlistStockItemDao[] = [
   { symbol: "NTPC", priority: "HIGH", category: "Power Generation" },
 ];
 
-export const ALL_DEFAULT_SYMBOLS: WatchlistStockItemDao[] = [
-  { symbol: "ADANIPORTS", priority: "HIGH", category: "Core Port" },
-  { symbol: "HINDUNILVR", priority: "HIGH", category: "FMCG Bluechip" },
-  { symbol: "BAJAJ-AUTO", priority: "HIGH", category: "Auto" },
-  { symbol: "NATIONALUM", priority: "MEDIUM", category: "Metals" },
-  { symbol: "ASHOKLEY", priority: "MEDIUM", category: "Auto" },
-  { symbol: "UNIONBANK", priority: "LOW", category: "PSU Bank" },
-  { symbol: "CHOLAFIN", priority: "HIGH", category: "NBFC" },
-  { symbol: "BHEL", priority: "MEDIUM", category: "Power Infra" },
-  { symbol: "SRF", priority: "HIGH", category: "Chemicals" },
-  { symbol: "PNB", priority: "LOW", category: "PSU Bank" },
-  { symbol: "SIEMENS", priority: "HIGH", category: "Capital Goods" },
-  { symbol: "CGPOWER", priority: "HIGH", category: "Industrial" },
-  { symbol: "KPITTECH", priority: "HIGH", category: "Auto Tech" },
-  { symbol: "PFC", priority: "MEDIUM", category: "Power Finance" },
-  { symbol: "TVSMOTOR", priority: "HIGH", category: "Auto" },
-  { symbol: "HAL", priority: "HIGH", category: "Defense" },
-  { symbol: "IRFC", priority: "MEDIUM", category: "Railways" },
-  { symbol: "SOLARINDS", priority: "HIGH", category: "Defense / Explosives" },
-  { symbol: "BEL", priority: "HIGH", category: "Defense Electronics" },
-  { symbol: "MOTHERSON", priority: "MEDIUM", category: "Auto Ancillary" },
-  { symbol: "KALYANKJIL", priority: "HIGH", category: "Retail Gems" },
-  { symbol: "SBIN", priority: "HIGH", category: "PSU Banking Leader" },
-  { symbol: "TITAN", priority: "HIGH", category: "Consumer Luxury" },
-  { symbol: "CANBK", priority: "LOW", category: "PSU Bank" },
-  { symbol: "RBLBANK", priority: "LOW", category: "Private Bank" },
-  { symbol: "FEDERALBNK", priority: "MEDIUM", category: "Private Bank" },
-  { symbol: "NESTLEIND", priority: "HIGH", category: "FMCG Leader" },
-  { symbol: "CIPLA", priority: "HIGH", category: "Pharma" },
-  { symbol: "GRASIM", priority: "MEDIUM", category: "Paints & Materials" },
-  { symbol: "TIINDIA", priority: "HIGH", category: "Engineering" },
-  { symbol: "NAUKRI", priority: "HIGH", category: "Internet / Tech" },
-  { symbol: "INDIANB", priority: "LOW", category: "PSU Bank" },
-  { symbol: "SUNPHARMA", priority: "HIGH", category: "Pharma Leader" },
-  { symbol: "ICICIPRULI", priority: "MEDIUM", category: "Insurance" },
-  { symbol: "HDFCAMC", priority: "HIGH", category: "Asset Management" },
-  { symbol: "ZOMATO", priority: "HIGH", category: "Food Delivery & Quick Commerce" },
-  { symbol: "SHRIRAMFIN", priority: "HIGH", category: "NBFC" },
-  { symbol: "CUMMINSIND", priority: "HIGH", category: "Capital Goods" },
-  { symbol: "VBL", priority: "HIGH", category: "Beverages Growth" },
-  { symbol: "ABCAPITAL", priority: "MEDIUM", category: "Financial Services" },
-  { symbol: "UPL", priority: "LOW", category: "Agrochem" },
-  { symbol: "MARICO", priority: "MEDIUM", category: "FMCG" },
-  { symbol: "DIXON", priority: "HIGH", category: "EMS / Electronics" },
-  { symbol: "BHARATFORG", priority: "HIGH", category: "Defense & Auto" },
-  { symbol: "GODREJPROP", priority: "HIGH", category: "Real Estate" },
-  { symbol: "GODREJCP", priority: "MEDIUM", category: "FMCG" },
-  { symbol: "NBCC", priority: "LOW", category: "PSU Infra" },
-  { symbol: "ZYDUSLIFE", priority: "MEDIUM", category: "Pharma" },
-  { symbol: "PAGEIND", priority: "HIGH", category: "Textiles / Retail" },
-  { symbol: "JUBLFOOD", priority: "MEDIUM", category: "QSR" },
-  { symbol: "ALKEM", priority: "MEDIUM", category: "Pharma" },
-  { symbol: "ASTRAL", priority: "HIGH", category: "Building Materials" }
-];
 
 function sanitizeStockItem(it: any): WatchlistStockItemDao {
   let sym = extractSymbol(it);
@@ -171,21 +117,72 @@ function sanitizeWatchlistArray(lists: any[]): any[] {
   }));
 }
 
+/** Single default watchlist for every user: the 25 F&O stocks.
+ *  (30 Sep 2026: the old 52-stock "Default" list was retired — every user sees
+ *  only this one starter list.) */
 function createDefaultWatchlists() {
   return [
     {
-      id: 'default-1',
-      name: 'Default',
-      is_active: 1,
-      items: JSON.parse(JSON.stringify(ALL_DEFAULT_SYMBOLS))
-    },
-    {
       id: 'dhan-fo-top25',
-      name: 'Dhan - Futures & Options (Top 25)',
+      name: 'Futures & Options',
       is_active: 1,
-      items: JSON.parse(JSON.stringify(DHAN_FO_STOCKS))
+      items: JSON.parse(JSON.stringify(FO_TOP25_STOCKS))
     }
   ];
+}
+
+const LEGACY_DEFAULT_LIST_ID = 'default-1';
+const LEGACY_FO_LIST_ID = 'dhan-fo-top25';
+const LEGACY_FO_LIST_NAME = 'Dhan - Futures & Options (Top 25)';
+const FO_LIST_NAME = 'Futures & Options';
+
+/**
+ * One-time migration for users who already have saved watchlists:
+ * - renames the old "Dhan - Futures & Options (Top 25)" list to "Futures & Options"
+ *   (only when the user never renamed it themselves),
+ * - removes the retired 52-stock "Default" list (id 'default-1').
+ * User-created lists are never touched. Never leaves the user with zero lists.
+ */
+function migrateToSingleFoDefault(lists: any[]): { lists: any[]; changed: boolean } {
+  const input = Array.isArray(lists) ? lists : [];
+  let changed = false;
+  const renamed = input.map((l: any) => {
+    if (l && l.id === LEGACY_FO_LIST_ID && l.name === LEGACY_FO_LIST_NAME) {
+      changed = true;
+      return { ...l, name: FO_LIST_NAME };
+    }
+    return l;
+  });
+  const out = renamed.filter((l: any) => !(l && l.id === LEGACY_DEFAULT_LIST_ID));
+  if (out.length !== renamed.length) changed = true;
+  if (out.length === 0 && renamed.length > 0) {
+    // The retired list was their ONLY list — don't leave them with nothing.
+    return { lists: createDefaultWatchlists(), changed: true };
+  }
+  // Deliberately empty (user deleted everything) stays empty.
+  return { lists: out, changed };
+}
+
+/**
+ * Applies the single-F&O-default migration to an existing user's lists and
+ * persists the result (local JSON always; Firestore when available).
+ * Read-only alert scans (noCreate) never mutate.
+ */
+async function migrateExistingUserWatchlists(uid: string, lists: any[], noCreate: boolean): Promise<any[]> {
+  if (noCreate) return lists;
+  const { lists: migrated, changed } = migrateToSingleFoDefault(lists);
+  if (!changed) return lists;
+  userWatchlistsCache[uid] = { lists: migrated, fetchedAt: Date.now() };
+  userWatchlistsDirty[uid] = false;
+  writeLocalJson(getWatchlistFilename(uid), migrated);
+  if (uid !== 'guest' && !isFirestoreQuotaExceeded() && !isAdminPermissionDenied()) {
+    await adminDb.collection('user_watchlists').doc(uid).set(
+      { lists: migrated, isInitialized: true, updatedAt: Date.now() },
+      { merge: true }
+    ).catch(() => {});
+  }
+  console.log(`[WatchlistDao] Migrated to single "Futures & Options" default for UID: ${uid}`);
+  return migrated;
 }
 
 // In-memory cache keyed by sanitized userId with TTL for multi-instance sync
@@ -291,7 +288,9 @@ export async function migrateLegacyAdminWatchlists(targetRealUid: string): Promi
 }
 
 async function persistUserWatchlists(uid: string, lists: any[]): Promise<void> {
-  const sanitized = sanitizeWatchlistArray(lists);
+  // Defensive: the retired 52-stock "Default" list must never be re-persisted
+  // through any path (e.g. legacy admin merge). Idempotent for current data.
+  const sanitized = sanitizeWatchlistArray(migrateToSingleFoDefault(lists).lists);
   userWatchlistsCache[uid] = { lists: sanitized, fetchedAt: Date.now() };
   userWatchlistsDirty[uid] = false;
   writeLocalJson(getWatchlistFilename(uid), sanitized);
@@ -354,7 +353,7 @@ export async function getAllWatchlists(userId?: string, opts?: GetWatchlistsOpti
       if (snap && snap.exists) {
         const data = snap.data();
         if (data && (Array.isArray(data.lists) || data.isInitialized)) {
-          const sanitized = sanitizeWatchlistArray(data.lists || []);
+          const sanitized = await migrateExistingUserWatchlists(uid, sanitizeWatchlistArray(data.lists || []), noCreate);
           userWatchlistsCache[uid] = { lists: sanitized, fetchedAt: Date.now() };
           userWatchlistsDirty[uid] = false;
           writeLocalJson(localFile, sanitized);
@@ -375,7 +374,7 @@ export async function getAllWatchlists(userId?: string, opts?: GetWatchlistsOpti
         // Check if there is an existing local disk backup to migrate up to the cloud
         const loadedLocal = readLocalJson<any[] | null>(localFile, null);
         if (loadedLocal !== null && Array.isArray(loadedLocal) && loadedLocal.length > 0) {
-          const sanitized = sanitizeWatchlistArray(loadedLocal);
+          const sanitized = await migrateExistingUserWatchlists(uid, sanitizeWatchlistArray(loadedLocal), noCreate);
           userWatchlistsCache[uid] = { lists: sanitized, fetchedAt: Date.now() };
           userWatchlistsDirty[uid] = false;
           await adminDb.collection('user_watchlists').doc(uid).set({ lists: sanitized, isInitialized: true, createdAt: Date.now(), updatedAt: Date.now() }, { merge: true }).catch(() => {});
@@ -420,8 +419,9 @@ export async function getAllWatchlists(userId?: string, opts?: GetWatchlistsOpti
   }
 
   if (loadedLocal !== null && Array.isArray(loadedLocal)) {
-    const sanitized = sanitizeWatchlistArray(loadedLocal);
+    const sanitized = await migrateExistingUserWatchlists(uid, sanitizeWatchlistArray(loadedLocal), noCreate);
     userWatchlistsCache[uid] = { lists: sanitized, fetchedAt: Date.now() };
+    writeLocalJson(localFile, sanitized);
     return JSON.parse(JSON.stringify(sanitized));
   }
 
