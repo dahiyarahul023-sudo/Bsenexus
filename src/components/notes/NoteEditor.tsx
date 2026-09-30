@@ -248,7 +248,7 @@ function NoteEditorSheet({
                       className={cn(
                         'aspect-square rounded-[22px] grid place-items-center transition-all cursor-pointer overflow-hidden',
                         selected
-                          ? 'ring-[3px] ring-neutral-900 dark:ring-white ring-offset-2 ring-offset-white dark:ring-offset-[#171522] scale-[1.04]'
+                          ? 'ring-[3px] ring-[#0a84ff] ring-offset-2 ring-offset-white dark:ring-offset-[#171522] scale-[1.04]'
                           : 'hover:scale-105 ring-1 ring-black/5 dark:ring-white/10'
                       )}
                     >
