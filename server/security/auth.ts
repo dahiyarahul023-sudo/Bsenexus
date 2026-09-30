@@ -6,6 +6,8 @@ import { getSettings, saveSettings } from '../database/settingsDao.js';
 import { addLog } from '../database/logDao.js';
 import { getFirebaseAuth, getFirebaseAppCheck } from './firebaseAdmin.js';
 import { getUserProfile, saveUserProfile } from '../database/usersDao.js';
+import { reconcilePaymentEntitlement } from '../database/paymentEntitlementsDao.js';
+import { isPaymentStoreUnavailable } from '../database/paymentStore.js';
 import { verifyRecaptchaToken } from './recaptchaService.js';
 import { 
   getAccountKey, 
@@ -245,18 +247,23 @@ export const requireProOrAdmin = async (req: express.Request, res: express.Respo
   }
 
   // The JWT `isPro` claim is minted at login and goes stale the moment a user's
-  // Pro/trial expires, so it is NEVER trusted here. Only the live profile
-  // decides. The payment verify endpoint invalidates the profile cache on
-  // grant (TTL is 2.5s), so a fresh purchase is honoured immediately —
-  // no logout/login needed.
+  // Pro/trial expires, so it is NEVER trusted here. The dedicated payment
+  // entitlement is checked before the mutable profile mirror.
   let profileReadFailed = false;
   let wasPaidUser = false;
   try {
-    const profile = await getUserProfile(user.uid);
+    const reconciled = await reconcilePaymentEntitlement(user.uid);
+    const entitlement = reconciled.entitlement;
+    if (entitlement && entitlement.proExpiresAt > Date.now()) {
+      return next();
+    }
+    wasPaidUser = Boolean(entitlement?.lastPaymentAt || entitlement?.lastOrderId);
+
+    const profile = await getUserProfile(user.uid, { durable: true });
     const now = Date.now();
     // HARD RULE: a user with a successful payment on record is NEVER told
     // about a "trial" — even after their Pro expires.
-    wasPaidUser = Boolean((profile as any)?.lastPaymentAt || (profile as any)?.proPlanId);
+    wasPaidUser = wasPaidUser || Boolean((profile as any)?.lastPaymentAt || (profile as any)?.proPlanId);
     if (profile && (profile.tier === 'admin' || (profile.proExpiresAt && profile.proExpiresAt > now))) {
       return next();
     }
@@ -411,8 +418,36 @@ authRouter.post('/session', authRateLimiter, async (req, res) => {
     const isOwner = email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
     const existingIsAdmin = (req as any).user?.isAdmin === true || isOwner;
 
-    // Check / initialize 1-Week (7-Day) Pro Trial for authenticated users
-    let profile = await getUserProfile(cleanUid);
+    // Restore any durable paid entitlement before trial/profile logic runs.
+    // If the payment store cannot be read, do not mint a session that could
+    // label a paid user as Free.
+    try {
+      await reconcilePaymentEntitlement(cleanUid);
+    } catch (entitlementErr: any) {
+      if (isPaymentStoreUnavailable(entitlementErr)) {
+        return res.status(503).json({
+          success: false,
+          error: "Couldn't verify your subscription right now. Please retry in a moment.",
+        });
+      }
+      throw entitlementErr;
+    }
+
+    // Check / initialize 1-Week (7-Day) Pro Trial for authenticated users.
+    // Durable read: never mint a trial profile from a stale/missing local
+    // copy — a paid user must not get a replacement trial profile.
+    let profile: Awaited<ReturnType<typeof getUserProfile>> | null;
+    try {
+      profile = await getUserProfile(cleanUid, { durable: true });
+    } catch (profileErr: any) {
+      if (isPaymentStoreUnavailable(profileErr)) {
+        return res.status(503).json({
+          success: false,
+          error: "Couldn't verify your subscription right now. Please retry in a moment.",
+        });
+      }
+      throw profileErr;
+    }
     const now = Date.now();
     const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -465,6 +500,12 @@ authRouter.post('/session', authRateLimiter, async (req, res) => {
       profile 
     });
   } catch (error: any) {
+    if (isPaymentStoreUnavailable(error)) {
+      return res.status(503).json({
+        success: false,
+        error: "Couldn't verify your subscription right now. Please retry in a moment.",
+      });
+    }
     console.error("Firebase ID Token verification failed in /auth/session:", error?.message || error);
     return res.status(401).json({ success: false, error: "Invalid or expired Firebase ID token." });
   }

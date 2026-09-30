@@ -3,6 +3,7 @@ import { readLocalJson, writeLocalJson, isFirestoreQuotaExceeded, setFirestoreQu
 import { UserProfile } from '../../src/types.js';
 import { withRetry } from '../utils/retry.js';
 import { addLog } from './logDao.js';
+import { PaymentStoreUnavailableError, runPaymentStore } from './paymentStore.js';
 
 const USERS_FILE = 'users.json';
 const USER_CACHE_TTL_MS = 2500; // Fast cache invalidation for fresh Firestore reads
@@ -310,15 +311,56 @@ export async function cleanAndDeduplicateAllUsernames(): Promise<{ cleanedCount:
   }
 }
 
-export async function getUserProfile(uid: string): Promise<UserProfile | null> {
+export async function getUserProfile(
+  uid: string,
+  options: { durable?: boolean } = {},
+): Promise<UserProfile | null> {
   const now = Date.now();
+  const durable = options.durable === true;
 
-  // 1. Return fresh in-memory profile if within TTL
-  if (userProfilesCache[uid] && (now - userProfilesCache[uid].fetchedAt < USER_CACHE_TTL_MS)) {
+  // Ordinary app reads may use the short-lived cache. Durable payment/profile
+  // reads always go back to Firestore: an in-memory or local copy must never
+  // be allowed to reinterpret a paid user as trial/free after a republish.
+  if (!durable && userProfilesCache[uid] && (now - userProfilesCache[uid].fetchedAt < USER_CACHE_TTL_MS)) {
     return JSON.parse(JSON.stringify(userProfilesCache[uid].profile));
   }
 
-  // 2. Query Firestore as the authoritative source
+  if (durable) {
+    if (isFirestoreQuotaExceeded()) {
+      throw new PaymentStoreUnavailableError('read user profile', new Error('Firestore quota exceeded'));
+    }
+    if (isAdminPermissionDenied()) {
+      throw new PaymentStoreUnavailableError('read user profile', new Error('Firestore permission denied'));
+    }
+
+    const userDoc = await runPaymentStore(
+      'read user profile',
+      Promise.resolve().then(() => adminDb.collection('users').doc(uid).get()),
+      10_000,
+    ).catch((err: any) => {
+      if (isQuotaError(err?.cause || err)) setFirestoreQuotaExceeded(true);
+      if (isPermissionDeniedError(err?.cause || err)) setAdminPermissionDenied(true);
+      throw err;
+    });
+
+    if (!userDoc.exists) return null;
+
+    const data = userDoc.data() as UserProfile;
+    data.uid = uid;
+    userProfilesCache[uid] = { profile: data, fetchedAt: now };
+
+    // Local JSON is only a disposable cache here, never the source of truth.
+    try {
+      const localUsersMap = readLocalJson<Record<string, UserProfile>>(USERS_FILE, {});
+      localUsersMap[uid] = data;
+      writeLocalJson(USERS_FILE, localUsersMap);
+    } catch { /* non-fatal cache write */ }
+
+    return JSON.parse(JSON.stringify(data));
+  }
+
+  // General app path: Firestore first, local cache only as a resilience
+  // fallback for non-payment features. Payment code must pass durable:true.
   if (!isFirestoreQuotaExceeded() && !isAdminPermissionDenied()) {
     try {
       const userDoc = await adminDb.collection('users').doc(uid).get();
@@ -327,10 +369,11 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
         data.uid = uid;
         userProfilesCache[uid] = { profile: data, fetchedAt: now };
 
-        // Keep local disk backup updated
-        const localUsersMap = readLocalJson<Record<string, UserProfile>>(USERS_FILE, {});
-        localUsersMap[uid] = data;
-        writeLocalJson(USERS_FILE, localUsersMap);
+        try {
+          const localUsersMap = readLocalJson<Record<string, UserProfile>>(USERS_FILE, {});
+          localUsersMap[uid] = data;
+          writeLocalJson(USERS_FILE, localUsersMap);
+        } catch { /* non-fatal cache write */ }
 
         return JSON.parse(JSON.stringify(data));
       }
@@ -347,7 +390,6 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
     }
   }
 
-  // 3. Fallback to local disk file
   const localUsersMap = readLocalJson<Record<string, UserProfile>>(USERS_FILE, {});
   if (localUsersMap[uid]) {
     userProfilesCache[uid] = { profile: localUsersMap[uid], fetchedAt: now };
@@ -358,12 +400,27 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
 }
 
 export async function saveUserProfile(
-  uid: string, 
+  uid: string,
   profile: Partial<UserProfile>,
-  skipUniquenessCheck: boolean = false
+  skipUniquenessCheck: boolean = false,
+  options: { durable?: boolean } = {},
 ): Promise<UserProfile> {
-  const localUsersMap = readLocalJson<Record<string, UserProfile>>(USERS_FILE, {});
-  const existingProfile = userProfilesCache[uid]?.profile || localUsersMap[uid];
+  const durable = options.durable === true;
+
+  if (durable && isFirestoreQuotaExceeded()) {
+    throw new PaymentStoreUnavailableError('save user profile', new Error('Firestore quota exceeded'));
+  }
+  if (durable && isAdminPermissionDenied()) {
+    throw new PaymentStoreUnavailableError('save user profile', new Error('Firestore permission denied'));
+  }
+
+  let existingProfile: UserProfile | undefined;
+  if (durable) {
+    existingProfile = (await getUserProfile(uid, { durable: true })) || undefined;
+  } else {
+    const localUsersMap = readLocalJson<Record<string, UserProfile>>(USERS_FILE, {});
+    existingProfile = userProfilesCache[uid]?.profile || localUsersMap[uid];
+  }
   const existingEmail = existingProfile?.email || profile.email;
 
   // If username is being changed/set, enforce strict uniqueness unless skipping
@@ -382,11 +439,41 @@ export async function saveUserProfile(
   const existing = existingProfile || { uid, createdAt: Date.now() };
   const updated: UserProfile = { ...existing, ...profile, uid } as UserProfile;
 
+  if (durable) {
+    await runPaymentStore(
+      'save user profile',
+      Promise.resolve().then(() => adminDb.collection('users').doc(uid).set(updated, { merge: true })),
+      12_000,
+    ).catch((err: any) => {
+      if (isQuotaError(err?.cause || err)) setFirestoreQuotaExceeded(true);
+      if (isPermissionDeniedError(err?.cause || err)) setAdminPermissionDenied(true);
+      throw err;
+    });
+
+    userProfilesCache[uid] = { profile: updated, fetchedAt: Date.now() };
+    allUsersListCache = null;
+    usersWithTelegramCache = null;
+
+    // Cache only after Firestore confirms the write. A successful durable
+    // return must never mean "saved only in revision-local JSON".
+    try {
+      const localUsersMap = readLocalJson<Record<string, UserProfile>>(USERS_FILE, {});
+      localUsersMap[uid] = updated;
+      writeLocalJson(USERS_FILE, localUsersMap);
+    } catch { /* non-fatal cache write */ }
+
+    return updated;
+  }
+
   userProfilesCache[uid] = { profile: updated, fetchedAt: Date.now() };
   allUsersListCache = null;
   usersWithTelegramCache = null;
-  localUsersMap[uid] = updated;
-  writeLocalJson(USERS_FILE, localUsersMap);
+
+  try {
+    const localUsersMap = readLocalJson<Record<string, UserProfile>>(USERS_FILE, {});
+    localUsersMap[uid] = updated;
+    writeLocalJson(USERS_FILE, localUsersMap);
+  } catch { /* non-fatal cache write */ }
 
   if (!isFirestoreQuotaExceeded() && !isAdminPermissionDenied()) {
     try {

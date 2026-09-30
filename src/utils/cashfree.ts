@@ -151,10 +151,13 @@ export async function verifyProPayment(orderId: string): Promise<{ paid: boolean
  * the ledger and grant Pro for the ones Cashfree confirms as PAID.
  * Silent best-effort — never throws, never blocks the UI.
  */
-export async function recoverPendingPayments(): Promise<{ recoveredCount: number; recovered: Array<{ orderId: string; planId: string; proExpiresAt: number }> }> {
+export async function recoverPendingPayments(): Promise<{ recoveredCount: number; recovered: Array<{ orderId: string; planId: string; proExpiresAt: number }>; unavailable?: boolean }> {
   try {
     const res = await customFetch('/api/payments/recover', { method: 'POST' });
     const data = await res.json().catch(() => null);
+    if (res.status === 503 || (data as any)?.profileUnavailable) {
+      return { recoveredCount: 0, recovered: [], unavailable: true };
+    }
     if (!res.ok || !data?.success) return { recoveredCount: 0, recovered: [] };
     return { recoveredCount: Number(data.recoveredCount || 0), recovered: Array.isArray(data.recovered) ? data.recovered : [] };
   } catch {
@@ -215,6 +218,11 @@ export async function fetchPaymentHistory(): Promise<{ ok: boolean; payments: Pa
     const res = await customFetch('/api/payments/history');
     const data = await res.json().catch(() => null);
     if (!res.ok || !data?.success) {
+      // 503 storage outage: explicit "unavailable" wording so an empty
+      // history is never confused with "no payments".
+      if (res.status === 503 || (data as any)?.profileUnavailable) {
+        return { ok: false, payments: [], error: 'Payment history is temporarily unavailable. Nothing was deleted — please try again.' };
+      }
       return { ok: false, payments: [], error: data?.error || 'Could not load payment history.' };
     }
     return { ok: true, payments: Array.isArray(data.payments) ? data.payments : [] };

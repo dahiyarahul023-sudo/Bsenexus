@@ -81,6 +81,8 @@ import {
   deleteApprovedBugRule
 } from "../database/diagnosticsDao.js";
 import { seoRouter } from "./seoRoutes.js";
+import { reconcilePaymentEntitlement } from "../database/paymentEntitlementsDao.js";
+import { isPaymentStoreUnavailable } from "../database/paymentStore.js";
 import { paymentsRouter } from "./payments.js";
 import { faqRouter } from "./faq.js";
 import { notesRouter } from "./notes.js";
@@ -515,7 +517,15 @@ apiRouter.post("/announcements/:id/generate-summary", aiRateLimiter, async (req,
       profile = await getUserProfile(uid);
       const now = Date.now();
       isProLike = isProLike || profile?.tier === 'admin' || Boolean(profile?.proExpiresAt && profile.proExpiresAt > now);
-    } catch { /* profile stays null -> treated as free */ }
+    } catch (profileErr: any) {
+      if (isPaymentStoreUnavailable(profileErr)) {
+        return res.status(503).json({
+          success: false,
+          error: "Couldn't verify your Pro status right now. Please retry in a moment.",
+        });
+      }
+      throw profileErr;
+    }
 
     // FREE PLAN: exactly ONE AI summary demo — one disclosure, one time ever.
     // Claimed ATOMICALLY before generation (Firestore transaction + per-uid
@@ -933,6 +943,11 @@ apiRouter.get("/users/profile", requireAuth, async (req, res) => {
   try {
     const uid = getReqUserId(req);
     const userEmail = (req as any).user?.email;
+
+    // Repair the paid-entitlement mirror before returning the profile. This
+    // is deliberately read-only with respect to themes/preferences: it only
+    // restores payment fields from durable payment sources.
+    await reconcilePaymentEntitlement(uid);
     let profile = await getUserProfile(uid);
 
     // If profile exists but has no unique username, or is colliding, auto-assign one
@@ -942,9 +957,24 @@ apiRouter.get("/users/profile", requireAuth, async (req, res) => {
       profile = await saveUserProfile(uid, { username: uniqueUsername }, true);
     }
 
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        profileMissing: true,
+        error: 'Profile not found.',
+      });
+    }
+
     res.json({ success: true, profile });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+    if (isPaymentStoreUnavailable(err)) {
+      return res.status(503).json({
+        success: false,
+        profileUnavailable: true,
+        error: 'Profile is temporarily unavailable. Please retry in a moment.',
+      });
+    }
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -953,14 +983,19 @@ apiRouter.get("/users/profile", requireAuth, async (req, res) => {
 // (The JWT `isPro` claim is never trusted — it goes stale when Pro expires.)
 async function isProLikeUser(uid: string, isAdminUser: boolean): Promise<boolean> {
   if (isAdminUser) return true;
-  try {
-    const p = await getUserProfile(uid);
-    if (!p) return false;
-    const now = Date.now();
-    return p.tier === 'admin' || Boolean(p.proExpiresAt && p.proExpiresAt > now);
-  } catch {
-    return false;
+
+  // Paid entitlement is separate from the mutable profile. Check it first;
+  // if the durable payment store is unavailable, propagate the failure so
+  // callers return 503 rather than falsely treating a paid user as Free.
+  const reconciled = await reconcilePaymentEntitlement(uid);
+  if (reconciled.entitlement && reconciled.entitlement.proExpiresAt > Date.now()) {
+    return true;
   }
+
+  const p = await getUserProfile(uid, { durable: true });
+  if (!p) return false;
+  const now = Date.now();
+  return p.tier === 'admin' || Boolean(p.proExpiresAt && p.proExpiresAt > now);
 }
 
 const TELEGRAM_PRO_ERROR = "Telegram alerts are a Pro feature. Upgrade to Pro — one-time plans from ₹59 — to link Telegram and receive instant alerts.";
@@ -1004,7 +1039,19 @@ apiRouter.post("/users/profile", requireAuth, async (req, res) => {
       telegramAlertScope: np.telegramAlertScope,
       telegramNewsAlerts: np.telegramNewsAlerts,
     };
-    const existingForGate = await getUserProfile(uid).catch(() => null);
+    let existingForGate = null;
+    try {
+      existingForGate = await getUserProfile(uid, { durable: true });
+    } catch (gateErr: any) {
+      if (isPaymentStoreUnavailable(gateErr)) {
+        return res.status(503).json({
+          success: false,
+          profileUnavailable: true,
+          error: 'Profile is temporarily unavailable. Please retry in a moment.',
+        });
+      }
+      throw gateErr;
+    }
     if (wantsTelegramEnable(tgPatch, existingForGate)) {
       const proLike = await isProLikeUser(uid, (req as any).user?.isAdmin === true);
       if (!proLike) {
@@ -1016,6 +1063,13 @@ apiRouter.post("/users/profile", requireAuth, async (req, res) => {
     invalidateMonitorConfigCache(uid);
     res.json({ success: true, profile: updatedProfile });
   } catch (err: any) {
+    if (isPaymentStoreUnavailable(err)) {
+      return res.status(503).json({
+        success: false,
+        profileUnavailable: true,
+        error: 'Profile could not be saved right now. Please retry in a moment.',
+      });
+    }
     if (err.code === 'USERNAME_UNAVAILABLE') {
       return res.status(409).json({ 
         success: false, 
@@ -1024,7 +1078,7 @@ apiRouter.post("/users/profile", requireAuth, async (req, res) => {
         suggestion: err.suggestion 
       });
     }
-    res.status(500).json({ success: false, error: err.message });
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -1044,7 +1098,19 @@ apiRouter.post("/users/telegram/settings", requireAuth, async (req, res) => {
       unlink
     } = req.body || {};
 
-    const existingProfile = await getUserProfile(uid).catch(() => null);
+    let existingProfile = null;
+    try {
+      existingProfile = await getUserProfile(uid, { durable: true });
+    } catch (profileErr: any) {
+      if (isPaymentStoreUnavailable(profileErr)) {
+        return res.status(503).json({
+          success: false,
+          profileUnavailable: true,
+          error: 'Profile is temporarily unavailable. Please retry in a moment.',
+        });
+      }
+      throw profileErr;
+    }
     const currentPrefs = existingProfile?.notificationPreferences || ({} as any);
 
     // Change-based gate: linking a chat id or flipping any Telegram toggle /
@@ -1105,7 +1171,14 @@ apiRouter.post("/users/telegram/settings", requireAuth, async (req, res) => {
       aiSummaryLang: updatedProfile.notificationPreferences?.aiSummaryLang || 'english'
     });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+    if (isPaymentStoreUnavailable(err)) {
+      return res.status(503).json({
+        success: false,
+        profileUnavailable: true,
+        error: 'Profile is temporarily unavailable. Please retry in a moment.',
+      });
+    }
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -1430,6 +1503,13 @@ apiRouter.post("/news/summarize", aiRateLimiter, async (req, res) => {
   } catch (err: any) {
     // Generation threw — release the free demo claim so the user can retry it
     if (isFreeDemo) { try { await releaseFreeSummaryDemo(uid); } catch {} }
+    // Payment-store outage must never silently treat a paid user as Free.
+    if (isPaymentStoreUnavailable(err)) {
+      return res.status(503).json({
+        success: false,
+        error: "Couldn't verify your subscription right now. Please retry in a moment."
+      });
+    }
     res.status(500).json({ success: false, error: err.message });
   }
 });

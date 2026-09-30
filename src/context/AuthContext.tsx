@@ -90,6 +90,12 @@ interface AuthContextType {
    *  no manual toggling anywhere. */
   isPaidProActive: boolean;
   proDaysLeft: number;
+  /** True when the server profile/subscription state could not be read
+   *  (network failure or 503 storage outage). The UI must show an explicit
+   *  "unavailable — retrying" state and must NEVER render this as Free. The
+   *  last-known cached profile (if any) is kept visible, marked pending
+   *  verification. */
+  profileUnavailable: boolean;
   adminUnlocked: boolean;
   loginWithGoogle: (forceRedirect?: boolean) => Promise<{ 
     success: boolean; 
@@ -188,6 +194,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const cached = getCachedSession();
   const [user, setUser] = useState<any | null>(cached.user);
   const [profile, setProfile] = useState<UserProfile | null>(cached.profile);
+  const [profileUnavailable, setProfileUnavailable] = useState(false);
   const [loading, setLoading] = useState(!cached.user);
   const [authLoading, setAuthLoading] = useState(false);
   const [adminUnlocked, setAdminUnlocked] = useState(false);
@@ -278,7 +285,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (idToken && idToken.split('.').length === 3) {
         try {
-          await customFetch('/auth/session', {
+          const sessionRes = await customFetch('/auth/session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -288,6 +295,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               displayName: firebaseUser.displayName || 'Trader'
             })
           });
+          if (sessionRes && sessionRes.status === 503) {
+            // Payment/profile store unavailable on the server: the profile
+            // fetch below also reads durably, so it will fail closed too.
+            setProfileUnavailable(true);
+          }
         } catch (sessionErr) {
           console.warn('Backend session exchange error:', sessionErr);
         }
@@ -317,19 +329,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               resolvedTier = 'admin';
               proExpiresAt = now + 365 * 24 * 60 * 60 * 1000;
             } else if (!isGuestUser) {
-              // Real authenticated user (Google / Email)
-              if (data.profile.proExpiresAt) {
-                proExpiresAt = data.profile.proExpiresAt;
-              } else {
-                // Initialize 1-week (7-day) Pro trial for new authenticated users
-                const storedTrial = typeof window !== 'undefined' ? localStorage.getItem(`bse_pro_expires_${uid}`) : null;
-                proExpiresAt = storedTrial ? parseInt(storedTrial, 10) : (now + SEVEN_DAYS_MS);
-                if (typeof window !== 'undefined') {
-                  localStorage.setItem(`bse_pro_expires_${uid}`, String(proExpiresAt));
-                }
-              }
-              const isTrialActive = proExpiresAt > now;
-              resolvedTier = isTrialActive ? 'pro' : 'free';
+              // Real authenticated user (Google / Email): the SERVER owns
+              // trial state (it mints the 7-day trial durably at session
+              // creation). Never invent an expiry client-side — a stale
+              // local value must not resurrect a trial or mask paid state.
+              proExpiresAt = Number(data.profile.proExpiresAt || 0);
+              resolvedTier = proExpiresAt > now ? 'pro' : 'free';
             } else {
               // Guest user: strictly free, 0 trial
               resolvedTier = 'free';
@@ -365,54 +370,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (!userProfile) {
-        const resolvedUsername = savedLocalUsername || emailPrefix;
-        if (typeof window !== 'undefined' && resolvedUsername) {
-          localStorage.setItem(`bse_user_handle_${uid}`, resolvedUsername);
-        }
-
-        let proExpiresAt = 0;
-        let resolvedTier: 'free' | 'pro' | 'admin' = 'free';
-
+        // FAIL-CLOSED (30 Sep 2026): the server profile could not be read
+        // (network failure, 503 storage outage, or empty response). NEVER
+        // fabricate a replacement Free/trial profile here and NEVER POST one
+        // over the real profile — a paid user must not be relabelled, and
+        // unknown subscription state must read as "unavailable / retrying",
+        // never "Free".
+        const lastKnown = (getCachedSession().profile as UserProfile | null) || null;
         if (isOwnerAccount) {
-          resolvedTier = 'admin';
-          proExpiresAt = now + 365 * 24 * 60 * 60 * 1000;
-        } else if (!isGuestUser) {
-          const storedTrial = typeof window !== 'undefined' ? localStorage.getItem(`bse_pro_expires_${uid}`) : null;
-          proExpiresAt = storedTrial ? parseInt(storedTrial, 10) : (now + SEVEN_DAYS_MS);
-          if (typeof window !== 'undefined') {
-            localStorage.setItem(`bse_pro_expires_${uid}`, String(proExpiresAt));
-          }
-          resolvedTier = proExpiresAt > now ? 'pro' : 'free';
+          // Owner is always admin; safe local fallback without the server.
+          const resolvedUsername = savedLocalUsername || emailPrefix;
+          userProfile = {
+            uid: uid,
+            email: firebaseUser.email,
+            displayName: firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split('@')[0] : 'Trader'),
+            username: resolvedUsername,
+            photoURL: firebaseUser.photoURL || null,
+            tier: 'admin',
+            proExpiresAt: now + 365 * 24 * 60 * 60 * 1000,
+            telegramChatId: savedLocalTgChatId || null,
+            telegramUsername: savedLocalTgUsername || null,
+            notificationPreferences: defaultNotificationPreferences,
+            createdAt: now,
+            lastLoginAt: now,
+            maxWatchlistStocks: 9999
+          };
+        } else if (isGuestUser) {
+          // Guest sessions are local-only by design — no server profile exists.
+          const resolvedUsername = savedLocalUsername || emailPrefix;
+          userProfile = {
+            uid: uid,
+            email: firebaseUser.email,
+            displayName: firebaseUser.displayName || 'Trader',
+            username: resolvedUsername,
+            photoURL: firebaseUser.photoURL || null,
+            tier: 'free',
+            proExpiresAt: 0,
+            telegramChatId: null,
+            telegramUsername: null,
+            notificationPreferences: defaultNotificationPreferences,
+            createdAt: now,
+            lastLoginAt: now,
+            maxWatchlistStocks: 5
+          };
         } else {
-          resolvedTier = 'free';
-          proExpiresAt = 0;
+          // Real user, profile unreadable: keep the last-known cached profile
+          // visible (pending verification) ONLY if it belongs to this exact
+          // account — the cache is single-slot, so a different account's
+          // profile must never stand in for this user.
+          const ownLastKnown = lastKnown && lastKnown.uid === uid ? lastKnown : null;
+          setProfileUnavailable(true);
+          setUser(firebaseUser);
+          setProfile(ownLastKnown);
+          dispatchAuthChanged(uid, firebaseUser, ownLastKnown);
+          return ownLastKnown;
         }
-
-        userProfile = {
-          uid: uid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName || (firebaseUser.email ? firebaseUser.email.split('@')[0] : 'Trader'),
-          username: resolvedUsername,
-          photoURL: firebaseUser.photoURL || null,
-          tier: resolvedTier,
-          proExpiresAt: proExpiresAt,
-          telegramChatId: savedLocalTgChatId || null,
-          telegramUsername: savedLocalTgUsername || null,
-          notificationPreferences: defaultNotificationPreferences,
-          createdAt: now,
-          lastLoginAt: now,
-          maxWatchlistStocks: resolvedTier === 'pro' || resolvedTier === 'admin' ? 9999 : 5
-        };
-
-        try {
-          await customFetch('/api/users/profile', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(userProfile)
-          });
-        } catch (saveErr) {
-          console.warn('Backend user profile save notice:', saveErr);
-        }
+      } else {
+        setProfileUnavailable(false);
       }
 
       setUser(firebaseUser);
@@ -424,13 +438,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Login-time payment recovery (27 Sep 2026): if a past payment's grant
       // was missed (webhook never fired / return-verify never ran), the
       // server repairs it now from the durable order ledger. Once per uid per
-      // page load, silent best-effort — a repaired grant re-syncs the profile
-      // so the badge updates by itself.
+      // page load. A 503 surfaces as unavailable (never silent); a repaired
+      // grant re-syncs the profile so the badge updates by itself.
       if (!isGuestUser && !paymentRecoverAttempted.has(uid)) {
         paymentRecoverAttempted.add(uid);
         recoverPendingPayments()
           .then((r) => {
-            if (r.recoveredCount > 0) {
+            if (r.unavailable) {
+              setProfileUnavailable(true);
+            } else if (r.recoveredCount > 0) {
               syncUserProfile(firebaseUser).catch(() => {});
             }
           })
@@ -440,6 +456,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return userProfile;
     } catch (e: any) {
       console.warn("User profile sync error:", e.message);
+      // Fail closed for real users: never leave a paid account reading as
+      // Free after an unexpected sync error. (Guests are local-only anyway.)
+      const syncFailedGuest = Boolean(
+        firebaseUser?.isAnonymous ||
+        !firebaseUser?.email ||
+        firebaseUser?.email?.endsWith('@bse-trader.local') ||
+        firebaseUser?.uid?.startsWith('guest_') ||
+        firebaseUser?.uid?.startsWith('trader_')
+      );
+      if (!syncFailedGuest) setProfileUnavailable(true);
       return null;
     }
   };
@@ -1272,6 +1298,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isPaidPro,
         isPaidProActive,
         proDaysLeft,
+        profileUnavailable,
         adminUnlocked,
         loginWithGoogle,
         loginWithEmail,

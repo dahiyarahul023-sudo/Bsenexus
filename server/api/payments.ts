@@ -14,16 +14,22 @@ import express from 'express';
 import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
 import { requireAuth } from '../security/auth.js';
-import { getUserProfile, saveUserProfile, invalidateUserProfileCache } from '../database/usersDao.js';
+import { getUserProfile, invalidateUserProfileCache } from '../database/usersDao.js';
 import { sanitizeUserId } from '../database/watchlistDao.js';
 import {
   recordPendingOrder,
   getPendingOrdersForUser,
   getGrantedOrdersForUser,
-  tryClaimOrderForGrant,
-  markOrderGranted,
   markOrderFailed,
 } from '../database/paymentOrdersDao.js';
+import {
+  grantPaymentAtomically,
+  reconcilePaymentEntitlement,
+} from '../database/paymentEntitlementsDao.js';
+import {
+  isPaymentOrderOwnershipError,
+  isPaymentStoreUnavailable,
+} from '../database/paymentStore.js';
 
 /** Extract the verified uid from the authenticated request (local copy — avoids a routes.ts import cycle). */
 function getReqUserId(req: express.Request): string {
@@ -32,19 +38,6 @@ function getReqUserId(req: express.Request): string {
     return sanitizeUserId(user.uid);
   }
   return 'guest';
-}
-
-/**
- * Race a promise against a timeout. A stalled Firestore read must never
- * leave the client hanging until Cloudflare returns an HTML 502 — the
- * caller gets null and can fall back / respond with controlled JSON.
- */
-function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | null> {
-  let timer: ReturnType<typeof setTimeout>;
-  const timeout = new Promise<null>((resolve) => {
-    timer = setTimeout(() => resolve(null), ms);
-  });
-  return Promise.race([p, timeout]).finally(() => clearTimeout(timer));
 }
 
 export const paymentsRouter = express.Router();
@@ -238,107 +231,86 @@ async function fetchOrderFromCashfree(orderId: string): Promise<any | null> {
   }
 }
 
+/** Parse Cashfree's order creation timestamp for receipt/history display. */
+function paidAtFromCashfree(order: any): number {
+  const parsed = Date.parse(String(order?.created_at || ''));
+  return Number.isFinite(parsed) ? parsed : Date.now();
+}
+
 /**
- * Grant (or extend) Pro on the user's server-side profile.
- * Idempotent per order: the same order_id never grants twice.
- *
- * The per-order in-memory lock serializes concurrent grants for the same
- * order (e.g. return-URL verify racing the Cashfree webhook) so a single
- * payment can never extend Pro twice on one instance.
+ * True successful-payment time from Cashfree's order payments API.
+ * Prefers the SUCCESS payment's payment_completion_time (per official
+ * Cashfree docs), falls back to payment_time, then to the order's
+ * created_at (checkout creation — not the payment moment).
  */
-const grantLocks = new Map<string, Promise<{ proExpiresAt: number; alreadyGranted: boolean }>>();
-
-async function grantProForOrder(
-  uid: string,
-  orderId: string,
-  planId: PlanId,
-): Promise<{ proExpiresAt: number; alreadyGranted: boolean }> {
-  const inFlight = grantLocks.get(orderId);
-  if (inFlight) {
-    const r = await inFlight;
-    return { proExpiresAt: r.proExpiresAt, alreadyGranted: true };
-  }
-  const p = doGrantProForOrder(uid, orderId, planId);
-  grantLocks.set(orderId, p);
+async function fetchSuccessfulPaymentTime(orderId: string, order: any): Promise<number> {
   try {
-    return await p;
-  } finally {
-    grantLocks.delete(orderId);
+    const payRes = await cashfreeFetch(`/orders/${encodeURIComponent(orderId)}/payments`);
+    const list = Array.isArray(payRes?.data) ? payRes.data : [];
+    const okPay = list.find((p: any) => String(p?.payment_status || '').toUpperCase() === 'SUCCESS') || list[0];
+    const ts = String(okPay?.payment_completion_time || okPay?.payment_time || '');
+    const parsed = Date.parse(ts);
+    if (Number.isFinite(parsed)) return parsed;
+  } catch {
+    // fall through to order created_at
   }
-}
-
-async function doGrantProForOrder(uid: string, orderId: string, planId: PlanId): Promise<{ proExpiresAt: number; alreadyGranted: boolean }> {
-  const plan = PRO_PLANS[planId];
-  const now = Date.now();
-  const existing = await getUserProfile(uid);
-
-  if (existing?.lastOrderId === orderId && existing?.tier === 'pro') {
-    console.log(`[Payments] grant skipped (already granted): uid=${uid} order=${orderId} proExpiresAt=${existing.proExpiresAt || now}`);
-    return { proExpiresAt: existing.proExpiresAt || now, alreadyGranted: true };
-  }
-
-  const base = Math.max(now, existing?.proExpiresAt || 0);
-  const proExpiresAt = base + plan.validityDays * 24 * 60 * 60 * 1000;
-  console.log(`[Payments] grant: uid=${uid} order=${orderId} plan=${planId} validityDays=${plan.validityDays} existingProExpiresAt=${existing?.proExpiresAt || 0} base=${base} newProExpiresAt=${proExpiresAt} validUntil=${new Date(proExpiresAt).toISOString()}`);
-
-  await saveUserProfile(uid, {
-    tier: 'pro',
-    proExpiresAt,
-    maxWatchlistStocks: 9999,
-    proPlanId: plan.id,
-    lastPaymentAt: now,
-    lastOrderId: orderId,
-  } as any);
-  invalidateUserProfileCache(uid);
-
-  return { proExpiresAt, alreadyGranted: false };
+  return paidAtFromCashfree(order);
 }
 
 /**
- * Grant Pro with the durable order ledger (27 Sep 2026).
+ * Grant Pro through the dedicated payment-entitlement transaction.
  *
  * Every grant path — webhook, return-URL verify, login recovery, manual
- * claim — funnels through here so a payment can never be lost or granted
- * twice, even across Cloud Run instances:
- *
- * 1. Atomically claim the order in the ledger (pending -> granting).
- *    A concurrent grant on another instance loses the claim and returns
- *    already-granted instead of double-extending Pro.
- * 2. Run the profile grant (itself idempotent per order via lastOrderId).
- * 3. Mark the ledger `granted` — the durable proof of what was given.
+ * claim — funnels through grantPaymentAtomically(), which commits the
+ * ledger order, payment_entitlements/<uid>, and the users/<uid> mirror in
+ * ONE Firestore transaction. There is no local-JSON payment fallback: if
+ * Firestore cannot confirm the grant, this throws and the caller returns
+ * a retriable unavailable state instead of a false "granted" response.
  */
 async function grantWithLedger(
   uid: string,
   orderId: string,
   planId: PlanId,
   source: 'webhook' | 'verify' | 'recover' | 'claim',
-  orderMeta?: { email?: string; amountPaise?: number },
+  orderMeta?: { email?: string; amountPaise?: number; currency?: string; paidAt?: number },
 ): Promise<{ proExpiresAt: number; alreadyGranted: boolean }> {
-  const claim = await tryClaimOrderForGrant(orderId, uid);
-  if (!claim.ok) {
-    const p = await getUserProfile(uid);
-    console.log(`[Payments] ledger claim lost (already granted): uid=${uid} order=${orderId} source=${source}`);
-    return { proExpiresAt: p?.proExpiresAt || Date.now(), alreadyGranted: true };
-  }
-  const r = await grantProForOrder(uid, orderId, planId);
-  await markOrderGranted(orderId, {
+  const plan = PRO_PLANS[planId];
+  const r = await grantPaymentAtomically({
+    orderId,
     uid,
-    proExpiresAt: r.proExpiresAt,
-    grantSource: source,
-    email: orderMeta?.email,
+    email: orderMeta?.email || '',
     planId,
-    amountPaise: orderMeta?.amountPaise,
+    validityDays: plan.validityDays,
+    amountPaise: orderMeta?.amountPaise ?? plan.amountPaise,
+    currency: orderMeta?.currency || plan.currency,
+    paidAt: orderMeta?.paidAt,
+    grantSource: source,
   });
-  return r;
+  invalidateUserProfileCache(uid);
+  console.log(
+    `[Payments] payment grant ${r.alreadyGranted ? 'already-granted' : 'granted'}: uid=${uid} order=${orderId} plan=${planId} source=${source} proExpiresAt=${r.proExpiresAt}`,
+  );
+  return { proExpiresAt: r.proExpiresAt, alreadyGranted: r.alreadyGranted };
 }
 
-/** Build the invoice payload shared by verify and claim responses. */
-function buildReceipt(order: any, orderId: string, plan: (typeof PRO_PLANS)[PlanId], proExpiresAt: number, paymentMethod: string) {
+function paymentUnavailable(res: express.Response, message: string) {
+  return res.status(503).json({
+    success: false,
+    unavailable: true,
+    error: message,
+  });
+}
+
+/** Build the invoice payload shared by verify and claim responses.
+ *  The receipt date must be the actual payment moment (Cashfree
+ *  `payment_completion_time`), not the checkout/order `created_at`. The
+ *  caller resolves the real paid time via fetchSuccessfulPaymentTime(). */
+function buildReceipt(order: any, orderId: string, plan: (typeof PRO_PLANS)[PlanId], proExpiresAt: number, paymentMethod: string, paidAtMs?: number) {
   return {
     orderId,
     amount: Number(order.order_amount),
     currency: String(order.order_currency || plan.currency),
-    paidAt: String(order.created_at || new Date().toISOString()),
+    paidAt: typeof paidAtMs === 'number' && paidAtMs > 0 ? new Date(paidAtMs).toISOString() : String(order.created_at || new Date().toISOString()),
     email: String(order?.customer_details?.customer_email || ''),
     validUntil: proExpiresAt,
     planId: plan.id,
@@ -384,7 +356,9 @@ paymentsRouter.post('/create-order', requireAuth, async (req, res) => {
       return res.status(200).json({ success: false, error: 'Unknown plan selected.' });
     }
 
-    const profile = await withTimeout(getUserProfile(uid), 8000);
+    // Checkout only starts when the durable profile/payment path is
+    // readable. If storage is unavailable, create no Cashfree order at all.
+    const profile = await getUserProfile(uid, { durable: true });
     const email = (req as any).user?.email || profile?.email || '';
     if (!email) {
       return res.status(200).json({ success: false, error: 'A verified email is required for payment receipts. Please check your account.' });
@@ -401,6 +375,27 @@ paymentsRouter.post('/create-order', requireAuth, async (req, res) => {
     // grant the right validity without trusting the client.
     const orderId = `BN_${PLAN_CODES[plan.id as PlanId]}_${cleanCustomerId.slice(0, 10)}_${Date.now()}`;
     const base = siteUrl(req);
+
+    // Payment isolation: the durable Firestore reconciliation record must
+    // exist BEFORE Cashfree checkout starts. If it cannot be confirmed,
+    // do not take the user to payment — otherwise a paid gateway order
+    // could exist with no server-owned trail to recover it automatically.
+    try {
+      await recordPendingOrder({
+        orderId,
+        uid,
+        email,
+        planId: plan.id,
+        amountPaise: plan.amountPaise,
+        currency: plan.currency,
+      });
+    } catch (ledgerErr: any) {
+      console.error('[Payments] durable pending-order write failed; checkout blocked:', ledgerErr?.message || ledgerErr);
+      return paymentUnavailable(
+        res,
+        'Secure payment setup is temporarily unavailable. Please try again in a moment.',
+      );
+    }
 
     const { ok, status, data, timedOut } = await cashfreeFetch('/orders', {
       method: 'POST',
@@ -423,6 +418,7 @@ paymentsRouter.post('/create-order', requireAuth, async (req, res) => {
 
     if (!ok || !data?.payment_session_id) {
       console.error('[Payments] create-order failed:', status, 'mode=', cfg.mode, JSON.stringify(data)?.slice(0, 500));
+      await markOrderFailed(orderId, `create-order failed (${status || 'gateway error'})`).catch((e: any) => console.warn('[Payments] markOrderFailed failed:', orderId, e?.message || e));
       if (timedOut) {
         return res.status(200).json({ success: false, error: 'Payment gateway timed out. Please try again.' });
       }
@@ -448,22 +444,6 @@ paymentsRouter.post('/create-order', requireAuth, async (req, res) => {
       });
     }
 
-    // Durable order ledger (27 Sep 2026): record the order as pending BEFORE
-    // the user pays, so a missed webhook / return-verify can never lose the
-    // payment. Best-effort — the Cashfree order must not fail over this.
-    try {
-      await recordPendingOrder({
-        orderId,
-        uid,
-        email,
-        planId: plan.id,
-        amountPaise: plan.amountPaise,
-        currency: plan.currency,
-      });
-    } catch (ledgerErr: any) {
-      console.warn('[Payments] recordPendingOrder failed (non-fatal):', ledgerErr?.message || ledgerErr);
-    }
-
     res.json({
       success: true,
       orderId,
@@ -474,7 +454,13 @@ paymentsRouter.post('/create-order', requireAuth, async (req, res) => {
     });
   } catch (err: any) {
     console.error('[Payments] create-order error:', err?.message || err);
-    res.status(200).json({ success: false, error: 'Could not start payment: ' + (err?.message || 'unexpected error') });
+    if (isPaymentStoreUnavailable(err)) {
+      return paymentUnavailable(
+        res,
+        'Payments are temporarily unavailable. Please retry in a moment; no payment was started.',
+      );
+    }
+    return res.status(200).json({ success: false, error: 'Could not start payment: ' + (err?.message || 'unexpected error') });
   }
 });
 
@@ -512,49 +498,107 @@ paymentsRouter.get('/verify', requireAuth, async (req, res) => {
         console.warn('[Payments] verify amount mismatch:', orderId, paidAmount, paidCurrency, 'expected', plan.id);
         return res.status(200).json({ success: false, paid: false, error: 'Payment amount does not match the selected plan.' });
       }
+      const paidAtMs = await fetchSuccessfulPaymentTime(orderId, order);
       const { proExpiresAt, alreadyGranted } = await grantWithLedger(uid, orderId, planId, 'verify', {
         email: String(order?.customer_details?.customer_email || ''),
         amountPaise: plan.amountPaise,
+        currency: paidCurrency,
+        paidAt: paidAtMs,
       });
       const paymentMethod = await describeSuccessfulPayment(orderId);
-      const receipt = buildReceipt(order, orderId, plan, proExpiresAt, paymentMethod);
+      const receipt = buildReceipt(order, orderId, plan, proExpiresAt, paymentMethod, paidAtMs);
       return res.json({ success: true, paid: true, alreadyGranted, proExpiresAt, orderId, receipt });
     }
 
     return res.json({ success: true, paid: false, orderStatus: order.order_status, orderId });
   } catch (err: any) {
     console.error('[Payments] verify error:', err?.message || err);
-    res.status(200).json({ success: false, paid: false, error: 'Verification error: ' + (err?.message || 'unknown') });
+    if (isPaymentStoreUnavailable(err)) {
+      return res.status(503).json({
+        success: false,
+        paid: true,
+        unavailable: true,
+        error: 'Payment confirmed by Cashfree, but Pro activation is temporarily delayed. Do not pay again. It will be checked automatically on your next visit.',
+      });
+    }
+    if (isPaymentOrderOwnershipError(err)) {
+      return res.status(200).json({ success: false, paid: false, error: 'This order does not appear to belong to your account.' });
+    }
+    return res.status(200).json({ success: false, paid: false, error: 'Verification error: ' + (err?.message || 'unknown') });
   }
 });
 
 // ---------------------------------------------------------------------------
 // GET /api/payments/status — Pro state + catalogue for the Settings UI.
 // ---------------------------------------------------------------------------
+// GET /api/payments/status — Pro state + catalogue for the Settings UI.
+//
+// The dedicated payment_entitlements record is authoritative for PAID
+// state. The ordinary profile is only a compatibility mirror and a source
+// for the separate free trial. If the payment store cannot be read, this
+// endpoint fails closed with 503 instead of falsely reporting Free.
+// ---------------------------------------------------------------------------
 paymentsRouter.get('/status', requireAuth, async (req, res) => {
   try {
     const uid = getReqUserId(req);
-    const profile = await getUserProfile(uid);
+    const isAdmin = Boolean((req as any).user?.isAdmin || (req as any).user?.isOwner);
+    // Checkout only starts when the durable profile/payment path is
+    // readable. If storage is unavailable, create no Cashfree order at all.
+    const profile = await getUserProfile(uid, { durable: true });
     const now = Date.now();
-    const proExpiresAt = profile?.proExpiresAt || 0;
-    // Return the user's ACTUAL purchased plan (not a hardcoded default) so the
-    // Settings UI shows the right pack, price and validity days.
-    const planId = (profile as any)?.proPlanId as PlanId | undefined;
+
+    let entitlement = null;
+    let repaired = false;
+    try {
+      const reconciled = await reconcilePaymentEntitlement(uid);
+      entitlement = reconciled.entitlement;
+      repaired = reconciled.repaired;
+    } catch (err) {
+      if (!isAdmin) throw err;
+      console.warn('[Payments] status: payment entitlement unavailable for admin fallback:', (err as Error)?.message || err);
+    }
+
+    const paidExpiresAt = Number(entitlement?.proExpiresAt || 0);
+    const isPaidPro = Boolean(
+      entitlement && (entitlement.lastPaymentAt || entitlement.lastOrderId || entitlement.grantedOrderIds?.length),
+    );
+    const paidActive = isPaidPro && paidExpiresAt > now;
+    const profilePlanId = (profile as any)?.proPlanId as PlanId | undefined;
+    const entitlementPlanId = entitlement?.proPlanId as PlanId | undefined;
+    const planId = (isPaidPro ? entitlementPlanId : profilePlanId) || profilePlanId || entitlementPlanId;
     const plan = (planId && (PRO_PLANS as Record<string, (typeof PRO_PLANS)[PlanId]>)[planId]) || PRO_PLANS.pro_monthly;
-    res.json({
+
+    // Paid expiry always wins over a trial/profile expiry. A missing paid
+    // entitlement is the only case where the profile can describe a trial.
+    const proExpiresAt = isPaidPro ? paidExpiresAt : Number(profile?.proExpiresAt || 0);
+    const isPro = isAdmin || paidActive || (!isPaidPro && proExpiresAt > now && (profile?.tier === 'pro' || profile?.tier === 'admin'));
+
+    return res.json({
       success: true,
       configured: isConfigured(),
-      isPro: (profile?.tier === 'pro' || (profile as any)?.isAdmin) && proExpiresAt > now,
+      isPro,
+      isPaidPro,
+      paidActive,
+      entitlementSource: entitlement?.source || null,
+      repairedEntitlement: repaired,
+      store: 'firestore' as const,
       proExpiresAt,
       plan,
       plans: Object.values(PRO_PLANS),
-      lastPaymentAt: (profile as any)?.lastPaymentAt || null,
-      lastOrderId: (profile as any)?.lastOrderId || null,
+      lastPaymentAt: isPaidPro ? (entitlement?.lastPaymentAt || null) : ((profile as any)?.lastPaymentAt || null),
+      lastOrderId: isPaidPro ? (entitlement?.lastOrderId || null) : ((profile as any)?.lastOrderId || null),
       // Auto-renew needs RBI e-mandate approval — not available yet.
       autoRenew: 'coming_soon' as const,
     });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: 'Could not load subscription status.' });
+    console.error('[Payments] status error:', err?.message || err);
+    if (isPaymentStoreUnavailable(err)) {
+      return paymentUnavailable(
+        res,
+        'Subscription status is temporarily unavailable. Your payment record is not lost; please retry in a moment.',
+      );
+    }
+    return res.status(503).json({ success: false, error: 'Could not load subscription status.' });
   }
 });
 
@@ -569,54 +613,121 @@ paymentsRouter.get('/status', requireAuth, async (req, res) => {
 // Only PAID orders grant. Dropped / failed / expired orders are marked
 // `failed` in the ledger so they are never re-checked.
 // ---------------------------------------------------------------------------
+// POST /api/payments/recover — automatic payment reconciliation.
+//
+// Three durable repair sources run without asking the user for an Order ID:
+//   1. payment_entitlements vs granted ledger/profile mirrors;
+//   2. unresolved pending/granting ledger orders re-checked with Cashfree;
+//   3. the profile's lastOrderId for older grants that predate the ledger.
+//
+// Only Cashfree-confirmed PAID orders grant. Ownership, exact amount and
+// exact currency are mandatory. Dropped / failed / expired orders become
+// `failed` so recovery does not re-check them forever.
+// ---------------------------------------------------------------------------
 paymentsRouter.post('/recover', requireAuth, paymentRecoveryLimiter, async (req, res) => {
   try {
     const uid = getReqUserId(req);
     if (!isConfigured()) {
       return res.status(200).json({ success: false, error: 'Payment gateway not configured.' });
     }
-    const pending = await getPendingOrdersForUser(uid);
-    const recovered: Array<{ orderId: string; planId: string; proExpiresAt: number }> = [];
-    const cleanUid = uid.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 45);
 
-    for (const o of pending) {
+    // Repair the dedicated entitlement first. This fixes the exact reported
+    // failure class: durable payment evidence exists, but the user is being
+    // shown as Free because one mirror/revision lost it.
+    const reconciled = await reconcilePaymentEntitlement(uid);
+    const entitlement = reconciled.entitlement;
+    const recovered: Array<{ orderId: string; planId: string; proExpiresAt: number }> = [];
+    const recoveredIds = new Set<string>();
+
+    if (reconciled.repaired && entitlement?.lastOrderId && entitlement.proExpiresAt > Date.now()) {
+      recovered.push({
+        orderId: entitlement.lastOrderId,
+        planId: entitlement.proPlanId,
+        proExpiresAt: entitlement.proExpiresAt,
+      });
+      recoveredIds.add(entitlement.lastOrderId);
+    }
+
+    const cleanUid = uid.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 45);
+    const candidates = new Map<string, { orderId: string; email?: string }>();
+
+    for (const o of await getPendingOrdersForUser(uid)) {
+      candidates.set(o.orderId, { orderId: o.orderId, email: o.email });
+    }
+
+    // Older paid users may have only users/<uid>.lastOrderId as evidence.
+    // Do not ask them to paste it manually: safely re-check that exact order
+    // here, provided Cashfree proves ownership + PAID + exact amount.
+    // Checkout only starts when the durable profile/payment path is
+    // readable. If storage is unavailable, create no Cashfree order at all.
+    const profile = await getUserProfile(uid, { durable: true });
+    const legacyOrderId = String((profile as any)?.lastOrderId || '').trim();
+    if (
+      legacyOrderId &&
+      !recoveredIds.has(legacyOrderId) &&
+      !entitlement?.grantedOrderIds?.includes(legacyOrderId)
+    ) {
+      candidates.set(legacyOrderId, { orderId: legacyOrderId, email: profile?.email || '' });
+    }
+
+    for (const candidate of candidates.values()) {
       try {
-        const order = await fetchOrderFromCashfree(o.orderId);
+        const order = await fetchOrderFromCashfree(candidate.orderId);
         if (!order) continue;
         const status = String(order.order_status || '').toUpperCase();
         if (status === 'PAID') {
           // Ownership MUST match the signed-in user — fail closed.
           const orderCustomer = String(order?.customer_details?.customer_id || '');
-          if (orderCustomer && orderCustomer !== cleanUid && orderCustomer !== uid) {
-            await markOrderFailed(o.orderId, 'recover: customer mismatch');
+          if (!orderCustomer || (orderCustomer !== cleanUid && orderCustomer !== uid)) {
+            if (candidate.orderId !== legacyOrderId) {
+              await markOrderFailed(candidate.orderId, 'recover: customer mismatch').catch((e: any) => console.warn('[Payments] markOrderFailed failed:', candidate.orderId, e?.message || e));
+            }
             continue;
           }
-          const planId = planIdFromOrderId(o.orderId);
+          const planId = planIdFromOrderId(candidate.orderId);
           const plan = PRO_PLANS[planId];
           if (Number(order.order_amount) !== plan.amountPaise / 100 || String(order.order_currency || '') !== plan.currency) {
-            await markOrderFailed(o.orderId, 'recover: amount/currency mismatch');
+            if (candidate.orderId !== legacyOrderId) {
+              await markOrderFailed(candidate.orderId, 'recover: amount/currency mismatch').catch((e: any) => console.warn('[Payments] markOrderFailed failed:', candidate.orderId, e?.message || e));
+            }
             continue;
           }
-          const r = await grantWithLedger(uid, o.orderId, planId, 'recover', {
-            email: String(order?.customer_details?.customer_email || o.email || ''),
+          const r = await grantWithLedger(uid, candidate.orderId, planId, 'recover', {
+            email: String(order?.customer_details?.customer_email || candidate.email || ''),
             amountPaise: plan.amountPaise,
+            currency: String(order.order_currency || plan.currency),
+            paidAt: await fetchSuccessfulPaymentTime(candidate.orderId, order),
           });
-          if (!r.alreadyGranted) {
-            recovered.push({ orderId: o.orderId, planId, proExpiresAt: r.proExpiresAt });
+          if (!recoveredIds.has(candidate.orderId)) {
+            recovered.push({ orderId: candidate.orderId, planId, proExpiresAt: r.proExpiresAt });
+            recoveredIds.add(candidate.orderId);
           }
-        } else if (status && status !== 'ACTIVE') {
+        } else if (status && status !== 'ACTIVE' && candidate.orderId !== legacyOrderId) {
           // Terminal non-paid state (EXPIRED / CANCELLED / ...): stop re-checking.
-          await markOrderFailed(o.orderId, `recover: order ${status}`);
+          await markOrderFailed(candidate.orderId, `recover: order ${status}`).catch((e: any) => console.warn('[Payments] markOrderFailed failed:', candidate.orderId, e?.message || e));
         }
-        // ACTIVE = user may still be paying; leave pending.
+        // ACTIVE = user may still be paying; leave it pending.
       } catch (oneErr: any) {
-        console.warn('[Payments] recover: order check failed:', o.orderId, oneErr?.message || oneErr);
+        if (isPaymentStoreUnavailable(oneErr)) throw oneErr;
+        console.warn('[Payments] recover: order check failed:', candidate.orderId, oneErr?.message || oneErr);
       }
     }
-    return res.json({ success: true, recovered, recoveredCount: recovered.length });
+
+    return res.json({
+      success: true,
+      recovered,
+      recoveredCount: recovered.length,
+      repairedEntitlement: reconciled.repaired,
+    });
   } catch (err: any) {
     console.error('[Payments] recover error:', err?.message || err);
-    return res.status(200).json({ success: false, error: 'Recovery check failed. Please try again.' });
+    if (isPaymentStoreUnavailable(err)) {
+      return paymentUnavailable(
+        res,
+        'Payment recovery is temporarily unavailable. Do not pay again; your payment will be checked automatically.',
+      );
+    }
+    return res.status(503).json({ success: false, error: 'Recovery check failed. Please try again.' });
   }
 });
 
@@ -670,19 +781,31 @@ paymentsRouter.post('/claim', requireAuth, paymentRecoveryLimiter, async (req, r
     const plan = PRO_PLANS[planId];
     if (Number(order.order_amount) !== plan.amountPaise / 100 || String(order.order_currency || '') !== plan.currency) {
       console.warn('[Payments] claim amount mismatch:', orderId);
-      return res.status(200).json({ success: false, error: 'Payment amount plan se match nahi hua.' });
+      return res.status(200).json({ success: false, error: 'The payment amount does not match the selected plan.' });
     }
 
+    const paidAtMs = await fetchSuccessfulPaymentTime(orderId, order);
     const { proExpiresAt, alreadyGranted } = await grantWithLedger(uid, orderId, planId, 'claim', {
       email: String(order?.customer_details?.customer_email || ''),
       amountPaise: plan.amountPaise,
+      currency: String(order.order_currency || plan.currency),
+      paidAt: paidAtMs,
     });
     const paymentMethod = await describeSuccessfulPayment(orderId);
-    const receipt = buildReceipt(order, orderId, plan, proExpiresAt, paymentMethod);
+    const receipt = buildReceipt(order, orderId, plan, proExpiresAt, paymentMethod, paidAtMs);
     console.log(`[Payments] claim granted Pro: uid=${uid} order=${orderId} plan=${planId} already=${alreadyGranted}`);
     return res.json({ success: true, alreadyGranted, proExpiresAt, orderId, receipt });
   } catch (err: any) {
     console.error('[Payments] claim error:', err?.message || err);
+    if (isPaymentStoreUnavailable(err)) {
+      return paymentUnavailable(
+        res,
+        'Your payment was confirmed, but Pro activation is temporarily delayed. Do not pay again; it will be checked automatically.',
+      );
+    }
+    if (isPaymentOrderOwnershipError(err)) {
+      return res.status(200).json({ success: false, error: 'This order does not appear to belong to your account.' });
+    }
     return res.status(200).json({ success: false, error: 'Claim failed. Please try again.' });
   }
 });
@@ -711,7 +834,7 @@ paymentsRouter.get('/history', requireAuth, async (req, res) => {
         validityDays: plan ? plan.validityDays : null,
         amountPaise: o.amountPaise,
         currency: o.currency || 'INR',
-        paidAt: o.grantedAt ? new Date(o.grantedAt).toISOString() : new Date(o.updatedAt).toISOString(),
+        paidAt: o.paidAt ? new Date(o.paidAt).toISOString() : o.grantedAt ? new Date(o.grantedAt).toISOString() : new Date(o.updatedAt).toISOString(),
         validUntil: o.proExpiresAt || null,
         grantSource: o.grantSource || null,
       };
@@ -719,7 +842,13 @@ paymentsRouter.get('/history', requireAuth, async (req, res) => {
     return res.json({ success: true, payments });
   } catch (err: any) {
     console.error('[Payments] history error:', err?.message || err);
-    return res.status(200).json({ success: false, error: 'Could not load payment history.' });
+    if (isPaymentStoreUnavailable(err)) {
+      return paymentUnavailable(
+        res,
+        'Payment history is temporarily unavailable. Your receipts are not lost; please retry in a moment.',
+      );
+    }
+    return res.status(503).json({ success: false, error: 'Could not load payment history.' });
   }
 });
 
@@ -771,6 +900,11 @@ paymentsRouter.post('/webhook', async (req, res) => {
     // never from the webhook payload — and is sanitized like every auth uid.
     if (eventType === 'PAYMENT_SUCCESS_WEBHOOK' && paymentStatus === 'SUCCESS') {
       const order = await fetchOrderFromCashfree(orderId);
+      if (!order) {
+        // Ask Cashfree to retry: do not acknowledge a success webhook we
+        // could not independently confirm with the gateway.
+        return res.status(503).json({ ok: false, reason: 'cashfree-check-failed' });
+      }
       const rawUid: string = order?.customer_details?.customer_id || '';
       const planId = planIdFromOrderId(orderId);
       const plan = PRO_PLANS[planId];
@@ -781,18 +915,29 @@ paymentsRouter.post('/webhook', async (req, res) => {
         const { alreadyGranted } = await grantWithLedger(uid, orderId, planId, 'webhook', {
           email: String(order?.customer_details?.customer_email || ''),
           amountPaise: plan.amountPaise,
+          currency: String(order?.order_currency || plan.currency),
+          paidAt: await fetchSuccessfulPaymentTime(orderId, order),
         });
         console.log(`[Payments] webhook granted Pro: uid=${uid} order=${orderId} plan=${planId} already=${alreadyGranted}`);
       } else {
         console.warn('[Payments] webhook skipped: order not PAID / amount mismatch / no customer_id', orderId);
+        return res.status(200).json({ ok: false, reason: 'order-not-grantable' });
       }
     }
 
     return res.status(200).json({ ok: true });
   } catch (err: any) {
     console.error('[Payments] webhook error:', err?.message || err);
-    // Still 200 — Cashfree will retry; our grant is idempotent.
-    return res.status(200).json({ ok: false, reason: 'error' });
+    if (isPaymentStoreUnavailable(err)) {
+      // Non-2xx asks Cashfree to retry after the durable payment store is
+      // back. The atomic grant is idempotent, so a retry cannot double-grant.
+      return res.status(503).json({ ok: false, reason: 'payment-store-unavailable' });
+    }
+    // Non-2xx asks Cashfree to retry after the durable payment store is
+    // back. The atomic grant is idempotent, so a retry cannot double-grant.
+    // Unexpected errors also retry: the grant is idempotent, and losing a
+    // success notification without retry is worse than a duplicate delivery.
+    return res.status(503).json({ ok: false, reason: 'error-retry' });
   }
 });
 

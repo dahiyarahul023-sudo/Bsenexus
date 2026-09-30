@@ -39,9 +39,12 @@ function fmtINR(paise: number): string {
 }
 
 export function SubscriptionCard() {
-  const { user, refreshProfile, openCheckout, setReceipt } = useAuth();
+  const { user, refreshProfile, openCheckout, setReceipt, profileUnavailable: authProfileUnavailable } = useAuth();
   const [status, setStatus] = useState<SubStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  // Distinct from loading: the server positively could not confirm
+  // subscription state (503 storage outage). NEVER render this as Free.
+  const [unavailable, setUnavailable] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadingReceipt, setLoadingReceipt] = useState(false);
   // "Maine payment kar diya hai" claim flow (27 Sep 2026)
@@ -50,26 +53,69 @@ export function SubscriptionCard() {
   const [claiming, setClaiming] = useState(false);
   const [claimMsg, setClaimMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
+  const loadStatus = async (isCancelled?: () => boolean) => {
+    const dead = () => isCancelled?.() === true;
+    setLoading(true);
+    setUnavailable(false);
+    setError(null);
+    try {
+      const res = await customFetch('/api/payments/status');
+      const data = await res.json().catch(() => null);
+      if (dead()) return;
+      // 503 / profileUnavailable = storage outage: show an explicit
+      // unavailable/retrying state, never a Free-looking badge.
+      if (res.status === 503 || (data as any)?.profileUnavailable) {
+        setUnavailable(true);
+        setStatus(null);
+      } else if (data?.success) {
+        setStatus(data as SubStatus);
+        // Keep the app-wide Pro flag in sync with the server truth.
+        refreshProfile().catch(() => {});
+      } else {
+        setError(data?.error || 'Could not load subscription status.');
+      }
+    } catch {
+      if (!dead()) setError('Could not load subscription status.');
+    } finally {
+      if (!dead()) setLoading(false);
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const res = await customFetch('/api/payments/status');
-        const data = await res.json().catch(() => null);
-        if (!cancelled && data?.success) {
-          setStatus(data as SubStatus);
-          // Keep the app-wide Pro flag in sync with the server truth.
-          refreshProfile().catch(() => {});
-        }
-      } catch {
-        if (!cancelled) setError('Could not load subscription status.');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
+    loadStatus(() => cancelled);
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Real auto-retry behind the "Unavailable — retrying" label: while the
+  // server cannot confirm subscription state, re-check with a growing delay
+  // (8s, then 20s, then 45s) so a transient storage outage recovers on its
+  // own. Stops as soon as a positive status arrives; the manual retry button
+  // stays available throughout.
+  const autoRetryRef = React.useRef(0);
+  useEffect(() => {
+    if (!unavailable && !authProfileUnavailable) return;
+    const delays = [8000, 20000, 45000];
+    if (autoRetryRef.current >= delays.length) return;
+    const delay = delays[autoRetryRef.current];
+    const timer = setTimeout(() => {
+      autoRetryRef.current += 1;
+      loadStatus();
+    }, delay);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unavailable, authProfileUnavailable]);
+
+  // Effective unavailable signal: this card's own status fetch OR the
+  // app-wide auth profile state. Either way: retry UI, never Free.
+  const showUnavailable = unavailable || authProfileUnavailable;
+
+  const handleRetry = () => {
+    if (loading) return;
+    autoRetryRef.current = 0;
+    loadStatus();
+  };
 
   const handlePay = () => {
     if (!user) {
@@ -135,6 +181,10 @@ export function SubscriptionCard() {
         </div>
         {loading ? (
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500">Loading…</span>
+        ) : showUnavailable ? (
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 flex items-center gap-1">
+            Unavailable — retrying
+          </span>
         ) : status?.isPro ? (
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 flex items-center gap-1">
             <BadgeCheck className="w-3 h-3" /> Pro Active
@@ -144,7 +194,22 @@ export function SubscriptionCard() {
         )}
       </div>
 
-      {!loading && status && (
+      {!loading && showUnavailable && (
+        <div className="mb-4 py-3 px-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl">
+          <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+            Subscription status is temporarily unavailable. Your Pro access is safe — please retry in a moment.
+          </p>
+          <button
+            onClick={handleRetry}
+            disabled={loading}
+            className="mt-2 px-4 py-2 text-[11px] font-bold text-white bg-amber-600 hover:bg-amber-700 active:scale-95 rounded-full transition-all cursor-pointer disabled:opacity-60"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {!loading && !showUnavailable && status && (
         <div className="space-y-2.5 text-xs mb-4">
           <div className="flex items-center justify-between">
             <span className="text-slate-500 dark:text-slate-400">Plan</span>
@@ -194,7 +259,7 @@ export function SubscriptionCard() {
         </div>
       )}
 
-      {!loading && (
+      {!loading && !showUnavailable && (
         <button
           onClick={handlePay}
           disabled={!status?.configured}

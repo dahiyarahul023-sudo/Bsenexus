@@ -106,6 +106,15 @@ service cloud.firestore {
       allow update, delete: if isAuthenticated() && !isAnonymous() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
+    // Payment ledger & entitlements: SERVER ONLY (Admin SDK bypasses rules).
+    // Money truth must never be readable or writable from the client.
+    match /payment_orders/{orderId} {
+      allow read, write: if false;
+    }
+    match /payment_entitlements/{userId} {
+      allow read, write: if false;
+    }
+
     // Admins collection: Strictly restricted to Admin/Server
     match /admins/{adminId} {
       allow read, write: if isAdmin();
