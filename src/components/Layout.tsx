@@ -185,6 +185,34 @@ export function Layout({
 
   useVisibilityInterval(checkQuotaStatus, 30000);
 
+  // Honest engine pill: "Active" only means the user's engine switch is ON —
+  // it says nothing about BSE reachability. Poll the feed's real staleness so
+  // the pill shows "Delayed" (amber) when BSE hasn't returned usable data for
+  // 15+ min, instead of a fake green "Active" on day-old data.
+  const [feedStale, setFeedStale] = useState(false);
+  const [feedStaleAt, setFeedStaleAt] = useState<number | null>(null);
+
+  const checkFeedStaleness = async () => {
+    try {
+      const res = await customFetch('/api/announcements?limit=1');
+      if (res.ok) {
+        const stale = res.headers.get('x-bse-feed-stale') === 'true';
+        const updatedAt = res.headers.get('x-bse-feed-updated-at');
+        setFeedStale(stale);
+        const ts = updatedAt ? parseInt(updatedAt, 10) : 0;
+        setFeedStaleAt(stale && Number.isFinite(ts) && ts > 0 ? ts : null);
+      }
+    } catch {
+      // Ignore background errors — pill keeps its last known state
+    }
+  };
+
+  useEffect(() => {
+    checkFeedStaleness();
+  }, []);
+
+  useVisibilityInterval(checkFeedStaleness, 60000);
+
   const fetchUnreadCount = async () => {
     try {
       const res = await customFetch('/api/notifications/unread-count');
@@ -449,7 +477,10 @@ export function Layout({
                 </kbd>
               </motion.button>
 
-              {/* Engine Toggle Pill with Live Radar Beacon (Desktop only) */}
+              {/* Engine Toggle Pill with Live Radar Beacon (Desktop only).
+                  Honest states: "Active" (green) = switch ON and feed fresh;
+                  "Delayed" (amber) = switch ON but BSE feed stale 15+ min;
+                  "Paused" (amber) = user switched the engine off. */}
               <motion.div 
                 whileHover={{ scale: 1.03 }}
                 whileTap={buttonTap}
@@ -458,26 +489,36 @@ export function Layout({
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onToggleEngine?.(); }}
-                aria-label={isRunning ? "BSE indexing engine active. Click to pause." : "BSE indexing engine paused. Click to resume."}
+                aria-label={
+                  !isRunning
+                    ? "BSE indexing engine paused. Click to resume."
+                    : (feedStale
+                        ? "BSE feed delayed — engine is on and retrying automatically. Click to pause."
+                        : "BSE indexing engine active. Click to pause.")
+                }
                 className={cn(
                   "hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-bold cursor-pointer transition-colors shadow-xs shrink-0 select-none min-h-[32px]",
-                  isRunning
+                  (isRunning && !feedStale)
                     ? "bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-700/80 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-950"
                     : "bg-amber-50 dark:bg-amber-950/50 border-amber-300 dark:border-amber-700/80 text-amber-700 dark:text-amber-300 hover:bg-amber-100"
                 )}
-                title="Click to toggle real-time BSE indexing engine"
+                title={
+                  isRunning && feedStale && feedStaleAt
+                    ? `BSE feed delayed — last updated ${new Date(feedStaleAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })} IST. Click to pause the engine.`
+                    : "Click to toggle real-time BSE indexing engine"
+                }
               >
                 <span className="relative flex h-2 w-2 shrink-0">
-                  {isRunning && (
+                  {(isRunning && !feedStale) && (
                     <motion.span 
                       animate={{ scale: [1, 2, 2.5], opacity: [0.8, 0.4, 0] }}
                       transition={{ duration: 1.6, repeat: Infinity, ease: 'easeOut' }}
                       className="absolute inline-flex h-full w-full rounded-full bg-emerald-400" 
                     />
                   )}
-                  <span className={cn("relative inline-flex rounded-full h-2 w-2", isRunning ? "bg-emerald-500" : "bg-amber-500")} />
+                  <span className={cn("relative inline-flex rounded-full h-2 w-2", (isRunning && !feedStale) ? "bg-emerald-500" : "bg-amber-500")} />
                 </span>
-                <span className="whitespace-nowrap">{isRunning ? "Active" : "Paused"}</span>
+                <span className="whitespace-nowrap">{!isRunning ? "Paused" : (feedStale ? "Delayed" : "Active")}</span>
               </motion.div>
 
               {/* Item 6: Autosave Status Indicator */}
