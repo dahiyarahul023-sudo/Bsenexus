@@ -82,6 +82,22 @@ describe('Firestore Security Rules Least-Privilege Verification', () => {
       return false; // write strictly prohibited from client
     }
 
+    if (collection === 'user_notes') {
+      // Mirrors firestore.rules user_notes block: login-required, per-user, anonymous denied.
+      if (!isAuthenticated() || isAnonymous()) return false;
+      const uid = auth!.uid;
+      if (operation === 'read') {
+        return resourceData?.userId === uid; // (admin path is server-side only)
+      }
+      if (operation === 'create') {
+        return requestData?.userId === uid;
+      }
+      if (operation === 'update' || operation === 'delete') {
+        return resourceData?.userId === uid;
+      }
+      return false;
+    }
+
     if (collection === 'settings' || collection === 'logs' || collection === 'alert_rules' || collection === 'admins') {
       // Sensitive / private collections: denied to unauthenticated and anonymous users
       if (!isAuthenticated() || isAnonymous()) {
@@ -215,6 +231,43 @@ describe('Firestore Security Rules Least-Privilege Verification', () => {
       requestData: { symbols: ['TAMPER'] }
     });
     assert.strictEqual(canWriteOtherWatchlist, false, 'Guest must NOT write another user watchlist');
+  });
+
+  test('Saved Notes: owner can manage own notes; cross-user and anonymous access denied', () => {
+    const ownerAuth = {
+      uid: 'user_owner_1',
+      token: { firebase: { sign_in_provider: 'google.com' }, email: '<redacted>' }
+    };
+    const otherAuth = {
+      uid: 'user_attacker_2',
+      token: { firebase: { sign_in_provider: 'google.com' }, email: '<redacted>' }
+    };
+    const anonAuth = {
+      uid: 'anon_guest_9',
+      token: { firebase: { sign_in_provider: 'anonymous' }, email: '' }
+    };
+    const ownNote = { userId: 'user_owner_1', text: 'my note' };
+    const otherNote = { userId: 'user_attacker_2', text: 'victim note' };
+
+    // Owner can create / read / update / delete their own notes
+    assert.strictEqual(evaluateRule({ auth: ownerAuth, collection: 'user_notes', docId: 'n1', operation: 'create', requestData: ownNote }), true, 'Owner must create own note');
+    assert.strictEqual(evaluateRule({ auth: ownerAuth, collection: 'user_notes', docId: 'n1', operation: 'read', resourceData: ownNote }), true, 'Owner must read own note');
+    assert.strictEqual(evaluateRule({ auth: ownerAuth, collection: 'user_notes', docId: 'n1', operation: 'update', resourceData: ownNote, requestData: { ...ownNote, text: 'edited' } }), true, 'Owner must update own note');
+    assert.strictEqual(evaluateRule({ auth: ownerAuth, collection: 'user_notes', docId: 'n1', operation: 'delete', resourceData: ownNote }), true, 'Owner must delete own note');
+
+    // Cross-user: attacker cannot touch the victim's notes
+    assert.strictEqual(evaluateRule({ auth: otherAuth, collection: 'user_notes', docId: 'n1', operation: 'read', resourceData: ownNote }), false, 'Attacker must NOT read victim note');
+    assert.strictEqual(evaluateRule({ auth: otherAuth, collection: 'user_notes', docId: 'n1', operation: 'update', resourceData: ownNote, requestData: { userId: 'user_owner_1', text: 'tampered' } }), false, 'Attacker must NOT update victim note');
+    assert.strictEqual(evaluateRule({ auth: otherAuth, collection: 'user_notes', docId: 'n1', operation: 'delete', resourceData: ownNote }), false, 'Attacker must NOT delete victim note');
+    assert.strictEqual(evaluateRule({ auth: otherAuth, collection: 'user_notes', docId: 'n9', operation: 'create', requestData: { userId: 'user_owner_1', text: 'forged' } }), false, 'Attacker must NOT create a note under the victim uid');
+
+    // Anonymous (guest) users are fully denied
+    assert.strictEqual(evaluateRule({ auth: anonAuth, collection: 'user_notes', docId: 'n1', operation: 'read', resourceData: { userId: 'anon_guest_9', text: 'x' } }), false, 'Anonymous must NOT read notes');
+    assert.strictEqual(evaluateRule({ auth: anonAuth, collection: 'user_notes', docId: 'n1', operation: 'create', requestData: { userId: 'anon_guest_9', text: 'x' } }), false, 'Anonymous must NOT create notes');
+
+    // Unauthenticated visitors are fully denied
+    assert.strictEqual(evaluateRule({ auth: null, collection: 'user_notes', docId: 'n1', operation: 'read', resourceData: otherNote }), false, 'Unauthenticated must NOT read notes');
+    assert.strictEqual(evaluateRule({ auth: null, collection: 'user_notes', docId: 'n1', operation: 'create', requestData: otherNote }), false, 'Unauthenticated must NOT create notes');
   });
 
   test('Guest and Unauthenticated users can read public announcements/calendar, cannot write', () => {

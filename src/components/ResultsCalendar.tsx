@@ -31,6 +31,7 @@ import { usePullToRefresh } from '../hooks/usePullToRefresh';
 import { useSwipeGesture } from '../hooks/useSwipeGesture';
 import { PullToRefreshIndicator } from './ui/PullToRefreshIndicator';
 import { HeliosPill, heliosCard } from './ui/helios';
+import { SaveNoteButton } from './notes/SaveNoteButton';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -2113,6 +2114,16 @@ Your 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${g
                       <span>Details</span>
                       <ArrowUpRight size={11} className="text-slate-500" />
                     </button>
+
+                    {/* Saved Notes: one-tap note linked to this result */}
+                    <SaveNoteButton
+                      link={{
+                        type: 'result',
+                        label: `${item.symbol} · ${item.meetingDate}`,
+                        symbol: item.symbol,
+                      }}
+                      label={`Save note on ${item.symbol} results`}
+                    />
 
                     {/* Contextual Action Dropdown Popover */}
                     {activeActionMenuId === item.id && (

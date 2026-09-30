@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { IntelModalProvider } from './context/IntelModalContext';
+import { NoteEditorProvider } from './context/NoteEditorContext';
 import { ToastProvider, useToast } from './context/ToastContext';
 import { customFetch } from './api';
 import { verifyProPayment, clearPendingOrderId, getPlanDisplayFromOrderId, isValidPlanId } from './utils/cashfree';
@@ -862,12 +863,14 @@ export default function App() {
   return (
     <AuthProvider>
       <IntelModalProvider>
+        <NoteEditorProvider>
         <ToastProvider>
           <AppContent />
           <CashfreeReturnHandler />
           <ProCheckoutView />
           <ProReceiptView />
         </ToastProvider>
+        </NoteEditorProvider>
       </IntelModalProvider>
     </AuthProvider>
   );

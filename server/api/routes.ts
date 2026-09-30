@@ -83,6 +83,7 @@ import {
 import { seoRouter } from "./seoRoutes.js";
 import { paymentsRouter } from "./payments.js";
 import { faqRouter } from "./faq.js";
+import { notesRouter } from "./notes.js";
 import { pageRenderCache, staticGuideCache, apiResponseCache } from "../utils/renderCache.js";
 import { getMarketGuides, getMarketGuideBySlug } from "../services/marketGuidesService.js";
 
@@ -96,6 +97,9 @@ apiRouter.use("/payments", paymentsRouter);
 
 // Public AI FAQ section (bank-first, AI fallback behind server-side quotas)
 apiRouter.use("/faq", faqRouter);
+
+// Saved Notes (login-required, Firestore-first)
+apiRouter.use("/notes", notesRouter);
 
 // Educational Market Guides API (Fail-safe, cached)
 apiRouter.get("/market-guides", (_req, res) => {

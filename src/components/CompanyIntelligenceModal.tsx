@@ -9,6 +9,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { springSnappy, springBouncy, springSmoothPill, buttonTap, itemFadeUpVariants } from '../utils/motionTokens';
 import { ShareActionMenu } from './ui/motion/ShareActionMenu';
+import { SaveNoteButton } from './notes/SaveNoteButton';
 import { RollingNumber } from './ui/motion/RollingNumber';
 import { customFetch } from '../api';
 import { getLowestPlanPrice } from '../utils/cashfree';
@@ -405,6 +406,15 @@ export function CompanyIntelligenceModal({
             >
               <RefreshCw size={15} className={cn(loading && "animate-spin text-emerald-500")} />
             </motion.button>
+            {/* Saved Notes: one-tap note linked to this stock */}
+            <SaveNoteButton
+              link={{
+                type: 'stock',
+                label: effectiveName,
+                symbol: effectiveSymbol || undefined,
+              }}
+              label={`Save note on ${effectiveName}`}
+            />
             <motion.button
               whileTap={buttonTap}
               type="button"

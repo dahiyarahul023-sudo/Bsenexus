@@ -12,7 +12,7 @@ import {
   Volume2, VolumeX, Eye, HelpCircle, Scale, MessageSquare,
   Cookie, FileText, Search, RotateCcw, LayoutGrid, Layers, ArrowUpRight,
   Power, Unlink, Bot, Zap, UserX, SlidersHorizontal, Newspaper, Building2,
-  Crown, ArrowLeft
+  Crown, ArrowLeft, StickyNote
 } from 'lucide-react';
 import { TermsModal, LegalTabType } from './TermsModal';
 import { SecurityAuditModal } from './SecurityAuditModal';
@@ -22,6 +22,7 @@ import { SubscriptionCard } from './SubscriptionCard';
 import { useAuth } from '../context/AuthContext';
 import { customFetch } from '../api';
 import { useDeveloperMode } from '../utils/developerMode';
+import { SavedNotesScreen } from './notes/SavedNotesScreen';
 import { APP_VERSION } from '../version';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { useFeedDensity, DEFAULT_DENSITY, type FeedDensity } from '../hooks/useFeedDensity';
@@ -53,6 +54,7 @@ const SETTINGS_REGISTRY = [
   { id: 'profile', title: 'Profile & Display name', description: 'Investor identity, name, and public @username handle', category: 'Account & Identity', keywords: ['profile', 'display name', 'username', 'handle', 'account', 'identity'] },
   { id: 'telegram', title: 'Telegram Alert Delivery', description: 'Instant push notifications for watchlist disclosures', category: 'Account & Identity', keywords: ['telegram', 'chat id', 'push', 'notifications', 'phone', 'bot', 'mobile'] },
   { id: 'subscription', title: 'Subscription & Billing', description: 'Pro plan status, renewal and payment (auto-renew coming soon)', category: 'Account & Identity', keywords: ['subscription', 'billing', 'pro', 'payment', 'renew', 'plan', 'cashfree', 'auto-renew'] },
+  { id: 'saved-notes', title: 'Saved Notes', description: 'Personal notes linked to stocks, news and results', category: 'Account & Identity', keywords: ['notes', 'saved notes', 'notebook', 'memo', 'personal notes', 'diary'] },
   { id: 'export-csv', title: 'Export to CSV', description: 'Download tracked tickers and priorities in spreadsheet format', category: 'Watchlist & Data', keywords: ['export', 'csv', 'excel', 'spreadsheet', 'download', 'watchlist'] },
   { id: 'export-json', title: 'Export backup (JSON)', description: 'Full structured backup for porting or syncing', category: 'Watchlist & Data', keywords: ['export', 'json', 'backup', 'data', 'port', 'sync'] },
   { id: 'security-audit', title: '20-Point Launch Security & Pen-Test', description: 'IDOR defense, API key hardening, SQLi and red-team test harness', category: 'Advanced Engine', keywords: ['security', 'audit', 'pen-test', 'penetration', 'hardened', 'keys', 'idor'] },
@@ -114,6 +116,25 @@ export function SettingsTab({
   // Search filter query
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Saved Notes count for the index row badge (logged-in users only)
+  const [notesCount, setNotesCount] = useState(0);
+  useEffect(() => {
+    const isGuestUser = !user || (user as any).isAnonymous === true;
+    if (isGuestUser) { setNotesCount(0); return; }
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const { fetchNotes } = await import('../api/notesApi');
+        const res = await fetchNotes();
+        if (!cancelled && res.success && res.notes) setNotesCount(res.notes.length);
+      } catch { /* badge stays empty on failure */ }
+    };
+    refresh();
+    const h = () => refresh();
+    window.addEventListener('notes-changed', h);
+    return () => { cancelled = true; window.removeEventListener('notes-changed', h); };
+  }, [user]);
 
   // Instant saved indicator pill tracking ('theme' | 'density' | 'sound' | 'filter')
   const [savedPillKey, setSavedPillKey] = useState<string | null>(null);
@@ -925,6 +946,17 @@ export function SettingsTab({
       ) : undefined,
     },
     {
+      id: 'notes', title: 'Saved Notes',
+      subtitle: notesCount > 0 ? `${notesCount} saved · stocks, news & results` : 'Personal notes · stocks, news & results',
+      icon: StickyNote, iconClass: 'bg-orange-500/10 text-orange-600 dark:text-orange-400',
+      registryIds: ['saved-notes'],
+      badge: notesCount > 0 ? (
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-950/70 dark:text-orange-300 border border-orange-200 dark:border-orange-800">
+          {notesCount}
+        </span>
+      ) : undefined,
+    },
+    {
       id: 'watchlist', title: 'Watchlist & Data',
       subtitle: 'Export CSV & JSON backups',
       icon: Download, iconClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
@@ -1032,7 +1064,7 @@ export function SettingsTab({
   );
 
   const indexGroups: { label?: string; ids: string[]; danger?: boolean }[] = [
-    { ids: ['preferences', 'account', 'subscription', 'watchlist'] },
+    { ids: ['preferences', 'account', 'subscription', 'notes', 'watchlist'] },
     { label: 'Tools & Discovery', ids: ['alerts', 'news', 'companies'] },
     { label: 'Support', ids: ['help', 'about'] },
   ];
@@ -1181,6 +1213,18 @@ export function SettingsTab({
       )}
 
       {/* SECTION 1: PREFERENCES (Appearance, Audio, Density, Materiality) */}
+      {activeSection === 'notes' && isMatch('saved-notes') && (
+        <div className="space-y-2 select-none animate-in fade-in duration-200">
+          <div className="flex items-center justify-between px-1">
+            <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              Saved Notes
+            </h3>
+            <span className="text-[10px] text-slate-400">Synced to your account</span>
+          </div>
+          <SavedNotesScreen onNavigate={onNavigate} />
+        </div>
+      )}
+
       {activeSection === 'preferences' && (isMatch('appearance') || isMatch('density') || isMatch('sound') || isMatch('filter')) && (
         <div className="space-y-2 select-none">
           <div className="flex items-center justify-between px-1">

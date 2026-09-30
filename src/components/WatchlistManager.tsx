@@ -31,6 +31,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { springSnappy, springMorph, containerStaggerVariants, itemFadeUpVariants, buttonTap, cardHover } from '../utils/motionTokens';
 import { ShareActionMenu } from './ui/motion/ShareActionMenu';
 import { HeliosPill, heliosCard, heliosDivider, heliosTitle, heliosMeta } from './ui/helios';
+import { SaveNoteButton } from './notes/SaveNoteButton';
 import { AiSummaryViewer } from './AiSummaryViewer';
 
 function cn(...inputs: ClassValue[]) {
@@ -2668,6 +2669,14 @@ Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to create unlimi
                         >
                           <ArrowUpRight size={15} />
                         </motion.button>
+
+                        {/* Saved Notes: one-tap note linked to this stock */}
+                        <div onClick={(e) => e.stopPropagation()} className="flex items-center">
+                          <SaveNoteButton
+                            link={{ type: 'stock', label: c.name || c.symbol, symbol: c.symbol }}
+                            label={`Save note on ${c.name || c.symbol}`}
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -3139,6 +3148,15 @@ Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to create unlimi
                           >
                             <Trash2 size={14} />
                           </button>
+
+                          {/* Saved Notes: one-tap note linked to this stock */}
+                          <div onClick={(e) => e.stopPropagation()} className="-mr-2">
+                            <SaveNoteButton
+                              link={{ type: 'stock', label: item.companyName || item.symbol, symbol: item.symbol }}
+                              label={`Save note on ${item.companyName || item.symbol}`}
+                              className="min-w-[44px] min-h-[44px] flex items-center justify-center"
+                            />
+                          </div>
                         </div>
                       );
                     })}
@@ -3487,6 +3505,15 @@ Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to create unlimi
                         >
                           <Trash2 size={14} />
                         </button>
+
+                        {/* Saved Notes: one-tap note linked to this stock */}
+                        <div onClick={(e) => e.stopPropagation()} className="-mr-2">
+                          <SaveNoteButton
+                            link={{ type: 'stock', label: item.symbol, symbol: item.symbol }}
+                            label={`Save note on ${item.symbol}`}
+                            className="min-w-[44px] min-h-[44px] flex items-center justify-center"
+                          />
+                        </div>
                       </div>
                     );
                   })}

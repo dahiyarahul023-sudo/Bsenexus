@@ -46,6 +46,7 @@ import { PullToRefreshIndicator } from './ui/PullToRefreshIndicator';
 import { ActionButton } from './ui/ActionButton';
 import { HonestProgressBar } from './ui/HonestProgressBar';
 import { ShareActionMenu } from './ui/motion/ShareActionMenu';
+import { SaveNoteButton } from './notes/SaveNoteButton';
 import { useVisibilityInterval } from '../hooks/useVisibilityInterval';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { useFeedDensity } from '../hooks/useFeedDensity';
@@ -364,6 +365,17 @@ const NewsCardItem: React.FC<NewsCardProps> = React.memo(({
               headline={item.source ? `Source: ${item.source}` : undefined}
               url={item.link}
               size="xs"
+            />
+
+            {/* Saved Notes: one-tap note linked to this article */}
+            <SaveNoteButton
+              link={{
+                type: 'news',
+                label: (item.symbol || item.source || 'News').slice(0, 60),
+                symbol: item.symbol,
+                url: item.link,
+              }}
+              label="Save note on this article"
             />
 
             {/* External Source Link */}

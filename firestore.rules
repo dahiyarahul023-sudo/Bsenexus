@@ -96,6 +96,16 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // Saved Notes: per-user, login-required, Firestore-first
+    match /user_notes/{noteId} {
+      allow read: if isAuthenticated() && !isAnonymous() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isAuthenticated() && !isAnonymous() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && !isAnonymous() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
     // Admins collection: Strictly restricted to Admin/Server
     match /admins/{adminId} {
       allow read, write: if isAdmin();

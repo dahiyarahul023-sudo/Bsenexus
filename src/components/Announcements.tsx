@@ -47,6 +47,7 @@ import { AiSummaryViewer } from './AiSummaryViewer';
 import { HeliosPill, heliosCard, heliosDivider, heliosTitle, heliosDesc, heliosMeta } from './ui/helios';
 import { WatchlistStarButton } from './ui/motion/WatchlistStarButton';
 import { ShareActionMenu } from './ui/motion/ShareActionMenu';
+import { SaveNoteButton } from './notes/SaveNoteButton';
 import { RollingNumber } from './ui/motion/RollingNumber';
 
 function cn(...inputs: ClassValue[]) {
@@ -1017,6 +1018,16 @@ export function Announcements({
                 pdfUrl={item.pdfLink || item.ATTACHMENTNAME || item.attachmentName}
                 size="sm"
               />
+              {/* Saved Notes: one-tap note linked to this filing */}
+              <SaveNoteButton
+                link={{
+                  type: 'filing',
+                  label: `${item.companyName} · ${(cleanSub.headline || item.subject || 'Filing').slice(0, 60)}`,
+                  symbol: item.symbol,
+                  url: item.pdfLink || item.ATTACHMENTNAME || item.attachmentName || undefined,
+                }}
+                label={`Save note on this ${item.companyName} filing`}
+              />
             </div>
           </div>
         </div>
@@ -1795,6 +1806,16 @@ export function Announcements({
                           category={item.category}
                           pdfUrl={item.pdfLink || item.ATTACHMENTNAME || item.attachmentName}
                           size="xs"
+                        />
+                        {/* Saved Notes: one-tap note linked to this filing */}
+                        <SaveNoteButton
+                          link={{
+                            type: 'filing',
+                            label: `${item.companyName} · ${(cleanSub.headline || item.subject || 'Filing').slice(0, 60)}`,
+                            symbol: item.symbol,
+                            url: item.pdfLink || item.ATTACHMENTNAME || item.attachmentName || undefined,
+                          }}
+                          label={`Save note on this ${item.companyName} filing`}
                         />
                         <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform text-slate-400 dark:text-slate-500" />
                       </div>

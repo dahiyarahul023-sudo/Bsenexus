@@ -46,6 +46,7 @@ import { CookieConsentBanner } from './CookieConsentBanner';
 import { NotificationInbox } from './NotificationInbox';
 import { AlertRulesModal } from './AlertRulesModal';
 import { CompanyIntelligenceModal } from './CompanyIntelligenceModal';
+import { NoteEditorHost } from './notes/NoteEditor';
 import { TodayMarketStoryModal } from './TodayMarketStoryModal';
 import { getStorySessionStorageKey, getISTMarketSession } from './story/storyData';
 
@@ -907,6 +908,8 @@ export function Layout({
           companyName={selectedStock.companyName}
         />
       )}
+      {/* Global Saved-Notes editor (reel-style 2-step flow) */}
+      <NoteEditorHost />
 
       {/* Reconnecting / Network Interruption Banner */}
       <AnimatePresence>

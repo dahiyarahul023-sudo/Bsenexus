@@ -146,3 +146,35 @@ export interface MarketGuide {
   };
 }
 
+
+/** Saved Notes — optional link back to the exact item the note was saved from. */
+export type NoteLinkType = 'stock' | 'news' | 'result' | 'filing';
+
+export interface NoteLink {
+  type: NoteLinkType;
+  /** Human label, e.g. "RELIANCE", "RBI policy article", "INFY Q2 results". */
+  label: string;
+  /** Stock symbol for tap-to-jump into the company intelligence modal. */
+  symbol?: string;
+  /** External URL for tap-to-jump (news articles). */
+  url?: string;
+}
+
+export interface UserNote {
+  id: string;
+  userId: string;
+  text: string;
+  /** Index into the client NOTE_ICONS set (reel-style icon picker). */
+  icon: number;
+  tags: string[];
+  link: NoteLink | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface NoteInput {
+  text: string;
+  icon?: number;
+  tags?: string[];
+  link?: NoteLink | null;
+}
