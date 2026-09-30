@@ -30,6 +30,8 @@ let bseBlockedAtMs = 0;
 let bseLastEscalationMs = 0;
 let bseBlockBackoffLevel = 0; // 0 = not blocked; 1 = 20s; 2 = 60s; 3 = 300s
 let bootBackfillDone = false; // one-time deep page walk on the first poll after (re)start
+const bseModuleBootMs = Date.now(); // process (re)start time, for honest staleness math
+let lastSuccessfulFetchMs = 0; // last time BSE returned a usable (non-null) response
 
 export function isBseSourceBlocked(): boolean {
   return bseSourceBlocked;
@@ -69,6 +71,18 @@ export function getBseHealth() {
 
 export function getLastBseError(): string {
   return lastBseErrorDetails;
+}
+
+// Honest feed-staleness signal for the API/UI: how long since BSE last gave us
+// a usable response. Used to show "Feed delayed — last updated HH:MM" instead
+// of a fake green "Live" dot when the source is unreachable (403/timeout).
+export function getBseFeedStaleness(): { lastSuccessfulFetchMs: number; bootMs: number; blocked: boolean; blockBackoffLevel: number } {
+  return {
+    lastSuccessfulFetchMs,
+    bootMs: bseModuleBootMs,
+    blocked: bseSourceBlocked,
+    blockBackoffLevel: bseBlockBackoffLevel,
+  };
 }
 
 export function getBackupStalenessMetrics() {
@@ -393,6 +407,7 @@ export async function fetchBSEAnnouncements() {
 
   if (table && Array.isArray(table) && table.length > 0) {
     bseHealth = { status: totalLatency > 3000 ? 'degraded' : 'stable', latency: Math.round(totalLatency) };
+    lastSuccessfulFetchMs = Date.now();
     
     // Deduplicate by NEWSID and attach diagnostic metadata
     const uniqueMap = new Map();
@@ -408,6 +423,7 @@ export async function fetchBSEAnnouncements() {
   
   if (table !== null) {
     bseHealth = { status: 'stable', latency: Math.round(totalLatency) };
+    lastSuccessfulFetchMs = Date.now();
     return [];
   }
   bseHealth = { status: 'down', latency: -1 };

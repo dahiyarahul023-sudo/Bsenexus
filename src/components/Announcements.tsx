@@ -101,6 +101,10 @@ export function Announcements({
   // Subtle "feed delayed" state: BSE is rate-limiting our poller (sourceBlocked
   // from the server). Shows instead of silently serving stale data.
   const [feedDelayed, setFeedDelayed] = useState<boolean>(false);
+  // Honest staleness: server sends X-BSE-Feed-Stale when BSE hasn't returned a
+  // usable response for 15+ min (covers timeouts, which never set the 403-block
+  // flag). Shows "last updated HH:MM" instead of a fake green Live dot.
+  const [feedStaleAt, setFeedStaleAt] = useState<number | null>(null);
   // Prefetch-on-intent: announcement ids whose detail JSON is already warming
   const prefetchedIds = useRef<Set<string>>(new Set());
   const [search, setSearch] = useState<string>(() => {
@@ -788,6 +792,18 @@ export function Announcements({
       if (res.ok) {
         // BSE source-block flag (server sets X-BSE-Source-Blocked while backing off)
         try { setFeedDelayed(res.headers.get('x-bse-source-blocked') === 'true'); } catch { /* non-fatal */ }
+        // Honest staleness (server sets X-BSE-Feed-Stale when no usable BSE
+        // response for 15+ min). Any fresh success clears it.
+        try {
+          const staleHeader = res.headers.get('x-bse-feed-stale');
+          const updatedAt = res.headers.get('x-bse-feed-updated-at');
+          if (staleHeader === 'true') {
+            const ts = updatedAt ? parseInt(updatedAt, 10) : 0;
+            setFeedStaleAt(Number.isFinite(ts) && ts > 0 ? ts : -1);
+          } else {
+            setFeedStaleAt(null);
+          }
+        } catch { /* non-fatal */ }
         const data = await res.json();
         if (Array.isArray(data)) {
           const uniqueMap = new Map<string, any>();
@@ -1271,12 +1287,20 @@ export function Announcements({
               Live BSE Announcements
             </h1>
             {effectiveIsRunning && (
-              <span 
-                className="relative flex h-2.5 w-2.5 items-center justify-center shrink-0" 
-                title="BSE Live Realtime Poller Active (30s market hours / 5m off-hours)"
+              <span
+                className="relative flex h-2.5 w-2.5 items-center justify-center shrink-0"
+                title={feedStaleAt !== null
+                  ? "BSE feed delayed — showing last available data, retrying automatically"
+                  : "BSE Live Realtime Poller Active (30s market hours / 5m off-hours)"}
               >
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                {feedStaleAt !== null ? (
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                ) : (
+                  <>
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                  </>
+                )}
               </span>
             )}
             <button
@@ -1686,11 +1710,17 @@ export function Announcements({
               </div>
             )}
 
-            {/* Subtle source-blocked state: BSE is rate-limiting our feed; retrying automatically */}
-            {feedDelayed && (
+            {/* Subtle source-blocked state: BSE is rate-limiting our feed; retrying automatically.
+                Also covers honest staleness (no usable BSE response for 15+ min): shows the
+                last-updated time instead of a fake green "Live" dot on day-old data. */}
+            {(feedDelayed || feedStaleAt !== null) && (
               <div className="px-3.5 py-2 bg-slate-500/10 dark:bg-slate-400/10 border-b border-slate-300/60 dark:border-slate-600/40 flex items-center gap-1.5 text-[11px] font-bold text-slate-600 dark:text-slate-300 animate-in fade-in duration-200">
                 <Info size={12} className="text-slate-400 shrink-0" />
-                <span>Feed delayed — BSE is rate-limiting our connection. Retrying automatically.</span>
+                <span>
+                  {feedStaleAt !== null && feedStaleAt > 0
+                    ? `Feed delayed — last updated ${new Date(feedStaleAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })} IST. Retrying automatically.`
+                    : 'Feed delayed — BSE is rate-limiting our connection. Retrying automatically.'}
+                </span>
               </div>
             )}
 

@@ -6067,14 +6067,25 @@ setInterval(() => {
   pruneAndCheckStorageCapacity().catch(e => console.error("Periodic storage check err:", e.message));
 }, 15 * 60 * 1000);
 
-// Results Calendar Sync, Watchlists Init & Historical Sync
+// Results Calendar Sync, Watchlists Init & Historical Sync.
+// STAGGERED on boot: firing all BSE-heavy jobs at once (cold start burst) trips
+// BSE's Akamai rate-limiting and gets our cloud IP 403-blocked right after every
+// deploy. Light/local jobs run at +3s; BSE network jobs are spread over ~3 min.
 setTimeout(() => {
   initWatchlists().catch(e => console.info("[WatchlistDao] Initial watchlist check:", e?.message || e));
   updateTelegramHealth().catch(e => console.error("Initial telegram health check err:", e.message));
-  fetchAndSyncResultsCalendar().catch(e => console.error("Initial results calendar sync err:", e.message));
-  syncWatchlistHistoricalData().catch(e => console.error("Initial watchlist historical sync err:", e.message));
-  backfillRecentAnnouncements().catch(e => console.error("Initial backfill announcements err:", e.message));
 }, 3000);
+setTimeout(() => {
+  fetchAndSyncResultsCalendar().catch(e => console.error("Initial results calendar sync err:", e.message));
+}, 45 * 1000);
+setTimeout(() => {
+  backfillRecentAnnouncements().catch(e => console.error("Initial backfill announcements err:", e.message));
+}, 100 * 1000);
+setTimeout(() => {
+  // Heaviest job (per-stock historical walk): runs last, well after the poller
+  // has warmed up and the boot backfill has settled.
+  syncWatchlistHistoricalData().catch(e => console.error("Initial watchlist historical sync err:", e.message));
+}, 170 * 1000);
 setInterval(() => {
   fetchAndSyncResultsCalendar(true).catch(e => console.error("Periodic results calendar sync err:", e.message));
   syncWatchlistHistoricalData().catch(e => console.error("Periodic watchlist historical sync err:", e.message));

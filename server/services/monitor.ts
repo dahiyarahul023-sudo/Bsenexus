@@ -18,6 +18,12 @@ let consecutiveFailures = 0;
 let isBseOutageActive = false;
 let lastAlertTime = 0;
 const ALERT_COOLDOWN_MS = 60 * 60 * 1000;
+// Startup grace: after a (re)deploy the cold boot fires a burst of BSE requests
+// (10-page backfill + parallel syncs) that can trip Akamai rate-limiting for a
+// few minutes. Never send the outage Telegram alert during this window — the
+// feed genuinely failing AFTER the grace period still alerts normally.
+const PROCESS_BOOT_MS = Date.now();
+const OUTAGE_ALERT_STARTUP_GRACE_MS = 10 * 60 * 1000;
 
 export function getConsecutiveFailures(): number {
   return consecutiveFailures;
@@ -121,8 +127,11 @@ export async function processAnnouncements() {
     
     if (!announcements) {
       consecutiveFailures++;
-      // Fire outage alert ONLY when all tiers fail for 6 consecutive cycles and cooldown has elapsed
-      const canAlert = (lastAlertTime === 0) || (Date.now() - lastAlertTime > ALERT_COOLDOWN_MS);
+      // Fire outage alert ONLY when all tiers fail for 6 consecutive cycles and cooldown has elapsed.
+      // Suppressed during the post-boot grace window: a fresh deploy's cold-start burst can fail
+      // transiently (Akamai rate-limit) without the feed being genuinely down.
+      const pastStartupGrace = (Date.now() - PROCESS_BOOT_MS) > OUTAGE_ALERT_STARTUP_GRACE_MS;
+      const canAlert = ((lastAlertTime === 0) || (Date.now() - lastAlertTime > ALERT_COOLDOWN_MS)) && pastStartupGrace;
       if (consecutiveFailures >= 6 && !isBseOutageActive && canAlert) {
         const settings = await getSettings();
         if (settings.botToken && settings.chatId) {

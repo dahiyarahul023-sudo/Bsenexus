@@ -27,7 +27,7 @@ import {
   resetUserWatchlistsToDefault,
   sanitizeUserId
 } from "../database/watchlistDao.js";
-import { getBseHealth, testBSEConnection, syncWatchlistHistoricalData, syncSingleStockHistoricalData, backfillRecentAnnouncements, getBackupStalenessMetrics, isBseSourceBlocked } from "../services/bse.js";
+import { getBseHealth, testBSEConnection, syncWatchlistHistoricalData, syncSingleStockHistoricalData, backfillRecentAnnouncements, getBackupStalenessMetrics, isBseSourceBlocked, getBseFeedStaleness } from "../services/bse.js";
 import { getAllStockEntries } from "../utils/stockResolver.js";
 import { invalidateMonitorConfigCache } from "../services/monitor.js";
 import { wantsTelegramEnable } from "../utils/alertDecision.js";
@@ -419,6 +419,26 @@ apiRouter.get("/announcements",
     if (isBseSourceBlocked()) {
       res.setHeader('X-BSE-Source-Blocked', 'true');
     }
+    // Honest staleness: the 403-block flag only covers rate-limit blocks. Timeouts /
+    // network failures never set it, so the UI would show a fake green "Live" dot
+    // on day-old data. Expose last-successful-fetch age; the client shows
+    // "Feed delayed — last updated HH:MM" whenever the feed is genuinely stale.
+    // (Skipped for the first 5 min after boot: the poller may not have completed
+    // its first cycle yet, and "delayed" would be a lie.)
+    try {
+      const { lastSuccessfulFetchMs, bootMs } = getBseFeedStaleness();
+      const nowMs = Date.now();
+      const bootedAgoMs = nowMs - bootMs;
+      const STALE_AFTER_MS = 15 * 60 * 1000;
+      const isStale = bootedAgoMs > 5 * 60 * 1000 &&
+        (lastSuccessfulFetchMs === 0 || (nowMs - lastSuccessfulFetchMs) > STALE_AFTER_MS);
+      if (isStale) {
+        res.setHeader('X-BSE-Feed-Stale', 'true');
+        if (lastSuccessfulFetchMs > 0) {
+          res.setHeader('X-BSE-Feed-Updated-At', String(lastSuccessfulFetchMs));
+        }
+      }
+    } catch { /* non-fatal: staleness headers are best-effort */ }
     // Cap derived from per-stock policy: 25 filings per tracked stock × up to 100 stocks.
     // DAO serves from in-memory cache (up to 10k items), so this costs no extra Firestore reads.
     const limitParam = Math.min(2500, Math.max(1, parseInt(req.query.limit as string) || 50));
