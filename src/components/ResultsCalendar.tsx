@@ -17,6 +17,7 @@ import { useAiQuota, syncQuotaFromResponse } from '../utils/aiQuota';
 import { useDeveloperMode } from '../utils/developerMode';
 import { formatFullDateTime, formatShortDateTime, formatTimeOnly, formatDateOnly } from '../utils/timeFormat';
 import { getSafePdfUrl } from '../utils/pdfHelper';
+import { resultsUrl, normalizeQuarterKey, navigateToResults } from '../utils/shareUrls';
 import { checkIfDateIsTradingHoliday, generateGoogleCalendarUrl, downloadIcsCalendarFile, downloadMultiIcsCalendarFile } from '../utils/marketHolidays';
 import { MarketHolidaysModal } from './ui/MarketHolidaysModal';
 import { CustomDropdown, DropdownOption } from './ui/CustomDropdown';
@@ -203,6 +204,14 @@ export function ResultsCalendar() {
 
   // Modal inspection state & animations
   const [selectedModalItem, setSelectedModalItem] = useState<ResultCalendarItem | null>(null);
+  // Shareable results-page URL for a calendar item (/results/:symbol/:quarterKey).
+  // Empty string when the item has no resolvable quarter key.
+  const resultsPageUrlFor = (item: ResultCalendarItem | null): string => {
+    const sym = (item?.symbol || '').trim().toUpperCase();
+    const qk = normalizeQuarterKey(item?.quarterKey || '');
+    if (sym && /^Q[1-4]FY\d{2}$/.test(qk)) return resultsUrl(sym, qk);
+    return '';
+  };
   const [modalTab, setModalTab] = useState<'results' | 'meetings'>('results');
   const [stockHistory, setStockHistory] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState<boolean>(false);
@@ -2361,6 +2370,21 @@ Your 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${g
                       <Building2 size={13} />
                       <span>Stock 360°</span>
                     </button>
+                    {resultsPageUrlFor(selectedModalItem) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const sym = (selectedModalItem?.symbol || '').trim().toUpperCase();
+                          const qk = normalizeQuarterKey(selectedModalItem?.quarterKey || '');
+                          if (sym && qk) navigateToResults(sym, qk);
+                        }}
+                        className="px-2.5 py-1 bg-violet-50 hover:bg-violet-100 dark:bg-violet-950/60 dark:hover:bg-violet-900 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800 rounded-lg text-xs font-bold flex items-center gap-1 shrink-0 transition-colors cursor-pointer shadow-2xs"
+                        title="Open the shareable results page for this quarter"
+                      >
+                        <ExternalLink size={13} />
+                        <span>Open</span>
+                      </button>
+                    )}
                     <ShareActionMenu
                       title={`${selectedModalItem.companyName} (${selectedModalItem.symbol || selectedModalItem.scripCode || 'BSE'})`}
                       headline={`Board Meeting scheduled on ${selectedModalItem.meetingDate}. Purpose: ${selectedModalItem.purpose || 'Financial Results'}`}
@@ -2368,7 +2392,7 @@ Your 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${g
                       scripCode={selectedModalItem.scripCode}
                       symbol={selectedModalItem.symbol}
                       pdfUrl={selectedModalItem.declarationPdfLink}
-                      url={`https://bsenexus.in/results-calendar?scrip=${selectedModalItem.scripCode || ''}`}
+                      url={resultsPageUrlFor(selectedModalItem) || `https://bsenexus.in/results-calendar?scrip=${selectedModalItem.scripCode || ''}`}
                       size="xs"
                     />
                   </div>
@@ -2993,7 +3017,7 @@ Your 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${g
                   scripCode={selectedModalItem.scripCode}
                   symbol={selectedModalItem.symbol}
                   pdfUrl={selectedModalItem.declarationPdfLink}
-                  url={`https://bsenexus.in/results-calendar?scrip=${selectedModalItem.scripCode || ''}`}
+                  url={resultsPageUrlFor(selectedModalItem) || `https://bsenexus.in/results-calendar?scrip=${selectedModalItem.scripCode || ''}`}
                   size="sm"
                 />
 

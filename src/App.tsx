@@ -40,6 +40,10 @@ function TabFallback() {
 import { useScrollRestoration } from './hooks/useScrollRestoration';
 import { ScrollRestoredPill } from './components/ui/ScrollRestoredPill';
 import { saveScrollPosition } from './utils/scrollState';
+import { parseShareablePath } from './utils/shareUrls';
+import { FilingPage } from './components/filing/FilingPage';
+import { ResultsPage } from './components/results/ResultsPage';
+import { NoteEditorHost } from './components/notes/NoteEditor';
 const GuidesPage = lazy(() => import('./components/GuidesPage').then(m => ({ default: m.GuidesPage })));
 const CompaniesPage = lazy(() => import('./components/CompaniesPage').then(m => ({ default: m.CompaniesPage })));
 const TrustPage = lazy(() => import('./components/TrustPages').then(m => ({ default: m.TrustPage })));
@@ -64,6 +68,8 @@ function getAppPathRoute(): 'home' | 'pricing' | 'guides' | 'companies' | 'about
     path.startsWith('/guides/') ||
     path.startsWith('/announcement/') ||
     path.startsWith('/announcements') ||
+    path.startsWith('/filing/') ||
+    path.startsWith('/results/') ||
     path === '/live' ||
     path.startsWith('/results-calendar') ||
     path.startsWith('/watchlist') ||
@@ -165,6 +171,15 @@ function CashfreeReturnHandler() {
 
 function AppContent() {
   const [currentRoute, setCurrentRoute] = useState<'home' | 'pricing' | 'guides' | 'companies' | 'about' | 'contact' | 'privacy' | 'terms' | 'disclaimer' | '404'>(() => getAppPathRoute());
+  // Shareable deep-link route (/filing/:symbol/:newsId, /results/:symbol/:quarterKey).
+  // Rendered as standalone public pages; must survive the tab-sync pushState logic.
+  // Legacy /announcement/:newsId URLs 301-redirect server-side, so only the two
+  // canonical kinds become share routes here.
+  const sharePathFor = (pathname: string) => {
+    const p = parseShareablePath(pathname);
+    return p && (p.kind === 'filing' || p.kind === 'results') ? p : null;
+  };
+  const [shareRoute, setShareRoute] = useState(() => sharePathFor(window.location.pathname));
   const [activeTab, setActiveTab] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -429,6 +444,10 @@ function AppContent() {
     const handlePopState = () => {
       try {
         const pathname = window.location.pathname.toLowerCase().replace(/\/+$/, '');
+        // Shareable filing/results pages survive back/forward navigation as standalone routes.
+        const shared = sharePathFor(window.location.pathname);
+        setShareRoute(shared);
+        if (shared) return;
         if (pathname === '/announcements') {
           setActiveTab('dashboard');
           return;
@@ -586,6 +605,36 @@ function AppContent() {
   };
 
   // Render dedicated standalone routes with direct navigation, refresh, and SEO support
+
+  // Leave a shareable page: drop the share route and return to the app home.
+  const exitShareRoute = () => {
+    window.history.pushState(null, '', '/');
+    setShareRoute(null);
+    setCurrentRoute('home');
+    setActiveTab('home');
+    window.scrollTo(0, 0);
+  };
+
+  // Shareable filing / results pages — public, standalone, no login to view.
+  // Mounted here (before the landing guard) so tab-sync never clobbers the URL,
+  // and with NoteEditorHost so Save-note + guest sign-in work outside Layout.
+  if (shareRoute?.kind === 'filing') {
+    return (
+      <>
+        <FilingPage onBack={exitShareRoute} />
+        <NoteEditorHost />
+      </>
+    );
+  }
+
+  if (shareRoute?.kind === 'results') {
+    return (
+      <>
+        <ResultsPage onBack={exitShareRoute} />
+        <NoteEditorHost />
+      </>
+    );
+  }
 
   if (currentRoute === 'guides') {
     return (

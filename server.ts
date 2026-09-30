@@ -10,7 +10,7 @@ import { createServer as createViteServer } from "vite";
 import { authMiddleware, authRouter, apiRateLimiter, authRateLimiter } from "./server/security/auth.js";
 import { apiRouter } from "./server/api/routes.js";
 import { processAnnouncements, getConsecutiveFailures, pruneAndCheckStorageCapacity } from "./server/services/monitor.js";
-import { fetchAndSyncResultsCalendar } from "./server/services/resultsCalendarService.js";
+import { fetchAndSyncResultsCalendar, getStockResultsHistory, getResultsCalendarData } from "./server/services/resultsCalendarService.js";
 import { syncWatchlistHistoricalData, backfillRecentAnnouncements } from "./server/services/bse.js";
 import { initWatchlists } from "./server/database/watchlistDao.js";
 import { updateTelegramHealth } from "./server/services/telegram.js";
@@ -167,7 +167,36 @@ async function generateDynamicSitemap(): Promise<string> {
       }
       const lastmod = new Date(pubTs).toISOString().split('T')[0];
 
-      xml += `  <url>\n    <loc>https://bsenexus.in/announcement/${escapeHtmlAttr(newsId)}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>never</changefreq>\n    <priority>0.6</priority>\n  </url>\n`;
+      // Canonical shareable filing URL scheme: /filing/:symbol/:newsId.
+      // (Legacy /announcement/:newsId URLs 301-redirect there.)
+      const annSymbol = String(ann.symbol || ann.scrip_id || '').trim().toUpperCase();
+      const filingLoc = /^[A-Z0-9-]{2,20}$/.test(annSymbol)
+        ? `https://bsenexus.in/filing/${escapeHtmlAttr(annSymbol)}/${escapeHtmlAttr(newsId)}`
+        : `https://bsenexus.in/announcement/${escapeHtmlAttr(newsId)}`;
+
+      xml += `  <url>\n    <loc>${filingLoc}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>never</changefreq>\n    <priority>0.6</priority>\n  </url>\n`;
+    }
+
+    // Append shareable results pages (/results/:symbol/:quarterKey) from the
+    // results calendar — capped so the sitemap stays sane.
+    try {
+      const calItems = await getResultsCalendarData('all');
+      const calList = Array.isArray(calItems) ? calItems : (calItems?.items || []);
+      const seenResults = new Set<string>();
+      let resultsAdded = 0;
+      for (const c of calList) {
+        if (resultsAdded >= 300) break;
+        const sym = String(c.symbol || '').trim().toUpperCase();
+        const qk = normalizeQuarterKeyServer(c.quarterKey || '');
+        if (!/^[A-Z0-9-]{2,20}$/.test(sym) || !/^Q[1-4]FY\d{2}$/.test(qk)) continue;
+        const key = `${sym}/${qk}`;
+        if (seenResults.has(key)) continue;
+        seenResults.add(key);
+        resultsAdded++;
+        xml += `  <url>\n    <loc>https://bsenexus.in/results/${escapeHtmlAttr(sym)}/${escapeHtmlAttr(qk)}</loc>\n    <lastmod>${todayStr}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.6</priority>\n  </url>\n`;
+      }
+    } catch (calErr) {
+      console.warn("Error adding results pages to sitemap:", calErr);
     }
 
     // Append individual company/stock pages from master database
@@ -241,7 +270,7 @@ const AI_STUDIO_REDIRECT_SCRIPT = `  <script>
     })();
   </script>`;
 
-function renderAnnouncementPage(announcement: any, newsId: string): string {
+function renderAnnouncementPage(announcement: any, newsId: string, canonicalOverride?: string): string {
   const companyName = announcement.companyName || announcement.SLONGNAME || 'BSE Listed Company';
   const subject = announcement.subject || announcement.NEWSSUB || 'Corporate Announcement';
   const details = announcement.details || announcement.ATTACHMENTNAME || '';
@@ -285,7 +314,8 @@ function renderAnnouncementPage(announcement: any, newsId: string): string {
     hour12: true
   }) + ' IST';
 
-  const canonicalUrl = `https://bsenexus.in/announcement/${encodeURIComponent(newsId)}`;
+  const canonicalUrl = canonicalOverride
+    || `https://bsenexus.in/announcement/${encodeURIComponent(newsId)}`;
   const pageTitle = `${companyName} — ${subject} | BSE Nexus`;
   const isBatchTest = newsId.toLowerCase().includes('batch_test_');
   const robotsMeta = isBatchTest
@@ -5167,7 +5197,67 @@ for (const [sourcePath, targetPath] of Object.entries(PERMANENT_301_REDIRECTS)) 
   });
 }
 
-// Crawlable, server-rendered individual announcement pages for search engines & direct visitors
+// Crawlable, server-rendered individual filing pages (canonical shareable URL
+// scheme: /filing/:symbol/:newsId) for search engines & direct visitors.
+// Public — no login required, like /company/:symbol.
+app.get('/filing/:symbol/:newsId', async (req, res) => {
+  const rawSymbol = req.params.symbol;
+  const newsId = req.params.newsId;
+  if (!rawSymbol || typeof rawSymbol !== 'string' || !newsId || typeof newsId !== 'string') {
+    return res.status(404).setHeader('Content-Type', 'text/html; charset=utf-8').send(renderAnnouncement404Page());
+  }
+
+  const symbol = rawSymbol.trim().toUpperCase();
+  const cleanId = newsId.trim();
+  if (!/^[A-Z0-9-]{2,20}$/.test(symbol) || !cleanId) {
+    return res.status(404).setHeader('Content-Type', 'text/html; charset=utf-8').send(renderAnnouncement404Page());
+  }
+
+  const cacheKey = `filing:${symbol}:${cleanId}`;
+  const clientEtag = req.headers['if-none-match'];
+
+  const cached = pageRenderCache.get(cacheKey);
+  if (cached) {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('ETag', cached.etag);
+    res.setHeader('X-Cache', 'HIT');
+    res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+    if (clientEtag && clientEtag === cached.etag) {
+      return res.status(304).end();
+    }
+    return res.send(cached.body);
+  }
+
+  try {
+    const announcement = await getAnnouncementById(cleanId);
+    if (!announcement) {
+      return res.status(404).setHeader('Content-Type', 'text/html; charset=utf-8').send(renderAnnouncement404Page());
+    }
+    // Symbol in the URL must match the filing's own symbol (case-insensitive).
+    const annSymbol = String(announcement.symbol || announcement.scrip_id || '').trim().toUpperCase();
+    if (annSymbol && annSymbol !== symbol) {
+      return res.status(404).setHeader('Content-Type', 'text/html; charset=utf-8').send(renderAnnouncement404Page());
+    }
+
+    const canonicalUrl = `https://bsenexus.in/filing/${encodeURIComponent(symbol)}/${encodeURIComponent(cleanId)}`;
+    const html = renderAnnouncementPage(announcement, cleanId, canonicalUrl);
+    const entry = pageRenderCache.set(cacheKey, html, 'text/html; charset=utf-8', { ttlMs: 60 * 60 * 1000 });
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('ETag', entry.etag);
+    res.setHeader('X-Cache', 'MISS');
+    res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+    if (clientEtag && clientEtag === entry.etag) {
+      return res.status(304).end();
+    }
+    return res.send(html);
+  } catch (err: any) {
+    console.error("Error serving filing page:", err?.message || err);
+    return res.status(500).setHeader('Content-Type', 'text/html; charset=utf-8').send(renderAnnouncement404Page());
+  }
+});
+
+// Legacy /announcement/:newsId URLs 301-redirect to the canonical /filing/:symbol/:newsId
+// scheme (single canonical URL per filing — no duplicate-content SEO split).
 app.get('/announcement/:newsId', async (req, res) => {
   const newsId = req.params.newsId;
   if (!newsId || typeof newsId !== 'string') {
@@ -5182,29 +5272,32 @@ app.get('/announcement/:newsId', async (req, res) => {
     return res.redirect(301, '/announcements');
   }
 
-  const cacheKey = `ann:${cleanId}`;
-  const clientEtag = req.headers['if-none-match'];
-
-  // Check in-memory rendered page cache
-  const cached = pageRenderCache.get(cacheKey);
-  if (cached) {
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.setHeader('ETag', cached.etag);
-    res.setHeader('X-Cache', 'HIT');
-    res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
-    if (clientEtag && clientEtag === cached.etag) {
-      return res.status(304).end();
-    }
-    return res.send(cached.body);
-  }
-
   try {
     const isBatchTest = cleanId.toLowerCase().includes('batch_test_');
     const announcement = await getAnnouncementById(cleanId);
     if (!announcement) {
       return res.status(404).setHeader('Content-Type', 'text/html; charset=utf-8').send(renderAnnouncement404Page(isBatchTest));
     }
-
+    const annSymbol = String(announcement.symbol || announcement.scrip_id || '').trim().toUpperCase();
+    if (annSymbol) {
+      const target = `/filing/${encodeURIComponent(annSymbol)}/${encodeURIComponent(cleanId)}`;
+      res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=604800');
+      return res.redirect(301, target);
+    }
+    // No symbol on record — serve the legacy page as-is rather than breaking the URL.
+    const cacheKey = `ann:${cleanId}`;
+    const clientEtag = req.headers['if-none-match'];
+    const cached = pageRenderCache.get(cacheKey);
+    if (cached) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('ETag', cached.etag);
+      res.setHeader('X-Cache', 'HIT');
+      res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+      if (clientEtag && clientEtag === cached.etag) {
+        return res.status(304).end();
+      }
+      return res.send(cached.body);
+    }
     const html = renderAnnouncementPage(announcement, cleanId);
     const entry = pageRenderCache.set(cacheKey, html, 'text/html; charset=utf-8', { ttlMs: 60 * 60 * 1000 });
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -5218,6 +5311,330 @@ app.get('/announcement/:newsId', async (req, res) => {
   } catch (err: any) {
     console.error("Error serving announcement page:", err?.message || err);
     return res.status(500).setHeader('Content-Type', 'text/html; charset=utf-8').send(renderAnnouncement404Page());
+  }
+});
+
+/**
+ * Normalize any quarter-key variant to canonical `QNFYyy` form (server mirror
+ * of src/utils/shareUrls.ts normalizeQuarterKey — keep the two in sync).
+ */
+function normalizeQuarterKeyServer(raw: string): string {
+  const s = (raw || '').toUpperCase().replace(/[\s\-_]+/g, '');
+  let q: string | null = null;
+  let fy: string | null = null;
+
+  const qm = s.match(/Q([1-4])/);
+  if (qm) q = `Q${qm[1]}`;
+
+  const fym = s.match(/FY(\d{2,4})/);
+  if (fym) {
+    const y = fym[1];
+    fy = y.length === 4 ? y.slice(2) : y;
+  } else {
+    const ym = s.match(/^(\d{4})Q[1-4]$/) || s.match(/^Q[1-4](\d{4})$/);
+    if (ym && q) {
+      const calYear = parseInt(ym[1], 10);
+      const qNum = parseInt(q.slice(1), 10);
+      const fyYear = qNum === 4 ? calYear : calYear + 1;
+      fy = String(fyYear).slice(2);
+    }
+  }
+
+  if (q && fy) return `${q}FY${fy}`;
+  return s;
+}
+
+interface ResolvedResultPage {
+  item: any;
+  companyName: string;
+  scripCode: string;
+  quarterLabel: string;
+}
+
+async function resolveResultForPage(symbol: string, quarterKey: string): Promise<ResolvedResultPage | null> {
+  const target = normalizeQuarterKeyServer(quarterKey);
+  if (!target || !/^Q[1-4]FY\d{2}$/.test(target)) return null;
+  const scripCode = getScripCode(symbol) || '';
+
+  // 1. Declared results history (quarterly outcomes).
+  try {
+    const history = await getStockResultsHistory(symbol, scripCode);
+    for (const h of history || []) {
+      const hk = normalizeQuarterKeyServer(h.quarterKey || h.periodOrMeeting || '');
+      if (hk === target) {
+        return {
+          item: h,
+          companyName: h.companyName || h.companyShortName || symbol,
+          scripCode: String(h.scripCode || scripCode),
+          quarterLabel: target,
+        };
+      }
+    }
+  } catch (err: any) {
+    console.error('resolveResultForPage history lookup failed:', err?.message || err);
+  }
+
+  // 2. Results calendar (upcoming / recent board meetings).
+  try {
+    const cal = await getResultsCalendarData('all');
+    const calList = Array.isArray(cal) ? cal : (cal?.items || []);
+    for (const c of calList) {
+      if (String(c.symbol || '').toUpperCase() !== symbol) continue;
+      const ck = normalizeQuarterKeyServer(c.quarterKey || '');
+      if (ck === target) {
+        return {
+          item: c,
+          companyName: c.companyName || symbol,
+          scripCode: String(c.scripCode || scripCode),
+          quarterLabel: target,
+        };
+      }
+    }
+  } catch (err: any) {
+    console.error('resolveResultForPage calendar lookup failed:', err?.message || err);
+  }
+
+  return null;
+}
+
+function renderResultsPage(data: ResolvedResultPage, symbol: string, canonicalUrl: string): string {
+  const { item, companyName, scripCode, quarterLabel } = data;
+  const meetingDate = item.meetingDate || item.boardMeetingDate || item.declarationDate || '';
+  const status = String(item.status || (item.isOutcome ? 'DECLARED' : '')).toUpperCase();
+  const aiSummary = String(item.aiSummary || item.aiSummaryEn || '').trim();
+  const pdfLink = item.pdfLink || item.declarationPdfLink || item.declaredDetails?.pdfUrl || '';
+  const subject = String(item.subject || item.declarationSubject || item.purpose || `${quarterLabel} financial results`).trim();
+  const metrics = item.financialMetrics || {};
+
+  const pageTitle = `${companyName} (${symbol}) — ${quarterLabel} Results | BSE Nexus`;
+
+  let description = '';
+  if (aiSummary) {
+    description = aiSummary.replace(/\s+/g, ' ');
+  } else {
+    description = `${companyName} (${symbol}) ${quarterLabel} quarterly results${meetingDate ? ` — board meeting on ${meetingDate}` : ''}. Track declared numbers, AI summaries and filings on BSE Nexus.`;
+  }
+  if (description.length > 155) {
+    description = description.slice(0, 152).trim() + '...';
+  }
+
+  const metricRows: Array<[string, string]> = [
+    ['Revenue', metrics.revenueYoY],
+    ['Net profit', metrics.netProfitYoY],
+    ['Operating margin', metrics.operatingMargin],
+    ['EPS', metrics.eps],
+  ].filter(([, v]) => v) as Array<[string, string]>;
+
+  const jsonLd = JSON.stringify({
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebPage",
+        "@id": `${canonicalUrl}#webpage`,
+        "name": pageTitle,
+        "url": canonicalUrl,
+        "description": description,
+        "inLanguage": "en-IN"
+      },
+      {
+        "@type": "BreadcrumbList",
+        "@id": `${canonicalUrl}#breadcrumb`,
+        "itemListElement": [
+          { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://bsenexus.in/" },
+          { "@type": "ListItem", "position": 2, "name": "Results Calendar", "item": "https://bsenexus.in/results-calendar" },
+          { "@type": "ListItem", "position": 3, "name": `${companyName} ${quarterLabel}`, "item": canonicalUrl }
+        ]
+      }
+    ]
+  }).replace(/</g, '\\u003c');
+
+  return `<!DOCTYPE html>
+<html lang="en-IN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${escapeHtmlText(pageTitle)}</title>
+  <meta name="description" content="${escapeHtmlAttr(description)}">
+  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+  <link rel="canonical" href="${escapeHtmlAttr(canonicalUrl)}">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="BSE Nexus">
+  <meta property="og:title" content="${escapeHtmlAttr(pageTitle)}">
+  <meta property="og:description" content="${escapeHtmlAttr(description)}">
+  <meta property="og:url" content="${escapeHtmlAttr(canonicalUrl)}">
+  <meta property="og:image" content="https://bsenexus.in/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${escapeHtmlAttr(pageTitle)}">
+  <meta name="twitter:description" content="${escapeHtmlAttr(description)}">
+  <meta name="twitter:image" content="https://bsenexus.in/og-image.png">
+  <script type="application/ld+json">
+  ${jsonLd}
+  </script>
+  <style>
+    :root { --bg: #F8FAFC; --card-bg: #FFFFFF; --text: #0F172A; --text-muted: #64748B; --border-subtle: #E2E8F0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+    .topbar { background: #0F172A; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; }
+    .top-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: #FFFFFF; font-weight: 700; font-size: 1.125rem; letter-spacing: -0.02em; }
+    .top-brand span { color: #34D399; }
+    .app-btn { background: #34D399; color: #064E3B; font-weight: 600; font-size: 0.875rem; padding: 8px 16px; border-radius: 8px; text-decoration: none; white-space: nowrap; }
+    .container { max-width: 820px; margin: 32px auto 0 auto; padding: 0 20px; }
+    .card { background: var(--card-bg); border: 1px solid var(--border-subtle); border-radius: 16px; padding: 32px; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03), 0 1px 2px rgba(15, 23, 42, 0.04); }
+    .meta-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; background: #EDE9FE; color: #6D28D9; border: 1px solid #DDD6FE; }
+    .badge.scrip { background: #F1F5F9; color: #475569; border: 1px solid #E2E8F0; }
+    .timestamp { font-size: 0.8125rem; color: var(--text-muted); margin-left: auto; }
+    h1 { font-size: 1.75rem; font-weight: 800; line-height: 1.25; color: #0F172A; margin-bottom: 8px; letter-spacing: -0.02em; }
+    h2.subject { font-size: 1.125rem; font-weight: 600; color: #334155; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border-subtle); }
+    .ai-box { background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 12px; padding: 20px; margin-bottom: 24px; }
+    .ai-title { font-size: 0.8125rem; font-weight: 700; color: #047857; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
+    .ai-body { font-size: 0.9375rem; color: #1E293B; }
+    .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .metric { background: #F8FAFC; border: 1px solid var(--border-subtle); border-radius: 10px; padding: 14px; text-align: center; }
+    .metric .v { font-size: 1.125rem; font-weight: 800; color: #0F172A; }
+    .metric .k { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .action-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
+    .pdf-btn { display: inline-block; background: #0F172A; color: #FFFFFF; font-weight: 600; font-size: 0.9375rem; padding: 12px 22px; border-radius: 10px; text-decoration: none; }
+    .terminal-link { display: inline-block; color: #047857; font-weight: 600; font-size: 0.9375rem; padding: 12px 0; text-decoration: none; }
+    footer { max-width: 820px; margin: 32px auto; padding: 0 20px 40px 20px; font-size: 0.8125rem; color: var(--text-muted); }
+    @media (max-width: 640px) { .card { padding: 22px; } h1 { font-size: 1.375rem; } }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <a href="https://bsenexus.in/" class="top-brand">BSE <span>Nexus</span></a>
+    <a href="https://bsenexus.in/results-calendar" class="app-btn">Open Results Calendar</a>
+  </header>
+
+  <main class="container">
+    <article class="card">
+      <div class="meta-bar">
+        <span class="badge">${escapeHtmlText(quarterLabel)}</span>
+        ${status ? `<span class="badge scrip">${escapeHtmlText(status)}</span>` : ''}
+        ${scripCode ? `<span class="badge scrip">BSE: ${escapeHtmlText(String(scripCode))}</span>` : ''}
+        <span class="badge scrip">${escapeHtmlText(symbol)}</span>
+        ${meetingDate ? `<time class="timestamp">${escapeHtmlText(String(meetingDate))}</time>` : ''}
+      </div>
+
+      <h1>${escapeHtmlText(companyName)}</h1>
+      <h2 class="subject">${escapeHtmlText(subject)}</h2>
+
+      ${aiSummary ? `
+      <div class="ai-box">
+        <div class="ai-title">AI Financial Summary &amp; Key Highlights</div>
+        <div class="ai-body">${escapeHtmlText(aiSummary)}</div>
+      </div>
+      ` : ''}
+
+      ${metricRows.length > 0 ? `
+      <div class="metrics">
+        ${metricRows.map(([k, v]) => `<div class="metric"><div class="v">${escapeHtmlText(String(v))}</div><div class="k">${escapeHtmlText(k)} (YoY)</div></div>`).join('')}
+      </div>
+      ` : ''}
+
+      <div class="action-row">
+        ${pdfLink ? `
+        <a href="${escapeHtmlAttr(String(pdfLink))}" target="_blank" rel="noopener noreferrer" class="pdf-btn">
+          View Official BSE Filing (PDF) &nearr;
+        </a>
+        ` : ''}
+        <a href="https://bsenexus.in/company/${encodeURIComponent(symbol)}" class="terminal-link">
+          ${escapeHtmlText(companyName)} — full 360&deg; overview &rarr;
+        </a>
+      </div>
+    </article>
+
+    <footer>
+      Independent financial terminal for Indian equities (BSE). Disclosures sourced directly from BSE India public regulatory feeds.
+    </footer>
+  </main>
+</body>
+</html>`;
+}
+
+function renderResults404Page(symbol: string, quarterKey: string): string {
+  const safeSym = escapeHtmlText(symbol || '');
+  const safeQ = escapeHtmlText(quarterKey || '');
+  return `<!DOCTYPE html>
+<html lang="en-IN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Results not found | BSE Nexus</title>
+  <meta name="robots" content="noindex, nofollow">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #F8FAFC; color: #0F172A; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
+    .box { background: #fff; border: 1px solid #E2E8F0; border-radius: 16px; padding: 40px; max-width: 480px; text-align: center; }
+    h1 { font-size: 1.25rem; margin-bottom: 8px; }
+    p { color: #64748B; font-size: 0.9375rem; margin-bottom: 20px; }
+    a { display: inline-block; background: #0F172A; color: #fff; padding: 10px 20px; border-radius: 10px; text-decoration: none; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>Results page not found</h1>
+    <p>We couldn't find ${safeQ ? `<strong>${safeQ}</strong> results` : 'results'} for ${safeSym ? `<strong>${safeSym}</strong>` : 'this company'}. The quarter may not be declared yet.</p>
+    <a href="https://bsenexus.in/results-calendar">Open Results Calendar</a>
+  </div>
+</body>
+</html>`;
+}
+
+// Crawlable, server-rendered individual results pages (canonical shareable URL
+// scheme: /results/:symbol/:quarterKey) for search engines & direct visitors.
+// Public — no login required, like /company/:symbol.
+app.get('/results/:symbol/:quarterKey', async (req, res) => {
+  const rawSymbol = req.params.symbol;
+  const rawQuarter = req.params.quarterKey;
+  if (!rawSymbol || typeof rawSymbol !== 'string' || !rawQuarter || typeof rawQuarter !== 'string') {
+    return res.status(404).setHeader('Content-Type', 'text/html; charset=utf-8').send(renderResults404Page('', ''));
+  }
+
+  const symbol = rawSymbol.trim().toUpperCase();
+  const quarterKey = rawQuarter.trim().toUpperCase();
+  if (!/^[A-Z0-9-]{2,20}$/.test(symbol)) {
+    return res.status(404).setHeader('Content-Type', 'text/html; charset=utf-8').send(renderResults404Page(symbol, quarterKey));
+  }
+  const scripCode = getScripCode(symbol);
+  if (!scripCode) {
+    return res.status(404).setHeader('Content-Type', 'text/html; charset=utf-8').send(renderResults404Page(symbol, quarterKey));
+  }
+
+  const cacheKey = `results:${symbol}:${normalizeQuarterKeyServer(quarterKey)}`;
+  const clientEtag = req.headers['if-none-match'];
+
+  const cached = pageRenderCache.get(cacheKey);
+  if (cached) {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('ETag', cached.etag);
+    res.setHeader('X-Cache', 'HIT');
+    res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+    if (clientEtag && clientEtag === cached.etag) {
+      return res.status(304).end();
+    }
+    return res.send(cached.body);
+  }
+
+  try {
+    const resolved = await resolveResultForPage(symbol, quarterKey);
+    if (!resolved) {
+      return res.status(404).setHeader('Content-Type', 'text/html; charset=utf-8').send(renderResults404Page(symbol, quarterKey));
+    }
+
+    const canonicalUrl = `https://bsenexus.in/results/${encodeURIComponent(symbol)}/${encodeURIComponent(resolved.quarterLabel)}`;
+    const html = renderResultsPage(resolved, symbol, canonicalUrl);
+    const entry = pageRenderCache.set(cacheKey, html, 'text/html; charset=utf-8', { ttlMs: 60 * 60 * 1000 });
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('ETag', entry.etag);
+    res.setHeader('X-Cache', 'MISS');
+    res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+    if (clientEtag && clientEtag === entry.etag) {
+      return res.status(304).end();
+    }
+    return res.send(html);
+  } catch (err: any) {
+    console.error("Error serving results page:", err?.message || err);
+    return res.status(500).setHeader('Content-Type', 'text/html; charset=utf-8').send(renderResults404Page(symbol, quarterKey));
   }
 });
 

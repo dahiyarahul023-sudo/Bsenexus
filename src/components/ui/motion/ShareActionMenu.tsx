@@ -103,9 +103,13 @@ export const ShareActionMenu: React.FC<ShareActionMenuProps> = ({
   const effectiveHeadline = candidateHeadline && candidateHeadline !== effectiveTitle ? candidateHeadline : '';
 
   // Canonical Public Web URL for sharing
-  // Must always be a clean, absolute URL pointing to the announcement or stock on BSE Nexus
+  // Shareable scheme: filings → /filing/:symbol/:newsId, results → /results/:symbol/:quarterKey.
+  // The legacy /announcement/:newsId fallback is 301-redirected server-side to the filing URL.
+  const effectiveSymbol = (symbol || '').trim().toUpperCase();
   let canonicalWebUrl = '';
-  if (effectiveNewsId) {
+  if (effectiveNewsId && effectiveSymbol) {
+    canonicalWebUrl = `https://bsenexus.in/filing/${encodeURIComponent(effectiveSymbol)}/${encodeURIComponent(effectiveNewsId)}`;
+  } else if (effectiveNewsId) {
     canonicalWebUrl = `https://bsenexus.in/announcement/${encodeURIComponent(effectiveNewsId)}`;
   } else if (rawUrl && !rawUrl.includes('/api/pdf-open')) {
     if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
@@ -397,7 +401,7 @@ export const ShareActionMenu: React.FC<ShareActionMenuProps> = ({
                       <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-slate-200/50 dark:border-[#2B273E] text-[10px]">
                         <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-mono font-medium">
                           <Globe size={10} />
-                          <span className="truncate max-w-[190px]">bsenexus.in/announcement</span>
+                          <span className="truncate max-w-[190px]">{effectiveSymbol && effectiveNewsId ? 'bsenexus.in/filing' : 'bsenexus.in'}</span>
                         </span>
                         {directPdfUrl && (
                           <span className="flex items-center gap-1 text-rose-600 dark:text-rose-400 font-medium">

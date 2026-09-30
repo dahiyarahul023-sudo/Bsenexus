@@ -5,6 +5,7 @@ import { readLocalJson, writeLocalJson, isFirestoreQuotaExceeded, setFirestoreQu
 import { BloomFilter } from '../utils/bloomFilter.js';
 import { pageRenderCache } from '../utils/renderCache.js';
 import { notifySearchEnginesOfNewPages } from '../services/indexNow.js';
+import { resolveStockDetailsSync } from '../utils/stockResolver.js';
 
 const ANNOUNCEMENTS_FILE = 'announcements.json';
 const sentCache = new Set<string>();
@@ -692,12 +693,22 @@ export async function saveAnnouncementsBatch(items: AnnouncementInput[]): Promis
     scheduleLocalDiskSave();
     queueAnnouncementsBatchWrite(tasksToQueue);
 
-    // Notify search engines (Bing, Yandex, etc.) of newly published announcement pages
+    // Notify search engines (Bing, Yandex, etc.) of newly published announcement pages.
+    // Canonical shareable scheme: /filing/:symbol/:newsId (legacy /announcement/
+    // URLs 301-redirect there, but notify the canonical URL directly).
     if (inserted > 0) {
       const newUrls = items
         .filter(it => it && it.newsId)
         .slice(0, 50)
-        .map(it => `https://bsenexus.in/announcement/${it.newsId}`);
+        .map(it => {
+          // Resolve the trading symbol from the BSE scrip code for the
+          // canonical /filing/:symbol/:newsId URL; fall back to the legacy URL
+          // (server 301-redirects it) when the symbol can't be resolved.
+          const sym = String(resolveStockDetailsSync(String(it.scrip_cd || ''))?.symbol || '').trim().toUpperCase();
+          return /^[A-Z0-9-]{2,20}$/.test(sym)
+            ? `https://bsenexus.in/filing/${encodeURIComponent(sym)}/${encodeURIComponent(it.newsId)}`
+            : `https://bsenexus.in/announcement/${encodeURIComponent(it.newsId)}`;
+        });
       if (newUrls.length > 0) {
         notifySearchEnginesOfNewPages(newUrls);
       }

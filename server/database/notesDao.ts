@@ -33,6 +33,8 @@ export interface NoteLink {
   symbol?: string;
   /** External URL for tap-to-jump (news articles). */
   url?: string;
+  /** BSE filing id for tap-to-jump into the shareable filing page (/filing/:symbol/:newsId). */
+  newsId?: string;
 }
 
 export interface UserNote {
@@ -109,6 +111,8 @@ export function validateNoteInput(input: NoteInput): { ok: true; note: Required<
     };
     if (isNonEmptyString(l.symbol)) link.symbol = l.symbol.trim().toUpperCase().slice(0, 32);
     if (isNonEmptyString(l.url) && /^https?:\/\//i.test(l.url.trim())) link.url = l.url.trim().slice(0, 500);
+    // BSE filing id for tap-to-jump into the shareable filing page (/filing/:symbol/:newsId).
+    if (isNonEmptyString(l.newsId) && /^[A-Za-z0-9_-]{3,80}$/.test(l.newsId.trim())) link.newsId = l.newsId.trim();
   }
 
   return { ok: true, note: { text, icon, tags, link } };

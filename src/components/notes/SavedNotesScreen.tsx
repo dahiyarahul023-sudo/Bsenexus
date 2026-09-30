@@ -10,6 +10,7 @@ import { useIntelModal } from '../../context/IntelModalContext';
 import { useAuth } from '../../context/AuthContext';
 import { noteIconAt } from './noteIcons';
 import type { UserNote, NoteLinkType } from '../../types';
+import { navigateToFiling } from '../../utils/shareUrls';
 import { cn } from '../../lib/utils';
 
 const LINK_META: Record<NoteLinkType, { icon: any; tint: string; label: string }> = {
@@ -173,8 +174,12 @@ export function SavedNotesScreen({ onNavigate }: { onNavigate?: (tab: string) =>
     } else if (link.type === 'result') {
       if (onNavigate) onNavigate('results-calendar');
     } else if (link.type === 'filing') {
-      // Filing: reopen the exact source document when available.
-      if (link.url) window.open(link.url, '_blank', 'noopener,noreferrer');
+      // Filing: jump to its shareable filing page (/filing/:symbol/:newsId) when
+      // we know the filing id; otherwise fall back to the PDF or company overview.
+      const sym = (link.symbol || '').trim().toUpperCase();
+      if (sym && link.newsId) {
+        navigateToFiling(sym, link.newsId);
+      } else if (link.url) window.open(link.url, '_blank', 'noopener,noreferrer');
       else if (link.symbol) openIntelModal({ symbol: link.symbol });
     }
   };

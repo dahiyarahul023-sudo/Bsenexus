@@ -158,6 +158,8 @@ export interface NoteLink {
   symbol?: string;
   /** External URL for tap-to-jump (news articles). */
   url?: string;
+  /** BSE filing id for tap-to-jump into the shareable filing page (/filing/:symbol/:newsId). */
+  newsId?: string;
 }
 
 export interface UserNote {

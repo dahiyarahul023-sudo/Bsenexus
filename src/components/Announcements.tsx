@@ -17,6 +17,7 @@ import { twMerge } from 'tailwind-merge';
 import { formatFullDateTime, formatShortDateTime, formatTimeOnly, formatDateOnly, formatCleanDateTime, formatCleanTime, formatFilingRelativeTime } from '../utils/timeFormat';
 import { cleanBseSubject } from '../utils/cleanBseSubject';
 import { getSafePdfUrl } from '../utils/pdfHelper';
+import { navigateToFiling } from '../utils/shareUrls';
 import { useAuth } from '../context/AuthContext';
 import { useIntelModal } from '../context/IntelModalContext';
 import { useAiQuota, syncQuotaFromResponse } from '../utils/aiQuota';
@@ -710,10 +711,19 @@ export function Announcements({
   };
 
   const handleSelectAnnouncement = (item: any) => {
+    // Shareable URL scheme: tapping a filing card navigates to its canonical
+    // page (/filing/:symbol/:newsId) instead of the in-feed drawer. The drawer
+    // code below is retained as a fallback for items without a shareable URL.
+    const sym = String(item.symbol || item.scrip_id || '').toUpperCase();
+    const nid = item.id || item.newsId;
+    markAsRead(item.id);
+    if (sym && nid) {
+      navigateToFiling(sym, nid);
+      return;
+    }
     setSelectedItem(item);
     setLightningId(item.id);
     setCopiedSummary(false);
-    markAsRead(item.id);
     setTimeout(() => {
       setLightningId(null);
     }, 850);
@@ -1013,6 +1023,7 @@ export function Announcements({
                 headline={cleanSub.headline || item.subject}
                 companyName={item.companyName}
                 scripCode={item.scrip_cd}
+                symbol={item.symbol}
                 newsId={item.id || item.newsId}
                 category={item.category}
                 pdfUrl={item.pdfLink || item.ATTACHMENTNAME || item.attachmentName}
@@ -1024,6 +1035,7 @@ export function Announcements({
                   type: 'filing',
                   label: `${item.companyName} · ${(cleanSub.headline || item.subject || 'Filing').slice(0, 60)}`,
                   symbol: item.symbol,
+                  newsId: item.id || item.newsId || undefined,
                   url: item.pdfLink || item.ATTACHMENTNAME || item.attachmentName || undefined,
                 }}
                 label={`Save note on this ${item.companyName} filing`}
@@ -1802,6 +1814,7 @@ export function Announcements({
                           headline={cleanSub.headline || item.subject}
                           companyName={item.companyName}
                           scripCode={item.scrip_cd}
+                          symbol={item.symbol}
                           newsId={item.id || item.newsId}
                           category={item.category}
                           pdfUrl={item.pdfLink || item.ATTACHMENTNAME || item.attachmentName}
@@ -1813,6 +1826,7 @@ export function Announcements({
                             type: 'filing',
                             label: `${item.companyName} · ${(cleanSub.headline || item.subject || 'Filing').slice(0, 60)}`,
                             symbol: item.symbol,
+                            newsId: item.id || item.newsId || undefined,
                             url: item.pdfLink || item.ATTACHMENTNAME || item.attachmentName || undefined,
                           }}
                           label={`Save note on this ${item.companyName} filing`}
@@ -1957,6 +1971,7 @@ export function Announcements({
                         headline={cleanSub.headline || item.subject}
                         companyName={item.companyName}
                         scripCode={item.scrip_cd}
+                        symbol={item.symbol}
                         newsId={item.id || item.newsId}
                         category={item.category}
                         pdfUrl={item.pdfLink || item.ATTACHMENTNAME || item.attachmentName}
