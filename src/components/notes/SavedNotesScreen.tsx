@@ -58,9 +58,9 @@ function NoteRow({
       <div className="flex items-start gap-3">
         <button
           type="button" onClick={onJump} aria-label={note.link ? `Open linked ${note.link.type}` : 'Open note'}
-          className={cn('w-11 h-11 rounded-[14px] grid place-items-center text-[22px] shrink-0 cursor-pointer hover:scale-105 transition-transform', icon.bg, icon.darkBg, 'ring-1 ring-black/5 dark:ring-white/10')}
+          className="w-11 h-11 shrink-0 cursor-pointer hover:scale-105 transition-transform overflow-hidden rounded-[14px] ring-1 ring-black/5 dark:ring-white/10"
         >
-          <span role="img" aria-hidden>{icon.emoji}</span>
+          <icon.Icon className="w-full h-full" />
         </button>
         <button type="button" onClick={onJump} className="flex-1 min-w-0 text-left cursor-pointer">
           <p className="text-[13px] leading-snug text-slate-800 dark:text-slate-100 font-medium line-clamp-2">

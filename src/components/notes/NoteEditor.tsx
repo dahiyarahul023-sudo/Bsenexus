@@ -246,14 +246,13 @@ function NoteEditorSheet({
                       aria-label={ic.label}
                       aria-pressed={selected}
                       className={cn(
-                        'aspect-square rounded-[22px] grid place-items-center text-[26px] transition-all cursor-pointer',
-                        ic.bg, ic.darkBg,
+                        'aspect-square rounded-[22px] grid place-items-center transition-all cursor-pointer overflow-hidden',
                         selected
                           ? 'ring-[3px] ring-neutral-900 dark:ring-white ring-offset-2 ring-offset-white dark:ring-offset-[#171522] scale-[1.04]'
                           : 'hover:scale-105 ring-1 ring-black/5 dark:ring-white/10'
                       )}
                     >
-                      <span role="img" aria-hidden>{ic.emoji}</span>
+                      <ic.Icon className="w-full h-full" />
                     </motion.button>
                   );
                 })}
@@ -268,9 +267,9 @@ function NoteEditorSheet({
               <div className="flex items-center gap-3">
                 <button
                   type="button" onClick={() => setStep(0)} aria-label="Change icon"
-                  className={cn('w-12 h-12 rounded-2xl grid place-items-center text-2xl shrink-0 cursor-pointer hover:scale-105 transition-transform', icon.bg, icon.darkBg, 'ring-1 ring-black/5 dark:ring-white/10')}
+                  className="w-12 h-12 shrink-0 cursor-pointer hover:scale-105 transition-transform overflow-hidden rounded-2xl ring-1 ring-black/5 dark:ring-white/10"
                 >
-                  <span role="img" aria-hidden>{icon.emoji}</span>
+                  <icon.Icon className="w-full h-full" />
                 </button>
                 <div className="min-w-0 flex-1">
                   {link ? (
