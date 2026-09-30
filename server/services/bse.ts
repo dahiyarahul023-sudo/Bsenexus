@@ -5,7 +5,7 @@ import { resolveStockDetails } from '../utils/stockResolver.js';
 import { getActiveWatchlistSymbols } from '../database/watchlistDao.js';
 import { invalidateEnrichedCalendarCache } from './resultsCalendarService.js';
 import { bseCircuitBreaker } from '../utils/circuitBreaker.js';
-import { Agent as UndiciAgent } from 'undici';
+import { Agent as UndiciAgent, ProxyAgent } from 'undici';
 
 // ONE persistent HTTP/2 keep-alive session for all BSE polls — never open a
 // fresh TCP/TLS connection per poll. Reused across market-hours and off-hours.
@@ -14,6 +14,27 @@ const bseKeepAliveAgent = new UndiciAgent({
   keepAliveMaxTimeout: 120_000,
   connectTimeout: 3_000,
 });
+
+// ---- Optional egress proxy for BSE API traffic (IP-block avoidance) ----
+// BSE's Akamai WAF sometimes 403-blocks our cloud egress IP. When BSE_PROXY_URL
+// is set (e.g. http://user:pass@proxy-host:1234), EVERY BSE API request in this
+// file routes through that proxy instead of the server's own IP. Unset = direct
+// (current behavior). Configure via AI Studio Secrets / Cloud Run env vars —
+// no code change or redeploy needed beyond setting the variable.
+let bseProxyAgent: ProxyAgent | null = null;
+let bseProxyUrlSeen = '';
+function getBseDispatcher() {
+  const proxyUrl = (process.env.BSE_PROXY_URL || '').trim();
+  if (proxyUrl) {
+    if (!bseProxyAgent || bseProxyUrlSeen !== proxyUrl) {
+      bseProxyAgent = new ProxyAgent(proxyUrl);
+      bseProxyUrlSeen = proxyUrl;
+      addLog('INFO', 'POLLER', 'BSE egress proxy enabled via BSE_PROXY_URL').catch(() => {});
+    }
+    return bseProxyAgent;
+  }
+  return bseKeepAliveAgent;
+}
 
 let bseHealth = { status: 'unknown', latency: 0 };
 let lastBseErrorDetails = "No recent errors";
@@ -165,8 +186,9 @@ async function fetchWithHardenedRetries(url: string, timeoutMs: number = 3000, m
       const res = await fetch(url, {
         headers,
         signal: controller.signal,
-        // Reuse the single persistent keep-alive session for BSE
-        dispatcher: bseKeepAliveAgent,
+        // Egress via clean-IP proxy when BSE_PROXY_URL is set (IP-block avoidance),
+        // otherwise the single persistent keep-alive session.
+        dispatcher: getBseDispatcher(),
       } as any);
       clearTimeout(timer);
 
