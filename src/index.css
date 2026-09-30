@@ -448,3 +448,245 @@ body {
 .btn-shine:hover::after {
   left: 135%;
 }
+
+/* ==========================================================================
+ * SOFT-GLASS DESIGN THEME (PRO-only)
+ * Activated via <html data-design-theme="softglass">.
+ * Design language (from the @rondesignlab reference): warm-gray dotted canvas,
+ * frosted-white cards, oversized corner radii, soft diffused shadows,
+ * sage-green gradient accents, geometric sans (Outfit).
+ * While active, dark mode is forced off — the language is inherently light.
+ * ========================================================================== */
+
+[data-design-theme="softglass"] {
+  color-scheme: light;
+}
+
+/* --- Canvas: warm gray + dot grid, geometric sans --- */
+[data-design-theme="softglass"] body {
+  background-color: #edf0e9;
+  background-image: radial-gradient(#d4d9cd 1.3px, transparent 1.3px);
+  background-size: 22px 22px;
+  font-family: 'Outfit', 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  color: #1e211d;
+}
+
+[data-design-theme="softglass"] ::selection {
+  background-color: rgba(47, 158, 119, 0.28);
+  color: #1e211d;
+}
+
+[data-design-theme="softglass"] ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+[data-design-theme="softglass"] ::-webkit-scrollbar-track {
+  background: transparent;
+}
+[data-design-theme="softglass"] ::-webkit-scrollbar-thumb {
+  background: #c2c8b8;
+  border-radius: 8px;
+}
+[data-design-theme="softglass"] ::-webkit-scrollbar-thumb:hover {
+  background: #a9b09d;
+}
+
+/* --- Frosted white surfaces (cards, modals, dropdowns, inputs) --- */
+[data-design-theme="softglass"] .bg-white {
+  background-color: rgba(255, 255, 255, 0.82);
+}
+
+/* Warm up the cool slate/gray washes so they sit naturally on the canvas */
+[data-design-theme="softglass"] .bg-slate-50 {
+  background-color: rgba(244, 246, 241, 0.85);
+}
+[data-design-theme="softglass"] .bg-gray-50 {
+  background-color: rgba(244, 246, 241, 0.85);
+}
+[data-design-theme="softglass"] .bg-slate-100 {
+  background-color: rgba(233, 236, 228, 0.9);
+}
+[data-design-theme="softglass"] .bg-gray-100 {
+  background-color: rgba(233, 236, 228, 0.9);
+}
+
+/* --- Oversized radii: no sharp geometry anywhere --- */
+[data-design-theme="softglass"] [class*="rounded-lg"] {
+  border-radius: 16px;
+}
+[data-design-theme="softglass"] [class*="rounded-xl"] {
+  border-radius: 22px;
+}
+[data-design-theme="softglass"] [class*="rounded-2xl"] {
+  border-radius: 28px;
+}
+[data-design-theme="softglass"] [class*="rounded-3xl"] {
+  border-radius: 32px;
+}
+
+/* --- Helios card shell becomes true frosted glass --- */
+[data-design-theme="softglass"] .helios-card {
+  background: rgba(255, 255, 255, 0.78);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 28px;
+  box-shadow:
+    0 16px 34px rgba(62, 74, 60, 0.10),
+    0 3px 8px rgba(62, 74, 60, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+/* --- Helios pills: floating white chips with soft shadow --- */
+[data-design-theme="softglass"] .helios-pill {
+  box-shadow:
+    0 6px 16px rgba(62, 74, 60, 0.10),
+    0 2px 5px rgba(62, 74, 60, 0.06);
+  padding: 7px 14px;
+  font-weight: 600;
+}
+
+/* --- Modal / dialog / popover panels: deeper frost --- */
+[data-design-theme="softglass"] [role="dialog"] .bg-white,
+[data-design-theme="softglass"] [aria-modal="true"] .bg-white,
+[data-design-theme="softglass"] [role="menu"] .bg-white,
+[data-design-theme="softglass"] [role="listbox"] .bg-white {
+  background-color: rgba(255, 255, 255, 0.9);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  box-shadow:
+    0 24px 60px rgba(62, 74, 60, 0.18),
+    0 4px 12px rgba(62, 74, 60, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+/* --- Buttons: keep brand colors, enforce the pill language --- */
+[data-design-theme="softglass"] button[class*="rounded-lg"],
+[data-design-theme="softglass"] a[class*="rounded-lg"] {
+  border-radius: 999px;
+}
+
+/* --- Inputs: frosted, softly rounded --- */
+[data-design-theme="softglass"] input[class*="rounded"],
+[data-design-theme="softglass"] select[class*="rounded"],
+[data-design-theme="softglass"] textarea[class*="rounded"] {
+  background-color: rgba(255, 255, 255, 0.85);
+  border-color: rgba(190, 197, 182, 0.7);
+}
+
+/* --- Sage-green gradient hero card (the reference "Qualification" card).
+ * Apply via `sg-hero` class on status/hero cards for the signature look. --- */
+.sg-hero {
+  border-radius: 30px;
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #c9ecd4 0%, #7fd0a4 48%, #2f9e77 100%);
+  box-shadow:
+    0 16px 34px rgba(47, 158, 119, 0.28),
+    inset 0 2px 8px rgba(255, 255, 255, 0.5);
+}
+.sg-hero h1, .sg-hero h2, .sg-hero p {
+  text-shadow: 0 1px 6px rgba(30, 90, 60, 0.25);
+}
+
+/* Active filter pills get the sage tint (matches reference active states) */
+[data-design-theme="softglass"] .sg-active-pill {
+  background: #e2f4e9 !important;
+  color: #1c7a4b !important;
+  font-weight: 600;
+  box-shadow:
+    0 6px 16px rgba(47, 158, 119, 0.18),
+    0 2px 5px rgba(62, 74, 60, 0.06);
+}
+
+/* --- Frosted white opacity variants (sticky header, overlays) --- */
+[data-design-theme="softglass"] .bg-white\/80,
+[data-design-theme="softglass"] .bg-white\/90,
+[data-design-theme="softglass"] .bg-white\/95 {
+  background-color: rgba(255, 255, 255, 0.78);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(16px) saturate(1.4);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+/* --- Warm up remaining cool washes --- */
+[data-design-theme="softglass"] .bg-slate-200,
+[data-design-theme="softglass"] .bg-gray-200 {
+  background-color: rgba(226, 230, 220, 0.92);
+}
+[data-design-theme="softglass"] .bg-slate-300,
+[data-design-theme="softglass"] .bg-gray-300 {
+  background-color: rgba(210, 215, 202, 0.92);
+}
+
+/* --- Soften cool borders so they sit naturally on the canvas --- */
+[data-design-theme="softglass"] .border-slate-200,
+[data-design-theme="softglass"] .border-gray-200 {
+  border-color: rgba(190, 197, 182, 0.65);
+}
+[data-design-theme="softglass"] .border-slate-300,
+[data-design-theme="softglass"] .border-gray-300 {
+  border-color: rgba(175, 183, 166, 0.7);
+}
+
+/* --- Skeleton loaders: warm shimmer blocks --- */
+[data-design-theme="softglass"] .animate-pulse {
+  --tw-animate-pulse: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+[data-design-theme="softglass"] .animate-pulse.bg-slate-200,
+[data-design-theme="softglass"] .animate-pulse.bg-gray-200 {
+  background-color: rgba(190, 197, 182, 0.55);
+}
+
+/* --- Tables: airy rows on frosted cards --- */
+[data-design-theme="softglass"] table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+[data-design-theme="softglass"] thead th {
+  background-color: rgba(244, 246, 241, 0.85);
+  font-weight: 700;
+}
+[data-design-theme="softglass"] tbody tr {
+  background-color: rgba(255, 255, 255, 0.55);
+}
+[data-design-theme="softglass"] tbody tr:nth-child(even) {
+  background-color: rgba(244, 246, 241, 0.55);
+}
+
+/* --- Toggle switches: sage when on --- */
+[data-design-theme="softglass"] [role="switch"][aria-checked="true"],
+[data-design-theme="softglass"] button[aria-checked="true"].bg-emerald-500,
+[data-design-theme="softglass"] button[aria-checked="true"].bg-emerald-600 {
+  background-color: #2f9e77;
+  box-shadow: 0 4px 12px rgba(47, 158, 119, 0.35);
+}
+
+/* --- Progress bars: sage fill --- */
+[data-design-theme="softglass"] [role="progressbar"] > *,
+[data-design-theme="softglass"] .bg-emerald-500 {
+  background-color: #2f9e77;
+}
+
+/* --- Tooltips: frosted dark chips --- */
+[data-design-theme="softglass"] [role="tooltip"] {
+  background-color: rgba(30, 33, 29, 0.92);
+  color: #f4f6f1;
+  border-radius: 12px;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+/* --- Dividers: whisper-thin warm lines --- */
+[data-design-theme="softglass"] hr,
+[data-design-theme="softglass"] .divide-slate-200 > * + *,
+[data-design-theme="softglass"] .divide-gray-200 > * + * {
+  border-color: rgba(190, 197, 182, 0.5);
+}
+
+/* --- Focus rings: sage glow --- */
+[data-design-theme="softglass"] :focus-visible {
+  outline: 2px solid rgba(47, 158, 119, 0.6);
+  outline-offset: 2px;
+}

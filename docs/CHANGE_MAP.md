@@ -217,6 +217,42 @@ Domain-grep se pakad ke theek karo.
 
 ---
 
+## Domain 10 — Design theme (Classic / Soft Glass, 30 Sep 2026)
+
+Do design themes: **Classic** (current Helios look, dark/light toggle applies) aur
+**Soft Glass** (@rondesignlab soft-glass language — warm dotted canvas, frosted
+cards, oversized radii, sage accents; **light-only, PRO-only**).
+
+**Source of truth:**
+- `src/types.ts` (`DesignTheme = 'classic' | 'softglass'`, `notificationPreferences.designTheme?`)
+- `src/App.tsx` (`designTheme` state, `setDesignTheme` with PRO gate, `<html data-design-theme>` effect, profile-hydration effect)
+- `src/index.css` (`[data-design-theme="softglass"]` layer — ALL soft-glass styling lives here, scoped so Classic can never regress)
+
+**Related surfaces:**
+- `src/components/SettingsTab.tsx` (Appearance → Design Theme picker, PRO lock, Saved pill, reset)
+- `src/components/ui/helios.tsx` (`helios-card` / `helios-pill` hook classes — soft-glass restyles these site-wide)
+- Har component jo `heliosCard`/`HeliosPill` use karta hai (filings, watchlist, results, news, AI summary, modals)
+
+**PRO gate (2 jagah enforce hota hai, dono check karo):**
+1. `setDesignTheme('softglass')` → non-PRO par `setIsProModalOpen(true)`, returns false
+2. Hydration effect → stored `softglass` + expired/non-PRO = fallback to `classic`
+
+**Rules:**
+- Soft Glass **hamesha light** — active hote hi `.dark` class force-remove hoti hai; user's dark/light choice preserve karke Classic par wapas restore hoti hai
+- Nayi CSS **sirf** `[data-design-theme="softglass"]` scope me likho — bina scope ke likha to Classic tootega
+- Naye card/pill surfaces par `helios-card`/`helios-pill` hook classes lagao taaki theme unhe pakad sake
+- DEV-only preview: `?design=softglass` (production me kaam nahi karta)
+
+**Guard:** none — dhyan se (visual QA: static harness `file:///tmp/sg/harness.html` + real compiled CSS)
+
+**Checklist (theme-related badlav par):**
+1. `src/index.css` me `[data-design-theme="softglass"]` scope me style add karo
+2. Agar naya surface hai to `helios-card`/`helios-pill` hook lagao
+3. `npx tsc --noEmit` + `npm run build`
+4. Harness se 390px + 1536px screenshot verify karo
+
+---
+
 ## Shared manual-copy surfaces (kayin domains se judi hain)
 
 Ye do files **kisi bhi domain ke badlav par check karni hain** — ye code se nahi

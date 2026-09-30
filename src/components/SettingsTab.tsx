@@ -26,6 +26,7 @@ import { SavedNotesScreen } from './notes/SavedNotesScreen';
 import { APP_VERSION } from '../version';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { useFeedDensity, DEFAULT_DENSITY, type FeedDensity } from '../hooks/useFeedDensity';
+import type { DesignTheme } from '../types';
 import { springSnappy, buttonTap } from '../utils/motionTokens';
 import { SupportModal } from './ui/SupportFloat';
 import { ActionButton } from './ui/ActionButton';
@@ -42,12 +43,15 @@ interface SettingsTabProps {
   fetchSettings: () => void;
   theme?: string;
   setTheme?: (theme: string) => void;
+  designTheme?: DesignTheme;
+  setDesignTheme?: (theme: DesignTheme) => Promise<boolean> | boolean | void;
+  canUseSoftGlass?: boolean;
   onNavigate?: (tab: string) => void;
 }
 
 // Registry of all searchable settings for instant filtering & breadcrumb navigation
 const SETTINGS_REGISTRY = [
-  { id: 'appearance', title: 'Appearance & Theme', description: 'Toggle between Dark and Light mode', category: 'Preferences', keywords: ['dark', 'light', 'theme', 'mode', 'appearance', 'color'] },
+  { id: 'appearance', title: 'Appearance & Theme', description: 'Dark/Light mode and the Pro-only Soft Glass design theme', category: 'Preferences', keywords: ['dark', 'light', 'theme', 'mode', 'appearance', 'color', 'soft glass', 'design theme', 'pro theme', 'glass'] },
   { id: 'density', title: 'Feed Display Density', description: 'Adjust spacing for disclosure feeds (Comfortable, Compact, Dense)', category: 'Preferences', keywords: ['density', 'compact', 'comfortable', 'dense', 'spacing', 'feed', 'layout'] },
   { id: 'sound', title: 'Audio alerts', description: 'Play chime on high-impact filing updates', category: 'Preferences', keywords: ['sound', 'audio', 'chime', 'bell', 'alert', 'volume', 'audio cue'] },
   { id: 'filter', title: 'High impact filter', description: 'Highlight material price-sensitive disclosures (SEBI LODR 30)', category: 'Preferences', keywords: ['filter', 'materiality', 'high impact', 'sebi', 'lodr', 'price-sensitive'] },
@@ -77,6 +81,7 @@ const SETTINGS_REGISTRY = [
 
 // Default baseline preferences for one-click resets
 const DEFAULT_THEME = 'dark';
+const DEFAULT_DESIGN_THEME: DesignTheme = 'classic';
 const DEFAULT_SOUND = true;
 const DEFAULT_FILTER = false;
 
@@ -86,6 +91,9 @@ export function SettingsTab({
   fetchSettings, 
   theme = 'dark', 
   setTheme,
+  designTheme = 'classic',
+  setDesignTheme,
+  canUseSoftGlass = false,
   onNavigate
 }: SettingsTabProps) {
   const { 
@@ -383,9 +391,29 @@ export function SettingsTab({
     handleSetDensity(DEFAULT_DENSITY);
   };
 
+  // Design theme (Classic / Soft Glass PRO). Locked choice opens the upgrade
+  // sheet via App; only show the Saved pill on a successful switch.
+  const handleSelectDesignTheme = async (next: DesignTheme) => {
+    if (next === designTheme) return;
+    if (setDesignTheme) {
+      const ok = await setDesignTheme(next);
+      if (ok !== false) showSavedPill('design-theme');
+    }
+  };
+
+  const handleResetDesignTheme = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (setDesignTheme) {
+      void Promise.resolve(setDesignTheme(DEFAULT_DESIGN_THEME)).then((ok) => {
+        if (ok !== false) showSavedPill('design-theme');
+      });
+    }
+  };
+
   const handleResetAllPreferences = (e: React.MouseEvent) => {
     e.stopPropagation();
     handleResetTheme(e);
+    handleResetDesignTheme(e);
     handleResetSound(e);
     handleResetFilter(e);
     handleResetDensity(e);
@@ -872,12 +900,14 @@ export function SettingsTab({
 
   // Modified State Tracking (VS Code Style dot + undo)
   const isThemeModified = theme !== DEFAULT_THEME;
+  const isDesignThemeModified = designTheme !== DEFAULT_DESIGN_THEME;
   const isSoundModified = soundEnabled !== DEFAULT_SOUND;
   const isFilterModified = isFilterEnabled !== DEFAULT_FILTER;
   const isDensityModified = feedDensity !== DEFAULT_DENSITY;
 
   const modifiedPreferencesCount = 
     (isThemeModified ? 1 : 0) + 
+    (isDesignThemeModified ? 1 : 0) +
     (isSoundModified ? 1 : 0) + 
     (isFilterModified ? 1 : 0) + 
     (isDensityModified ? 1 : 0);
@@ -1264,6 +1294,11 @@ export function SettingsTab({
                   </div>
                   <div className="text-[11px] text-slate-500 dark:text-slate-400">
                     High contrast adaptive interface (Dark default)
+                    {designTheme === 'softglass' && (
+                      <span className="block text-[10px] text-emerald-700 dark:text-emerald-300 font-medium mt-0.5">
+                        Soft Glass is always light — switch to Classic to use Dark mode
+                      </span>
+                    )}
                   </div>
                 </div>
                 
@@ -1298,14 +1333,145 @@ export function SettingsTab({
                   </span>
                   <motion.button
                     type="button"
-                    whileTap={buttonTap}
+                    whileTap={designTheme === 'softglass' ? undefined : buttonTap}
                     transition={springSnappy}
                     onClick={handleToggleTheme}
-                    className="p-1.5 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg bg-slate-100 dark:bg-[#252236] text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#2F2B40] transition-colors cursor-pointer"
-                    title="Toggle Dark / Light theme"
+                    disabled={designTheme === 'softglass'}
+                    className={cn(
+                      "p-1.5 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg bg-slate-100 dark:bg-[#252236] text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#2F2B40] transition-colors",
+                      designTheme === 'softglass' ? "opacity-40 cursor-not-allowed" : "cursor-pointer"
+                    )}
+                    title={designTheme === 'softglass' ? "Disabled while Soft Glass is active (always light)" : "Toggle Dark / Light theme"}
                   >
                     {theme === 'dark' ? <Moon size={15} /> : <Sun size={15} />}
                   </motion.button>
+                </div>
+              </div>
+            )}
+
+            {/* 1.1b Design Theme picker (PRO-only) */}
+            {isMatch('appearance') && (
+              <div className="p-3.5 text-xs">
+                <div className="flex items-center justify-between gap-3 mb-2.5">
+                  <div>
+                    {renderSearchBreadcrumb('Preferences')}
+                    <div className="flex items-center gap-1.5">
+                      {isDesignThemeModified && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" title="Modified from default (Classic)" />
+                      )}
+                      <span className="font-semibold text-slate-900 dark:text-white">Design Theme</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 dark:bg-violet-950/70 dark:text-violet-300">PRO</span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Soft Glass redesign is exclusive to Pro members
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <AnimatePresence>
+                      {savedPillKey === 'design-theme' && (
+                        <motion.span
+                          initial={{ opacity: 0, scale: 0.85, x: 4 }}
+                          animate={{ opacity: 1, scale: 1, x: 0 }}
+                          exit={{ opacity: 0, scale: 0.85 }}
+                          transition={springSnappy}
+                          className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-800 px-1.5 py-0.5 rounded-md flex items-center gap-1 shadow-2xs"
+                        >
+                          <Check size={10} /> Saved
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+
+                    {isDesignThemeModified && (
+                      <button
+                        type="button"
+                        onClick={handleResetDesignTheme}
+                        className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#252236] transition-colors cursor-pointer"
+                        title="Reset to Classic"
+                      >
+                        <RotateCcw size={12} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  {/* Classic */}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectDesignTheme('classic')}
+                    className={cn(
+                      "relative rounded-2xl border-2 p-2.5 text-left transition-all cursor-pointer",
+                      designTheme === 'classic'
+                        ? "border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/30 shadow-2xs"
+                        : "border-slate-200 dark:border-[#2d283e] bg-white dark:bg-[#1A1926] hover:border-slate-300 dark:hover:border-[#3a3450]"
+                    )}
+                  >
+                    <div
+                      className="h-14 rounded-xl mb-2 relative overflow-hidden"
+                      style={{ background: 'linear-gradient(135deg, #151a2e 0%, #151a2e 52%, #f1f5f9 52%, #e2e8f0 100%)' }}
+                    >
+                      <div className="absolute left-2 top-2 right-[46%] h-4 rounded bg-white/90" />
+                      <div className="absolute left-2 bottom-2 w-10 h-2.5 rounded-full bg-emerald-400/90" />
+                      <div className="absolute right-2 bottom-2 w-8 h-8 rounded-full bg-emerald-400/80" />
+                    </div>
+                    <div className="flex items-center justify-between gap-1">
+                      <div>
+                        <div className="font-bold text-slate-900 dark:text-white text-[12px] leading-tight">Classic</div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400">Current Helios look</div>
+                      </div>
+                      {designTheme === 'classic' && (
+                        <span className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
+                          <Check size={12} strokeWidth={3} />
+                        </span>
+                      )}
+                    </div>
+                  </button>
+
+                  {/* Soft Glass (PRO) */}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectDesignTheme('softglass')}
+                    className={cn(
+                      "relative rounded-2xl border-2 p-2.5 text-left transition-all cursor-pointer overflow-hidden",
+                      designTheme === 'softglass'
+                        ? "border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/30 shadow-2xs"
+                        : "border-slate-200 dark:border-[#2d283e] bg-white dark:bg-[#1A1926] hover:border-emerald-300"
+                    )}
+                    title={canUseSoftGlass ? "Switch to Soft Glass" : "Pro only — tap to upgrade"}
+                  >
+                    <div
+                      className="h-14 rounded-xl mb-2 relative overflow-hidden"
+                      style={{
+                        backgroundImage: 'radial-gradient(#cfd5c8 1px, transparent 1px), linear-gradient(135deg, #dff3e6 0%, #a9e2c0 55%, #5cbf8d 100%)',
+                        backgroundSize: '9px 9px, cover'
+                      }}
+                    >
+                      <div className="absolute left-3 right-3 top-2.5 h-9 rounded-lg bg-white/85 backdrop-blur-sm shadow-[0_4px_12px_rgba(62,74,60,0.15)]" />
+                      <div className="absolute left-5 top-4 w-8 h-2 rounded-full bg-emerald-500/70" />
+                      <div className="absolute left-5 top-7 w-14 h-1.5 rounded-full bg-slate-400/50" />
+                    </div>
+                    <div className="flex items-center justify-between gap-1">
+                      <div>
+                        <div className="font-bold text-slate-900 dark:text-white text-[12px] leading-tight flex items-center gap-1">
+                          Soft Glass
+                          {!canUseSoftGlass && <Lock size={11} className="text-violet-500" />}
+                        </div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                          {canUseSoftGlass ? 'Frosted glass look' : 'Pro members only'}
+                        </div>
+                      </div>
+                      {designTheme === 'softglass' ? (
+                        <span className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
+                          <Check size={12} strokeWidth={3} />
+                        </span>
+                      ) : !canUseSoftGlass ? (
+                        <span className="text-[10px] font-bold text-violet-700 dark:text-violet-300 bg-violet-100 dark:bg-violet-950/70 px-2 py-1 rounded-full shrink-0">
+                          Upgrade
+                        </span>
+                      ) : null}
+                    </div>
+                  </button>
                 </div>
               </div>
             )}

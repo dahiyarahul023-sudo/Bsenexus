@@ -50,7 +50,7 @@ export function HeliosPill({
     <span
       title={title}
       className={cn(
-        'inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap select-none',
+        'helios-pill inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap select-none',
         toneBg[tone],
         className
       )}
@@ -63,9 +63,11 @@ export function HeliosPill({
   );
 }
 
-/** Helios card shell — white, large radius, soft shadow (no heavy borders). */
+/** Helios card shell — white, large radius, soft shadow (no heavy borders).
+ *  The `helios-card` hook class lets the soft-glass design theme restyle every
+ *  card surface site-wide without touching each call site. */
 export const heliosCard =
-  'bg-white dark:bg-[#1A1926] rounded-[22px] border border-transparent dark:border-[#2D283E] shadow-[0_10px_30px_rgba(15,23,42,0.07)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.45)]';
+  'helios-card bg-white dark:bg-[#1A1926] rounded-[22px] border border-transparent dark:border-[#2D283E] shadow-[0_10px_30px_rgba(15,23,42,0.07)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.45)]';
 
 /** Hairline divider used inside Helios cards. */
 export const heliosDivider = 'h-px bg-slate-100 dark:bg-[#262238]';

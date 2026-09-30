@@ -19,8 +19,11 @@ export interface Watchlist {
   items: (string | WatchlistStockItem)[];
 }
 
-export interface UserNotificationPreferences {
-  resultsAndEarnings: boolean;
+/** Site design theme: 'classic' = current Helios look (dark/light toggle applies),
+ * 'softglass' = @rondesignlab soft-glass language (light-only, PRO-only). */
+export type DesignTheme = 'classic' | 'softglass';
+
+export interface UserNotificationPreferences {  resultsAndEarnings: boolean;
   orderWinsAndExpansion: boolean;
   dividendsAndBonus: boolean;
   acquisitionsAndMergers: boolean;
@@ -43,6 +46,10 @@ export interface UserNotificationPreferences {
   telegramAiSummaryEnabled?: boolean;
   telegramAlertScope?: AlertScopeFilter;
   aiSummaryLang?: 'hinglish' | 'english';
+  // Design theme: 'classic' = current Helios look (dark/light), 'softglass' =
+  // @rondesignlab soft-glass language (light-only). PRO-only; enforced client-side
+  // (Settings picker + App gate effect). Stored here so it syncs across devices.
+  designTheme?: 'classic' | 'softglass';
   alertPriority: AlertPriorityFilter;
   alertScope: AlertScopeFilter;
   alertCategory: AlertCategoryFilter;

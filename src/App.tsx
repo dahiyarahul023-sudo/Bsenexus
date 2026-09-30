@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { IntelModalProvider } from './context/IntelModalContext';
 import { NoteEditorProvider } from './context/NoteEditorContext';
@@ -6,6 +6,7 @@ import { ToastProvider, useToast } from './context/ToastContext';
 import { customFetch } from './api';
 import { verifyProPayment, clearPendingOrderId, getPlanDisplayFromOrderId, isValidPlanId } from './utils/cashfree';
 import { useVisibilityInterval } from './hooks/useVisibilityInterval';
+import type { DesignTheme } from './types';
 
 import { LandingPage } from './components/LandingPage';
 import { Layout } from './components/Layout';
@@ -247,7 +248,8 @@ function AppContent() {
   
   const { user, profile, authLoading, isAdmin, isPro, adminUnlocked, logout, 
     setIsAuthModalOpen, setIsProModalOpen, setCheckoutPlanId,
-    isAuthModalOpen, isProModalOpen, isAdminPinModalOpen 
+    isAuthModalOpen, isProModalOpen, isAdminPinModalOpen,
+    isPaidProActive, updateNotificationPreferences
   } = useAuth();
   const [serverAuth, setServerAuth] = useState<{ isAuthenticated: boolean; hasPin: boolean } | null>(null);
 
@@ -519,6 +521,82 @@ function AppContent() {
     else document.documentElement.classList.remove('dark');
     localStorage.setItem('theme', theme);
   }, [theme]);
+
+  // --- Design theme: 'classic' (current Helios look) vs 'softglass' (PRO-only) ---
+  // DEV-only visual-QA override: ?design=softglass forces the theme without PRO.
+  const devDesignOverride: boolean = (() => {
+    try {
+      return import.meta.env.DEV && new URLSearchParams(window.location.search).get('design') === 'softglass';
+    } catch { return false; }
+  })();
+
+  const [designTheme, setDesignThemeState] = useState<DesignTheme>(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('design') === 'softglass') return 'softglass';
+        const saved = localStorage.getItem('bse_design_theme');
+        if (saved === 'softglass' || saved === 'classic') return saved;
+      }
+    } catch {}
+    return 'classic';
+  });
+
+  const canUseSoftGlass = devDesignOverride || isPaidProActive;
+
+  const setDesignTheme = useCallback(async (next: DesignTheme): Promise<boolean> => {
+    if (next === 'softglass' && !canUseSoftGlass) {
+      // PRO gate: trial/free users get the upgrade sheet instead.
+      setIsProModalOpen(true);
+      return false;
+    }
+    setDesignThemeState(next);
+    try {
+      localStorage.setItem('bse_design_theme', next);
+      if (user?.uid) localStorage.setItem(`bse_design_theme_${user.uid}`, next);
+    } catch {}
+    // Cross-device persistence via the profile (fire-and-forget).
+    if (user) {
+      try { await updateNotificationPreferences({ designTheme: next }); } catch {}
+    }
+    return true;
+  }, [canUseSoftGlass, user, setIsProModalOpen, updateNotificationPreferences]);
+
+  // Apply the theme to <html>. Soft-glass is inherently light: while active the
+  // dark class is forced off (the user's dark/light choice is kept and restored
+  // when they switch back to Classic).
+  useEffect(() => {
+    const root = document.documentElement;
+    if (designTheme === 'softglass') {
+      root.dataset.designTheme = 'softglass';
+      root.classList.remove('dark');
+    } else {
+      delete root.dataset.designTheme;
+      if (theme === 'dark') root.classList.add('dark');
+      else root.classList.remove('dark');
+    }
+  }, [designTheme, theme]);
+
+  // Hydrate from the profile (cross-device) once auth resolves, and enforce the
+  // PRO gate: a stored softglass choice without active PRO falls back to classic
+  // (e.g. subscription expired, or another user on the same device).
+  useEffect(() => {
+    if (authLoading || devDesignOverride) return;
+    const fromProfile = profile?.notificationPreferences?.designTheme;
+    let fromLocal: string | null = null;
+    try {
+      fromLocal = localStorage.getItem(user?.uid ? `bse_design_theme_${user.uid}` : 'bse_design_theme');
+    } catch {}
+    const valid = (v: unknown): v is DesignTheme => v === 'classic' || v === 'softglass';
+    let wanted: DesignTheme = 'classic';
+    if (valid(fromProfile)) wanted = fromProfile;
+    else if (valid(fromLocal)) wanted = fromLocal;
+    if (wanted === 'softglass' && !isPaidProActive) wanted = 'classic';
+    if (wanted !== designTheme) {
+      setDesignThemeState(wanted);
+      try { localStorage.setItem(user?.uid ? `bse_design_theme_${user.uid}` : 'bse_design_theme', wanted); } catch {}
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user?.uid, profile?.notificationPreferences?.designTheme, isPaidProActive]);
 
   const fetchWatchlists = async () => {
     try {
@@ -891,7 +969,10 @@ function AppContent() {
                 setSettings={setSettings} 
                 fetchSettings={fetchSettings} 
                 theme={theme} 
-                setTheme={setTheme} 
+                setTheme={setTheme}
+                designTheme={designTheme}
+                setDesignTheme={setDesignTheme}
+                canUseSoftGlass={canUseSoftGlass}
                 onNavigate={(tab: string) => handleTabChange(tab)}
               />
             </Suspense>
