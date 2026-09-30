@@ -28,6 +28,7 @@ import { BlogReaderModal } from './BlogReaderModal';
 import { scrollToElementWithOffset } from '../utils/scrollState';
 import { FollowBseNexusBlock, SocialIconsRow } from './ui/SocialLinks';
 import { CommonQuestionsFAQ } from './ui/CommonQuestionsFAQ';
+import { AiFaqSection } from './ui/AiFaqSection';
 import { getPlanDisplay, getLowestPlanPrice } from '../utils/cashfree';
 import { PlanCard } from './ui/PlanCard';
 import ParticleRibbons from './ui/ParticleRibbons';
@@ -2108,6 +2109,9 @@ export function LandingPage({
               ))}
             </div>
           </div>
+
+          {/* AI FAQ section: static FAQs (SEO) + ask-the-AI box (limited v1) */}
+          <AiFaqSection onLoginRequest={() => onEnterTerminal()} />
 
         </div>
       </section>

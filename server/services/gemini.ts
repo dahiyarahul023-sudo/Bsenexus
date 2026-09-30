@@ -630,6 +630,62 @@ When the user asks how to do something in the app, give direct, actionable steps
   }
 }
 
+/**
+ * Public website FAQ answerer — Layer 2 of the AI FAQ abuse defence.
+ *
+ * Only called when the curated bank (Layer 1) has no match. Deliberately
+ * lean: single-shot, no conversation history, no watchlist context (the
+ * visitor is usually anonymous), cheapest model first, English only.
+ * Throws on failure so the caller can return a 503 WITHOUT consuming the
+ * visitor's daily quota.
+ */
+export async function askPublicFaq(userQuestion: string): Promise<string> {
+  const ai = getAI();
+  if (!ai) {
+    throw new Error('Gemini AI is not configured');
+  }
+  if (geminiCircuitBreaker.getState() === 'OPEN') {
+    throw new Error('AI service is temporarily overloaded');
+  }
+
+  const systemInstruction = `You are the BSE Nexus website FAQ assistant. Answer ONLY questions about BSE Nexus itself: its features, plans and pricing, free trial, and how to use the site (watchlists, Telegram alerts, results calendar, AI summaries, company pages, filings).
+
+Rules (strict):
+- Plain English, friendly, under 80 words. No markdown tables.
+- Use ONLY the facts below; never invent prices, dates, or features.
+- If the question is NOT about BSE Nexus, reply with exactly this sentence and nothing else: "I can only answer questions about BSE Nexus — try asking about our features, plans, or how to use the site."
+- Never give investment advice, stock tips, or buy/sell recommendations.
+
+Facts:
+- BSE Nexus = live BSE India corporate disclosures terminal: filings feed, results calendar, AI filing summaries, watchlists, Telegram alerts. Data from official bseindia.com filings, 5000+ scrips covered.
+- Pro one-time plans (NO auto-renewal, NO subscription): Weekly ₹59/7 days, Monthly ₹199/30 days (most popular), 6-Month ₹999/180 days, Yearly ₹1,799/365 days (best value).
+- 7-day free Pro trial, no card required. After trial ends the account moves to the Free tier; nothing is ever charged automatically.
+- Free tier: live BSE announcements, results calendar, exactly one one-time AI summary demo. No watchlists, no Telegram alerts.
+- Pro adds: unlimited watchlists (per-stock priority HIGH/MED/LOW), Telegram alerts for watched stocks, AI filing summaries, smart mute filter for routine filings, CSV/JSON export.
+- AI summaries: English by default, Hinglish toggle available. Generated from official filing text — verify critical figures on bseindia.com.
+- Telegram alerts: Pro feature; link via Settings → Telegram.
+- Company pages: search any BSE scrip or open /company/SYMBOL for filings history, board meetings, price data, peers.
+- BSE Nexus is NOT affiliated with BSE India Ltd, SEBI, or Nexus Select Trust.`;
+
+  const publicFaqModels = ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  let lastErr: any = null;
+  for (const mName of publicFaqModels) {
+    try {
+      const response = await ai.models.generateContent({
+        model: mName,
+        contents: [{ role: 'user', parts: [{ text: userQuestion }] }],
+        config: { systemInstruction, temperature: 0.4 },
+      });
+      const text = (response as any)?.text?.trim();
+      if (text) return text;
+    } catch (e: any) {
+      lastErr = e;
+    }
+  }
+  addLog('ERROR', 'GEMINI', `Public FAQ AI error: ${lastErr?.message || lastErr}`);
+  throw lastErr || new Error('Failed to generate answer');
+}
+
 export async function generateAndSendSummary(
   replyToMessageId: number, 
   company: string, 

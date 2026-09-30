@@ -82,6 +82,7 @@ import {
 } from "../database/diagnosticsDao.js";
 import { seoRouter } from "./seoRoutes.js";
 import { paymentsRouter } from "./payments.js";
+import { faqRouter } from "./faq.js";
 import { pageRenderCache, staticGuideCache, apiResponseCache } from "../utils/renderCache.js";
 import { getMarketGuides, getMarketGuideBySlug } from "../services/marketGuidesService.js";
 
@@ -92,6 +93,9 @@ apiRouter.use("/seo", seoRouter);
 
 // Cashfree one-time Pro payments (create-order / verify / webhook / status)
 apiRouter.use("/payments", paymentsRouter);
+
+// Public AI FAQ section (bank-first, AI fallback behind server-side quotas)
+apiRouter.use("/faq", faqRouter);
 
 // Educational Market Guides API (Fail-safe, cached)
 apiRouter.get("/market-guides", (_req, res) => {
