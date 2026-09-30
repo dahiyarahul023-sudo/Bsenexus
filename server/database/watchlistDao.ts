@@ -187,7 +187,11 @@ async function migrateExistingUserWatchlists(uid: string, lists: any[], noCreate
 
 // In-memory cache keyed by sanitized userId with TTL for multi-instance sync
 const userWatchlistsCache: Record<string, { lists: any[]; fetchedAt: number }> = {};
-const WATCHLISTS_CACHE_TTL_MS = 2000; // 2 seconds TTL to prevent stale reads
+// Quota-bachao (1 Oct): 2s TTL meant every monitor poll cycle re-read every
+// user's watchlist doc from Firestore. Mutations are write-through
+// (persistUserWatchlists refreshes this cache entry + clears dirty), so a
+// longer TTL never serves stale data after a change made on this instance.
+const WATCHLISTS_CACHE_TTL_MS = 60 * 1000;
 const userWatchlistsDirty: Record<string, boolean> = {};
 
 // Per-UID async mutex lock to prevent read-modify-write race conditions

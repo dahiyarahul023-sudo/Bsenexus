@@ -7,6 +7,13 @@ import { PaymentStoreUnavailableError, runPaymentStore } from './paymentStore.js
 
 const USERS_FILE = 'users.json';
 const USER_CACHE_TTL_MS = 2500; // Fast cache invalidation for fresh Firestore reads
+// Quota-bachao (1 Oct): the ALL-users list is consumed only by background
+// scans (monitor cycle, news worker). A full `users` collection scan on every
+// poll cycle burned thousands of reads/day for data that changes rarely — and
+// every profile save already nulls this cache (saveUserProfile /
+// invalidateUserProfileCache), so OFF/payment/preference changes still punch
+// through instantly. Per-UID profile reads keep the short TTL above.
+const ALL_USERS_LIST_CACHE_TTL_MS = 5 * 60 * 1000;
 export const ADMIN_EMAIL = 'dahiyarahul023@gmail.com';
 
 // Strictly reserved system and staff handles that regular users cannot claim
@@ -115,7 +122,7 @@ export function sanitizeUsername(raw: string): string {
 
 export async function getAllUserProfiles(): Promise<UserProfile[]> {
   const now = Date.now();
-  if (allUsersListCache && (now - allUsersListCache.fetchedAt < USER_CACHE_TTL_MS)) {
+  if (allUsersListCache && (now - allUsersListCache.fetchedAt < ALL_USERS_LIST_CACHE_TTL_MS)) {
     return JSON.parse(JSON.stringify(allUsersListCache.list));
   }
 
