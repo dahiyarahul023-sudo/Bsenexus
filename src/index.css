@@ -5,6 +5,8 @@
 @font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 400 800; font-display: swap; src: url('/fonts/JetBrainsMono.woff2') format('woff2'); }
 @font-face { font-family: 'Outfit'; font-style: normal; font-weight: 100 900; font-display: swap; src: url('/fonts/Outfit.woff2') format('woff2'); }
 @font-face { font-family: 'Plus Jakarta Sans'; font-style: normal; font-weight: 200 800; font-display: swap; src: url('/fonts/PlusJakartaSans.woff2') format('woff2'); }
+@font-face { font-family: 'Playfair Display'; font-style: normal; font-weight: 400 900; font-display: swap; src: url('/fonts/PlayfairDisplay.woff2') format('woff2'); }
+@font-face { font-family: 'Playfair Display'; font-style: italic; font-weight: 400 900; font-display: swap; src: url('/fonts/PlayfairDisplay-Italic.woff2') format('woff2'); }
 
 @variant dark (&:where(.dark, .dark *));
 
@@ -12,6 +14,7 @@
   --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --font-display: 'Outfit', 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
 
   --animate-marquee: marquee 300s linear infinite;
 
@@ -36,6 +39,12 @@
 .animate-ticker-smooth:hover,
 .animate-ticker-smooth:active {
   animation-play-state: paused;
+}
+
+/* Landing feature-tab progress bar (6s auto-advance indicator) */
+@keyframes tabfill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
 }
 
 @keyframes priceTickGreen {
