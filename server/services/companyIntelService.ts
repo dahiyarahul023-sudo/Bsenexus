@@ -1,5 +1,5 @@
 import YahooFinance from 'yahoo-finance2';
-import { getStockResultsHistory, getResultsCalendarData, fetchDeepHistoricalResultsForStock } from './resultsCalendarService.js';
+import { getStockResultsHistory, getResultsCalendarData, autoFetchDeepHistoricalResults } from './resultsCalendarService.js';
 import { classifyMaterialEvent, MaterialEvent } from './timelineClassifier.js';
 import { getRecentAnnouncements, getAnnouncementsForScrip } from '../database/announcementDao.js';
 import { generateDirectSummary } from './gemini.js';
@@ -264,11 +264,17 @@ export async function getCompanyIntelligence(scripCode: string, symbol: string):
   // filings but not one declared quarter), automatically pull a 1-year
   // archive from BSE so the Financial Results tab never opens blank for a
   // listed company, then refresh BOTH the filings list and the results.
+  // The pull is bounded (autoFetchDeepHistoricalResults): a fast fetch
+  // still lands in this same response; a slow/blocked BSE finishes in the
+  // background instead of freezing the modal, and a per-scrip cooldown
+  // keeps repeat opens cheap. The re-read below runs only when the pull
+  // actually landed inside the wait — otherwise the modal opens at once
+  // with what's stored and the next open shows the filled results.
   const hasDeclaredResult = quarterlyResults.some((r: any) => r.status === 'Declared');
   if (targetScrip && (filingMap.size === 0 || !hasDeclaredResult)) {
     try {
-      await fetchDeepHistoricalResultsForStock(targetScrip, targetSym, 1);
-      const syncedHistory = await getStockResultsHistory(targetScrip, targetSym);
+      const fetchedInTime = await autoFetchDeepHistoricalResults(targetScrip, targetSym, 1);
+      const syncedHistory = fetchedInTime ? await getStockResultsHistory(targetScrip, targetSym) : [];
       for (const h of syncedHistory || []) {
         const hId = h.id || `hist_${h.meetingDate}`;
         if (!filingMap.has(hId)) {

@@ -135,9 +135,19 @@ export interface NSECalendarEvent {
   date: string;
 }
 
+// Per-symbol memo (10 min): board-meeting dates don't move minute to
+// minute, and one stock open reads history twice (raw read + post-sync
+// re-read) — without this, a slow/hung NSE endpoint taxes every read
+// with an 8s timeout plus retry. Empty answers are cached too; the
+// results poller keeps filings fresh independently of this calendar.
+const NSE_EVENT_CACHE_TTL_MS = 10 * 60 * 1000;
+const nseEventCache = new Map<string, { ts: number; events: NSECalendarEvent[] }>();
+
 export async function fetchNSEEventCalendarForSymbol(symbol: string): Promise<NSECalendarEvent[]> {
   if (!symbol) return [];
   const cleanSym = symbol.trim().toUpperCase();
+  const cached = nseEventCache.get(cleanSym);
+  if (cached && Date.now() - cached.ts < NSE_EVENT_CACHE_TTL_MS) return cached.events;
   const url = `https://www.nseindia.com/api/event-calendar?symbol=${encodeURIComponent(cleanSym)}`;
   const attempt = () => externalFeedsCircuitBreaker.execute(
     async (signal) => {
@@ -156,9 +166,14 @@ export async function fetchNSEEventCalendarForSymbol(symbol: string): Promise<NS
   // the only date source for quarters whose filings sit outside the recent
   // cache — one quiet retry before giving up.
   const first = await attempt();
-  if (first.length > 0) return first;
+  if (first.length > 0) {
+    nseEventCache.set(cleanSym, { ts: Date.now(), events: first });
+    return first;
+  }
   await new Promise(r => setTimeout(r, 700));
-  return attempt();
+  const second = await attempt();
+  nseEventCache.set(cleanSym, { ts: Date.now(), events: second });
+  return second;
 }
 
 export async function fetchGeneralNSEEventCalendar(): Promise<NSECalendarEvent[]> {
@@ -1549,6 +1564,54 @@ export async function fetchDeepHistoricalResultsForStock(
     totalHistoryCount: updatedHistory.length,
     years: validYears
   };
+}
+
+// ── Bounded auto deep-fetch ─────────────────────────────────────────────
+// The auto-fill callers (company-intel auto-sync, empty results history)
+// must never hold an HTTP request hostage: when BSE is slow or blocked, a
+// 1-year archive pull burns 9s page timeouts batch after batch (~45s+),
+// and the UI reads that as a frozen app. So the auto fetch gets three
+// guards: (1) a bounded wait — the request waits at most
+// AUTO_DEEP_FETCH_WAIT_MS; a fast fetch still lands in the SAME response
+// because the caller re-reads right after; (2) in-flight dedupe — repeat
+// opens of the same stock share one fetch instead of stacking BSE calls;
+// (3) a per-scrip cooldown — a stock attempted within
+// AUTO_DEEP_FETCH_COOLDOWN_MS is not re-fetched, so a stock with nothing
+// on BSE doesn't tax every open. The fetch itself is unchanged and keeps
+// running past the bounded wait, saving batch by batch, so the next open
+// serves the filled history from store. The manual Sync endpoints keep
+// awaiting the full fetch on purpose (explicit user action).
+const AUTO_DEEP_FETCH_WAIT_MS = 8000;
+const AUTO_DEEP_FETCH_COOLDOWN_MS = 10 * 60 * 1000;
+const autoDeepFetchInFlight = new Map<string, Promise<unknown>>();
+const autoDeepFetchLastAttempt = new Map<string, number>();
+
+export async function autoFetchDeepHistoricalResults(
+  scripCode: string,
+  symbol: string | undefined,
+  years: number
+): Promise<boolean> {
+  const key = String(scripCode || '').trim();
+  if (!key) return false;
+  let task = autoDeepFetchInFlight.get(key);
+  if (!task) {
+    const lastAttempt = autoDeepFetchLastAttempt.get(key) || 0;
+    if (Date.now() - lastAttempt < AUTO_DEEP_FETCH_COOLDOWN_MS) return false;
+    autoDeepFetchLastAttempt.set(key, Date.now());
+    task = fetchDeepHistoricalResultsForStock(key, symbol, years)
+      .catch(() => undefined)
+      .finally(() => {
+        autoDeepFetchInFlight.delete(key);
+      });
+    autoDeepFetchInFlight.set(key, task);
+  }
+  // true = the pull landed inside the wait, so a re-read shows fresh data;
+  // false = still running in the background (or skipped by cooldown), and
+  // callers must NOT pay a second slow read on top of the wait.
+  return Promise.race([
+    task.then(() => true),
+    new Promise<boolean>((resolve) => setTimeout(() => resolve(false), AUTO_DEEP_FETCH_WAIT_MS))
+  ]);
 }
 
 export async function fetchDeepHistoricalResultsForWatchlist(

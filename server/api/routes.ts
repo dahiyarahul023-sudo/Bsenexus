@@ -39,6 +39,7 @@ import {
   getStockResultsHistory, 
   broadcastUpcomingMeetingsToTelegram,
   fetchDeepHistoricalResultsForStock,
+  autoFetchDeepHistoricalResults,
   fetchDeepHistoricalResultsForWatchlist,
   boostPreResultWindow,
   getPreResultRunupAnnouncements
@@ -1773,11 +1774,16 @@ apiRouter.get("/stock-results-history", async (req, res) => {
     let history = await getStockResultsHistory(symbol, scripCode, companyName);
     // Empty history for a real stock almost always means its filings sit
     // outside the recent cache window — pull one year from BSE once, then
-    // re-read, so the tab never opens blank for a listed company.
+    // re-read, so the tab never opens blank for a listed company. The pull
+    // is bounded (autoFetchDeepHistoricalResults): a fast fetch still
+    // lands in this same response; a slow/blocked BSE finishes in the
+    // background instead of freezing the page.
     if (history.length === 0 && scripCode) {
       try {
-        await fetchDeepHistoricalResultsForStock(scripCode, symbol, 1);
-        history = await getStockResultsHistory(symbol, scripCode, companyName);
+        const fetchedInTime = await autoFetchDeepHistoricalResults(scripCode, symbol, 1);
+        if (fetchedInTime) {
+          history = await getStockResultsHistory(symbol, scripCode, companyName);
+        }
       } catch (e) {}
     }
     res.json({ success: true, symbol, scripCode, history });
