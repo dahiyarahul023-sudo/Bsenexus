@@ -188,19 +188,23 @@ export function CompanyIntelligenceModal({
     }
   };
 
-  const handleFetchDeepHistory = async () => {
+  const handleFetchDeepHistory = async (years?: number | React.MouseEvent) => {
     if (!effectiveScrip && !effectiveSymbol) return;
+    const yearsToUse = typeof years === 'number' ? years : selectedYears;
+    if (typeof years === 'number' && years !== selectedYears) {
+      setSelectedYears(years);
+    }
     setIsFetchingHistory(true);
     setHistorySuccessMsg(null);
     try {
       const res = await customFetch(`/api/stocks/${effectiveScrip || effectiveSymbol}/fetch-deep-history`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol: effectiveSymbol, years: selectedYears })
+        body: JSON.stringify({ symbol: effectiveSymbol, years: yearsToUse })
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setHistorySuccessMsg(`✅ Synced ${data.totalHistoryCount || data.newlySaved} historical BSE filings across ${selectedYears} years!`);
+        setHistorySuccessMsg(`✅ Synced ${data.totalHistoryCount || data.newlySaved} historical BSE filings across ${yearsToUse} years!`);
         showToast(`✅ Synced ${data.totalHistoryCount || data.newlySaved} historical filings!`, 'success');
         await loadIntelligence();
       } else {

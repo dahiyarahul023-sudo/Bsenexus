@@ -100,7 +100,7 @@ export const QuarterlyResultsLedger: React.FC<QuarterlyResultsLedgerProps> = ({
 }) => {
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
   const [filterMode, setFilterMode] = useState<'declared' | 'all'>('declared');
-  const [selectedYears, setSelectedYears] = useState<number>(1);
+  const [selectedYears, setSelectedYears] = useState<number>(3);
 
   const toggleAccordion = (id: string) => {
     setExpandedCards(prev => ({
@@ -166,7 +166,11 @@ export const QuarterlyResultsLedger: React.FC<QuarterlyResultsLedgerProps> = ({
                 { value: 5, label: '5 Years (20 Qtrs)' }
               ]}
               value={selectedYears}
-              onChange={(val) => setSelectedYears(Number(val))}
+              onChange={(val) => {
+                const y = Number(val);
+                setSelectedYears(y);
+                if (onFetchDeepHistory) onFetchDeepHistory(y);
+              }}
               disabled={isFetchingDeep}
               size="xs"
               menuWidth="w-40"
@@ -179,7 +183,7 @@ export const QuarterlyResultsLedger: React.FC<QuarterlyResultsLedgerProps> = ({
               loadingText="Syncing BSE..."
               variant="primary"
               size="sm"
-              className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-mono"
+              className="bg-emerald-600 hover:bg-emerald-500 text-white font-mono"
             >
               Sync {selectedYears}Y BSE History
             </ActionButton>
@@ -288,7 +292,9 @@ export const QuarterlyResultsLedger: React.FC<QuarterlyResultsLedgerProps> = ({
             }
 
             const boardMeetingDate = item.boardMeetingDate || item.meetingDate || item.declarationDate || 'N/A';
-            const declaredAt = item.declaredAtFormatted || (item.declarationTime ? `${item.declarationDate || boardMeetingDate}, ${item.declarationTime}` : (isDeclared ? boardMeetingDate : null));
+            const rawTime = item.declarationTime || '';
+            const timeOnly = rawTime ? (rawTime.includes('IST') ? rawTime : `${rawTime} IST`) : '';
+            const declaredAt = item.declaredAtFormatted || (timeOnly ? `${boardMeetingDate}, ${timeOnly}` : (isDeclared ? boardMeetingDate : null));
 
             const safePdf = item.pdfLink ? getSafePdfUrl(item.pdfLink, undefined, item.id, item.scripCode || scripCode) : null;
 
@@ -354,18 +360,25 @@ export const QuarterlyResultsLedger: React.FC<QuarterlyResultsLedgerProps> = ({
                 </div>
 
                 {/* Row 2: Board Meeting Date (Left) & Declared At Exact Time (Right) */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs pt-1 border-t border-slate-100 dark:border-[#2D283E]">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs pt-1 border-t border-slate-100 dark:border-[#2D283E]">
                   <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400">
+                    <Calendar size={13} className="text-slate-400" />
                     <span>Board meeting:</span>
                     <span className="font-semibold text-slate-900 dark:text-slate-200 font-mono">{boardMeetingDate}</span>
                   </div>
 
-                  {declaredAt && (
+                  {timeOnly ? (
+                    <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-md border border-emerald-500/20">
+                      <Clock size={12} className="text-emerald-500" />
+                      <span className="text-[11px] text-slate-400 font-sans">1st Filing Time:</span>
+                      <span className="font-mono font-bold whitespace-nowrap">{timeOnly}</span>
+                    </div>
+                  ) : declaredAt ? (
                     <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400">
                       <span>Declared at:</span>
                       <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">{declaredAt}</span>
                     </div>
-                  )}
+                  ) : null}
                 </div>
 
                 {/* Row 3: Headline Subject with Protected PDF Button */}
@@ -399,15 +412,15 @@ export const QuarterlyResultsLedger: React.FC<QuarterlyResultsLedgerProps> = ({
                       type="button"
                       whileTap={buttonTap}
                       onClick={() => toggleAccordion(cardId)}
-                      className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 font-medium flex items-center gap-1.5 transition-colors cursor-pointer py-1 min-h-[36px] sm:min-h-[32px]"
+                      className="text-amber-500 dark:text-amber-400 hover:text-amber-600 dark:hover:text-amber-300 font-medium flex items-center gap-1.5 transition-colors cursor-pointer py-1 min-h-[36px] sm:min-h-[32px] select-none"
                     >
                       {isExpanded ? (
                         <ChevronDown size={14} className="text-amber-500" />
                       ) : (
-                        <ChevronRight size={14} className="text-slate-400" />
+                        <ChevronRight size={14} className="text-amber-500" />
                       )}
-                      <span>
-                        {followUpCount} {followUpCount === 1 ? 'follow-up filing' : 'follow-up filings'} same day
+                      <span className="font-semibold">
+                        ⚡ {followUpCount} {followUpCount === 1 ? 'Same-Day Filing' : 'Same-Day Filings'} & Disclosures
                       </span>
                     </motion.button>
                   ) : (
@@ -434,24 +447,31 @@ export const QuarterlyResultsLedger: React.FC<QuarterlyResultsLedgerProps> = ({
                       transition={accordionTransition}
                       className="overflow-hidden mt-2 pl-3 border-l-2 border-amber-500/40 space-y-2 bg-slate-950/40 p-2.5 rounded-r-lg"
                     >
-                      <div className="text-[11px] font-bold text-amber-400/90 uppercase tracking-wider">
-                        Same-day Related Disclosures:
+                      <div className="text-[11px] font-bold text-amber-400/90 uppercase tracking-wider flex items-center justify-between">
+                        <span>Smart Grouped Same-Day Filings:</span>
+                        <span className="text-[10px] text-slate-400 font-normal">Earliest filing sets declaration time</span>
                       </div>
                       <div className="space-y-1.5">
                         {followUps.map((f, fIdx) => {
                           const fPdf = f.pdfLink ? getSafePdfUrl(f.pdfLink, undefined, f.id, item.scripCode || scripCode) : null;
+                          const fCat = f.category || 'Results';
                           return (
                             <div
                               key={`${f.id || 'f'}-${fIdx}`}
-                              className="flex items-center justify-between gap-2 text-xs p-2 bg-slate-900/80 rounded border border-slate-800/80"
+                              className="flex items-center justify-between gap-2 text-xs p-2 bg-slate-900/80 rounded border border-slate-800/80 hover:border-slate-700 transition-colors"
                             >
-                              <div className="min-w-0 flex-1 space-y-0.5">
-                                <div className="font-medium text-slate-300 truncate">
-                                  {f.subject}
+                              <div className="min-w-0 flex-1 space-y-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="px-1.5 py-0.5 text-[9px] font-extrabold rounded bg-amber-500/10 text-amber-400 border border-amber-500/30 uppercase tracking-wide">
+                                    {fCat}
+                                  </span>
+                                  <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1">
+                                    <Clock size={10} className="text-slate-500" />
+                                    <span>{f.timeStr || f.exactDateTimeStr}</span>
+                                  </div>
                                 </div>
-                                <div className="text-[10px] text-slate-500 font-mono flex items-center gap-2">
-                                  <Clock size={10} />
-                                  <span>{f.exactDateTimeStr || f.timeStr}</span>
+                                <div className="font-medium text-slate-200 line-clamp-2 leading-snug">
+                                  {f.subject}
                                 </div>
                               </div>
 
@@ -460,10 +480,12 @@ export const QuarterlyResultsLedger: React.FC<QuarterlyResultsLedgerProps> = ({
                                   href={fPdf}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="px-2 py-1 text-[10px] font-bold bg-slate-800 hover:bg-slate-700 text-amber-300 rounded flex items-center gap-1 shrink-0"
+                                  className="px-2.5 py-1 text-[11px] font-bold bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border border-rose-800/60 rounded flex items-center gap-1 shrink-0 transition-colors"
+                                  title="View official PDF"
                                 >
+                                  <FileText size={10} className="text-rose-400" />
                                   <span>PDF</span>
-                                  <ExternalLink size={9} />
+                                  <ExternalLink size={9} className="opacity-70" />
                                 </a>
                               )}
                             </div>

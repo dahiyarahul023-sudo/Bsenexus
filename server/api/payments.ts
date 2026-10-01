@@ -30,6 +30,10 @@ import {
   isPaymentOrderOwnershipError,
   isPaymentStoreUnavailable,
 } from '../database/paymentStore.js';
+import {
+  isFirestoreQuotaExceeded,
+  isAdminPermissionDenied,
+} from '../database/localStore.js';
 
 /** Extract the verified uid from the authenticated request (local copy — avoids a routes.ts import cycle). */
 function getReqUserId(req: express.Request): string {
@@ -376,6 +380,13 @@ paymentsRouter.post('/create-order', requireAuth, async (req, res) => {
     const orderId = `BN_${PLAN_CODES[plan.id as PlanId]}_${cleanCustomerId.slice(0, 10)}_${Date.now()}`;
     const base = siteUrl(req);
 
+    if (isFirestoreQuotaExceeded() || isAdminPermissionDenied()) {
+      return paymentUnavailable(
+        res,
+        'Secure payment setup is temporarily unavailable. Please try again in a moment.',
+      );
+    }
+
     // Payment isolation: the durable Firestore reconciliation record must
     // exist BEFORE Cashfree checkout starts. If it cannot be confirmed,
     // do not take the user to payment — otherwise a paid gateway order
@@ -453,13 +464,14 @@ paymentsRouter.post('/create-order', requireAuth, async (req, res) => {
       currency: plan.currency,
     });
   } catch (err: any) {
-    console.error('[Payments] create-order error:', err?.message || err);
     if (isPaymentStoreUnavailable(err)) {
+      console.warn('[Payments] create-order: payment store unavailable:', err?.message || err);
       return paymentUnavailable(
         res,
         'Payments are temporarily unavailable. Please retry in a moment; no payment was started.',
       );
     }
+    console.error('[Payments] create-order error:', err?.message || err);
     return res.status(200).json({ success: false, error: 'Could not start payment: ' + (err?.message || 'unexpected error') });
   }
 });
@@ -549,13 +561,19 @@ paymentsRouter.get('/status', requireAuth, async (req, res) => {
 
     let entitlement = null;
     let repaired = false;
-    try {
-      const reconciled = await reconcilePaymentEntitlement(uid);
-      entitlement = reconciled.entitlement;
-      repaired = reconciled.repaired;
-    } catch (err) {
-      if (!isAdmin) throw err;
-      console.warn('[Payments] status: payment entitlement unavailable for admin fallback:', (err as Error)?.message || err);
+    if (!isFirestoreQuotaExceeded() && !isAdminPermissionDenied()) {
+      try {
+        const reconciled = await reconcilePaymentEntitlement(uid);
+        entitlement = reconciled.entitlement;
+        repaired = reconciled.repaired;
+      } catch (err) {
+        if (!isAdmin && !isPaymentStoreUnavailable(err)) throw err;
+        console.warn('[Payments] status: payment entitlement unavailable for fallback:', (err as Error)?.message || err);
+      }
+    } else if (isAdmin) {
+      console.warn('[Payments] status: storage quota exceeded or local mode; bypassing entitlement check for admin');
+    } else {
+      console.warn('[Payments] status: storage quota exceeded or local mode; falling back to durable profile');
     }
 
     const paidExpiresAt = Number(entitlement?.proExpiresAt || 0);
@@ -591,13 +609,14 @@ paymentsRouter.get('/status', requireAuth, async (req, res) => {
       autoRenew: 'coming_soon' as const,
     });
   } catch (err: any) {
-    console.error('[Payments] status error:', err?.message || err);
     if (isPaymentStoreUnavailable(err)) {
+      console.warn('[Payments] status: payment store unavailable:', err?.message || err);
       return paymentUnavailable(
         res,
         'Subscription status is temporarily unavailable. Your payment record is not lost; please retry in a moment.',
       );
     }
+    console.error('[Payments] status error:', err?.message || err);
     return res.status(503).json({ success: false, error: 'Could not load subscription status.' });
   }
 });

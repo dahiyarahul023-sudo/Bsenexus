@@ -1052,7 +1052,7 @@ Your 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${g
 
   // Split history into Financial Results (1 canonical Result per Quarter) vs Board Meetings
   const financialResultsHistory = useMemo(() => {
-    const rawResults = stockHistory.filter(h => h.isOutcome && !h.periodOrMeeting?.toLowerCase().startsWith('board meeting:'));
+    const rawResults = stockHistory.filter(h => (h.isOutcome || h.status === 'Declared' || h.status === 'Outcome Declared') && !h.periodOrMeeting?.toLowerCase().startsWith('board meeting:'));
     const map = new Map<string, any>();
     
     rawResults.forEach(item => {
@@ -1070,12 +1070,20 @@ Your 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${g
 
     if (selectedModalItem && selectedModalItem.isDeclared) {
       const modalQuarterKey = selectedModalItem.quarterKey || `current-${selectedModalItem.meetingDate}`;
-      const hasDuplicate = Array.from(map.values()).some(x => 
+      const existing = map.get(modalQuarterKey) || Array.from(map.values()).find(x => 
         (x.quarterKey && selectedModalItem.quarterKey && x.quarterKey === selectedModalItem.quarterKey) ||
         x.meetingDate === selectedModalItem.meetingDate || 
         x.declarationDate === selectedModalItem.meetingDate
       );
-      if (!hasDuplicate) {
+      if (existing) {
+        if (!existing.declarationTime && selectedModalItem.resultDeclarationTime) {
+          existing.declarationTime = formatTimeOnly(selectedModalItem.resultDeclarationTime);
+          existing.declaredAtFormatted = selectedModalItem.resultDeclarationTime;
+        }
+        if (!existing.pdfLink && selectedModalItem.declarationPdfLink) {
+          existing.pdfLink = selectedModalItem.declarationPdfLink;
+        }
+      } else {
         map.set(modalQuarterKey, {
           id: selectedModalItem.id,
           quarterKey: selectedModalItem.quarterKey,
@@ -2666,7 +2674,11 @@ Your 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${g
                             { value: 5, label: '5 Years (5 yrs)' }
                           ]}
                           value={selectedYears}
-                          onChange={(val) => setSelectedYears(Number(val))}
+                          onChange={(val) => {
+                            const y = Number(val);
+                            setSelectedYears(y);
+                            handleFetchDeepHistory(selectedModalItem.scripCode, selectedModalItem.symbol, y);
+                          }}
                           size="sm"
                           menuWidth="w-36"
                           align="right"

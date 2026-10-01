@@ -50,6 +50,15 @@ export function isPaymentOrderOwnershipError(error: unknown): boolean {
   );
 }
 
+import {
+  isFirestoreQuotaExceeded,
+  isAdminPermissionDenied,
+  isQuotaError,
+  isPermissionDeniedError,
+  setFirestoreQuotaExceeded,
+  setAdminPermissionDenied,
+} from './localStore.js';
+
 /**
  * Run one Firestore payment operation with a hard timeout. Any Firestore
  * error (quota, permission, network, timeout, missing configuration) is
@@ -61,6 +70,13 @@ export async function runPaymentStore<T>(
   promise: Promise<T>,
   timeoutMs = 10_000,
 ): Promise<T> {
+  if (isFirestoreQuotaExceeded()) {
+    throw new PaymentStoreUnavailableError(operation, new Error('Firestore quota exceeded'));
+  }
+  if (isAdminPermissionDenied()) {
+    throw new PaymentStoreUnavailableError(operation, new Error('Firestore permission denied'));
+  }
+
   const TIMEOUT = Symbol('payment-store-timeout');
   let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -77,6 +93,13 @@ export async function runPaymentStore<T>(
     }
     return result;
   } catch (error) {
+    const rawErr = (error as any)?.cause || error;
+    if (isQuotaError(rawErr)) {
+      setFirestoreQuotaExceeded(true);
+    } else if (isPermissionDeniedError(rawErr)) {
+      setAdminPermissionDenied(true);
+    }
+
     if (error instanceof PaymentStoreUnavailableError || isPaymentOrderOwnershipError(error)) {
       throw error;
     }
