@@ -82,7 +82,16 @@ export async function fetchStockQuote(symbol: string): Promise<CompanyQuoteConte
 
   for (const ticker of tickerVariants) {
     try {
-      const q = await yf.quote(ticker);
+      // PERF (1 Oct 2026 audit PERF-003): yf.quote() has no built-in timeout.
+      // Yahoo periodically hangs (rate-limited / IP-blocked) and a hung call
+      // blocks the entire getCompanyIntelligence chain indefinitely. Wrap in
+      // Promise.race with 2.5s timeout (mirrors marketIndicesService pattern).
+      const q = await Promise.race([
+        yf.quote(ticker),
+        new Promise<null>((_, reject) =>
+          setTimeout(() => reject(new Error('Yahoo Finance timeout')), 2500)
+        ),
+      ]);
       if (q && q.regularMarketPrice !== undefined) {
         // Enforce Indian Rupees currency and Indian exchange to guarantee India stocks only
         const currency = q.currency || 'INR';

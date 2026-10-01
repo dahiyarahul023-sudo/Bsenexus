@@ -124,32 +124,12 @@ export const authMiddleware = async (req: express.Request, _res: express.Respons
             }
           } catch {}
 
-          // Fallback verify claims on valid Google Firebase ID tokens
-          try {
-            const unverified: any = jwt.decode(token);
-            const nowSec = Math.floor(Date.now() / 1000);
-            if (
-              unverified &&
-              unverified.sub &&
-              unverified.iss &&
-              unverified.iss.startsWith('https://securetoken.google.com/') &&
-              unverified.exp &&
-              unverified.exp > nowSec
-            ) {
-              const isAnonymous = unverified.firebase?.sign_in_provider === 'anonymous' || !unverified.email;
-              const isOwner = !isAnonymous && unverified.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-              (req as any).user = {
-                uid: unverified.sub,
-                rawUid: unverified.sub,
-                email: unverified.email || '',
-                name: unverified.name || (unverified as any).displayName || (isAnonymous ? 'Guest Trader' : 'User'),
-                isOwner,
-                isAdmin: isOwner,
-                isAnonymous
-              };
-              return next();
-            }
-          } catch {}
+          // SECURITY (1 Oct 2026 audit SEC-001): The previous unverified jwt.decode()
+          // fallback allowed attackers to forge Firebase-looking JWTs with any signing
+          // key and gain admin/owner access. Removed entirely — if both jwt.verify and
+          // adminAuth.verifyIdToken fail, the token is rejected and the request is
+          // treated as an anonymous guest. Production MUST require successful Admin SDK
+          // verification; never accept unverified claims.
         }
 
         // Token verification failed - strictly treat as unauthenticated guest
@@ -367,31 +347,12 @@ authRouter.post('/session', authRateLimiter, async (req, res) => {
       }
     }
 
-    // Resilient fallback: decode Firebase JWT token to inspect claims if Admin SDK credentials are unconfigured
-    if (!decodedToken) {
-      try {
-        const unverified: any = jwt.decode(idToken);
-        const nowSec = Math.floor(Date.now() / 1000);
-        if (
-          unverified &&
-          unverified.sub &&
-          unverified.iss &&
-          unverified.iss.startsWith('https://securetoken.google.com/') &&
-          unverified.exp &&
-          unverified.exp > nowSec
-        ) {
-          decodedToken = {
-            uid: unverified.sub,
-            email: unverified.email || req.body?.email || '',
-            name: unverified.name || unverified.display_name || req.body?.displayName || '',
-            email_verified: unverified.email_verified,
-            firebase: unverified.firebase
-          };
-        }
-      } catch {
-        // JWT decode failed
-      }
-    }
+    // SECURITY (1 Oct 2026 audit SEC-002): The previous unverified jwt.decode()
+    // fallback allowed attackers to forge Firebase-looking JWTs and obtain a
+    // server-signed admin JWT (7-day validity) with isOwner:true. Removed
+    // entirely — if adminAuth.verifyIdToken() fails or is unavailable, the
+    // session request MUST fail with 401. Never mint a JWT_SECRET-signed token
+    // from unverified claims.
 
     if (!decodedToken || !decodedToken.uid) {
       const failResult = await recordFailedAttempt(accountKey);
@@ -611,9 +572,15 @@ authRouter.post('/login', authRateLimiter, async (req, res) => {
     // Authentication succeeded: safely reset account protection counter
     await resetAccountProtection(accountKey);
 
-    const elevatedUid = ((req as any).user?.uid && (req as any).user.uid !== 'guest')
-      ? (req as any).user.uid
-      : 'bcb4FayOgxYPdyH7HoBKlfCpjZB2';
+    // SECURITY (1 Oct 2026 audit SEC-009): Removed hardcoded owner UID fallback.
+    // PIN entry requires a prior verified Firebase Auth session. If the caller is
+    // a guest (no verified uid), reject instead of minting a token for a hardcoded
+    // owner UID. The isAuthorizedAdmin check above already gates this path, but
+    // defense-in-depth says never trust a hardcoded identity.
+    const elevatedUid = (req as any).user?.uid;
+    if (!elevatedUid || elevatedUid === 'guest') {
+      return res.status(401).json({ success: false, error: "PIN entry requires prior Firebase authentication." });
+    }
     const token = jwt.sign(
       { auth: true, isAdmin: true, uid: elevatedUid, rawUid: elevatedUid, email: ADMIN_EMAIL, isOwner: true },
       JWT_SECRET,
@@ -741,9 +708,15 @@ authRouter.post('/verify-pin', authRateLimiter, async (req, res) => {
   if (isValid) {
     await resetAccountProtection(accountKey);
 
-    const elevatedUid = ((req as any).user?.uid && (req as any).user.uid !== 'guest')
-      ? (req as any).user.uid
-      : 'bcb4FayOgxYPdyH7HoBKlfCpjZB2';
+    // SECURITY (1 Oct 2026 audit SEC-009): Removed hardcoded owner UID fallback.
+    // PIN entry requires a prior verified Firebase Auth session. If the caller is
+    // a guest (no verified uid), reject instead of minting a token for a hardcoded
+    // owner UID. The isAuthorizedAdmin check above already gates this path, but
+    // defense-in-depth says never trust a hardcoded identity.
+    const elevatedUid = (req as any).user?.uid;
+    if (!elevatedUid || elevatedUid === 'guest') {
+      return res.status(401).json({ success: false, error: "PIN entry requires prior Firebase authentication." });
+    }
     const token = jwt.sign(
       { auth: true, isAdmin: true, uid: elevatedUid, rawUid: elevatedUid, email: ADMIN_EMAIL, isOwner: true },
       JWT_SECRET,

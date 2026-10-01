@@ -183,8 +183,11 @@ export function parseBseDate(dateStr?: string): number {
     return isNaN(ts) ? 0 : ts;
   }
 
-  // 2. Standard ISO with Z or explicit timezone offset (+05:30, -04:00, etc.)
-  if (/^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})$/i.test(str)) {
+  // 2. Standard ISO with Z or explicit timezone offset (+05:30, -04:00, +5:30, etc.)
+  // BUGFIX (1 Oct 2026 audit LOGIC-040): Was `[+-]\d{2}:?\d{2}` which required
+  // exactly 2 digits before the colon. `+5:30` (1 digit, valid ISO) would fail
+  // and fall through to other formats. Changed to `\d{1,2}` to accept both.
+  if (/^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{1,2}:?\d{2})$/i.test(str)) {
     const ts = Date.parse(str.replace(' ', 'T'));
     if (!isNaN(ts)) return ts;
   }
@@ -403,7 +406,10 @@ export function getISTMarketStatus(): {
 
   // Monday (1) to Friday (5), between 09:15 (555m) and 15:30 (930m) IST
   const isWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
-  const isMarketHours = isWeekday && totalMinutes >= 555 && totalMinutes <= 930;
+  // BUGFIX (1 Oct 2026 audit LOGIC-030): Was `totalMinutes <= 930` which treated
+  // 15:30:00 as market hours. BSE closes AT 15:30 (pre-close auction starts), so
+  // 15:30 should be off-hours. Changed to `< 930` (exclusive).
+  const isMarketHours = isWeekday && totalMinutes >= 555 && totalMinutes < 930;
 
   if (isMarketHours) {
     return {

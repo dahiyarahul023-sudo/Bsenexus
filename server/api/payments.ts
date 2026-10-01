@@ -504,10 +504,15 @@ paymentsRouter.get('/verify', requireAuth, async (req, res) => {
       // The paid amount + currency must match that plan exactly, else fail closed.
       const planId = planIdFromOrderId(orderId);
       const plan = PRO_PLANS[planId];
-      const paidAmount = Number(order.order_amount);
-      const paidCurrency = String(order.order_currency || '');
-      if (paidAmount !== plan.amountPaise / 100 || paidCurrency !== plan.currency) {
-        console.warn('[Payments] verify amount mismatch:', orderId, paidAmount, paidCurrency, 'expected', plan.id);
+      // BUGFIX (1 Oct 2026 audit LOGIC-026 + LOGIC-027): Amount comparison was
+      // using float arithmetic (Number(amount) !== paise/100) which can fail for
+      // non-integer rupees due to IEEE 754 representation. Currency comparison
+      // was case-sensitive with no trim — 'inr' or ' INR ' would fail. Now:
+      // (a) amount compared in integer paise, (b) currency trimmed + uppercased.
+      const paidAmountPaise = Math.round(Number(order.order_amount) * 100);
+      const paidCurrency = String(order.order_currency || '').trim().toUpperCase();
+      if (paidAmountPaise !== plan.amountPaise || paidCurrency !== plan.currency.toUpperCase()) {
+        console.warn('[Payments] verify amount mismatch:', orderId, paidAmountPaise, paidCurrency, 'expected', plan.id);
         return res.status(200).json({ success: false, paid: false, error: 'Payment amount does not match the selected plan.' });
       }
       const paidAtMs = await fetchSuccessfulPaymentTime(orderId, order);
@@ -705,7 +710,7 @@ paymentsRouter.post('/recover', requireAuth, paymentRecoveryLimiter, async (req,
           }
           const planId = planIdFromOrderId(candidate.orderId);
           const plan = PRO_PLANS[planId];
-          if (Number(order.order_amount) !== plan.amountPaise / 100 || String(order.order_currency || '') !== plan.currency) {
+          if (Math.round(Number(order.order_amount) * 100) !== plan.amountPaise || String(order.order_currency || '').trim().toUpperCase() !== plan.currency.toUpperCase()) {
             if (candidate.orderId !== legacyOrderId) {
               await markOrderFailed(candidate.orderId, 'recover: amount/currency mismatch').catch((e: any) => console.warn('[Payments] markOrderFailed failed:', candidate.orderId, e?.message || e));
             }
@@ -798,7 +803,7 @@ paymentsRouter.post('/claim', requireAuth, paymentRecoveryLimiter, async (req, r
 
     const planId = planIdFromOrderId(orderId);
     const plan = PRO_PLANS[planId];
-    if (Number(order.order_amount) !== plan.amountPaise / 100 || String(order.order_currency || '') !== plan.currency) {
+    if (Math.round(Number(order.order_amount) * 100) !== plan.amountPaise || String(order.order_currency || '').trim().toUpperCase() !== plan.currency.toUpperCase()) {
       console.warn('[Payments] claim amount mismatch:', orderId);
       return res.status(200).json({ success: false, error: 'The payment amount does not match the selected plan.' });
     }
@@ -927,8 +932,9 @@ paymentsRouter.post('/webhook', async (req, res) => {
       const rawUid: string = order?.customer_details?.customer_id || '';
       const planId = planIdFromOrderId(orderId);
       const plan = PRO_PLANS[planId];
-      const amountOk = Number(order?.order_amount) === plan.amountPaise / 100;
-      const currencyOk = String(order?.order_currency || '') === plan.currency;
+      // BUGFIX (1 Oct 2026 audit LOGIC-026 + LOGIC-027): Integer paise comparison + case-insensitive currency.
+      const amountOk = Math.round(Number(order?.order_amount || 0) * 100) === plan.amountPaise;
+      const currencyOk = String(order?.order_currency || '').trim().toUpperCase() === plan.currency.toUpperCase();
       if (order?.order_status === 'PAID' && rawUid && amountOk && currencyOk) {
         const uid = sanitizeUserId(rawUid);
         const { alreadyGranted } = await grantWithLedger(uid, orderId, planId, 'webhook', {

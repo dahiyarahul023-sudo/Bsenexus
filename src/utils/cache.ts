@@ -83,7 +83,11 @@ export function clearAllCache(): void {
           keysToRemove.push(k);
         }
       }
-      keysToRemove.forEach(k => window.sessionStorage.removeItem(k));
+      // BUGFIX (1 Oct 2026 audit LOGIC-006): Was calling sessionStorage.removeItem
+      // instead of localStorage.removeItem — the cache was NEVER actually cleared.
+      // Calling clearAllCache() was a no-op; stale data persisted across sessions
+      // and could leak between accounts on shared devices.
+      keysToRemove.forEach(k => window.localStorage.removeItem(k));
     }
   } catch (err) {}
 }

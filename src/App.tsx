@@ -104,12 +104,18 @@ function Dashboard({ bseHealth, telegramHealth, isRunning, handleToggle }: any) 
  * Runs on every route so a payment return always lands in the React app.
  */
 function CashfreeReturnHandler() {
-  const { user, refreshProfile, setReceipt } = useAuth();
+  const { user, refreshProfile, setReceipt, setIsAuthModalOpen } = useAuth();
   const { success, warning } = useToast();
   const handledRef = useRef<string | null>(null);
   // While our server confirms the payment with Cashfree, show a processing
   // overlay so the screen never sits blank before the invoice appears.
   const [verifying, setVerifying] = useState(false);
+  // UI-001 (1 Oct 2026 audit): Tracks the case where a payment return URL lands
+  // without an active Firebase session (incognito, different browser, session
+  // expiry). Previously the boot splash painted forever and the user had no
+  // path forward — the payment was already deducted. Now we drop the splash and
+  // surface an explicit "sign in to confirm" prompt.
+  const [needsLogin, setNeedsLogin] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -118,9 +124,19 @@ function CashfreeReturnHandler() {
       orderId = new URLSearchParams(window.location.search).get('cf_order_id');
     } catch { return; }
     if (!orderId || handledRef.current === orderId) return;
-    // The order was created by a logged-in uid; wait until that session is
-    // back before verifying (the uid in the JWT must match the order owner).
-    if (!user) return;
+
+    // UI-001 fix: If no user after auth has resolved, drop the splash and show
+    // the sign-in prompt. Stash the orderId so we can re-verify after login.
+    if (!user) {
+      try {
+        document.getElementById('cf-boot-splash')?.remove();
+      } catch { /* non-fatal */ }
+      try {
+        sessionStorage.setItem('cf_pending_order_id', orderId);
+      } catch { /* non-fatal */ }
+      setNeedsLogin(true);
+      return;
+    }
     handledRef.current = orderId;
     (async () => {
       // React has booted: drop the instant boot splash (see index.html) and
@@ -128,6 +144,7 @@ function CashfreeReturnHandler() {
       try {
         document.getElementById('cf-boot-splash')?.remove();
       } catch { /* non-fatal */ }
+      setNeedsLogin(false);
       setVerifying(true);
       const v = await verifyProPayment(orderId as string);
       clearPendingOrderId();
@@ -151,6 +168,45 @@ function CashfreeReturnHandler() {
       }
     })();
   }, [user]);
+
+  // UI-001: When user signs in after seeing the needs-login prompt, re-trigger
+  // verification using the stashed orderId.
+  useEffect(() => {
+    if (user && needsLogin) {
+      const stashed = sessionStorage.getItem('cf_pending_order_id');
+      if (stashed) {
+        sessionStorage.removeItem('cf_pending_order_id');
+        setNeedsLogin(false);
+        // Re-run the main effect by clearing the handled guard.
+        handledRef.current = null;
+        // Force re-render via state toggle.
+        setVerifying(false);
+      }
+    }
+  }, [user, needsLogin]);
+
+  if (needsLogin) {
+    return (
+      <div
+        className="fixed inset-0 z-[96] bg-[#0B0B14]/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-150"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Sign in to confirm payment"
+      >
+        <div className="w-full max-w-[360px] rounded-[28px] bg-white shadow-2xl p-8 flex flex-col items-center text-center animate-in zoom-in-95 duration-200">
+          <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mb-4 text-2xl" aria-hidden="true">🔐</div>
+          <h2 className="text-lg font-semibold text-slate-900 mb-2">Sign in to confirm your payment</h2>
+          <p className="text-sm text-slate-600 mb-6">Your payment was processed. Sign in to the same account that placed the order to view your receipt and activate Pro.</p>
+          <button
+            onClick={() => setIsAuthModalOpen(true)}
+            className="w-full px-5 py-3 rounded-full bg-slate-950 text-white font-medium hover:bg-slate-800 transition-colors"
+          >
+            Sign in
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!verifying) return null;
   return (

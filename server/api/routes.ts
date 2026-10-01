@@ -1668,7 +1668,7 @@ apiRouter.post("/storage/test-alert", requireAdmin, async (req, res) => {
 });
 
 // Storage Quota Mode Controls (Automatic vs Manual Override)
-apiRouter.get("/storage/quota-mode", (req, res) => {
+apiRouter.get("/storage/quota-mode", requireAdmin, (req, res) => {
   const mode = getManualStorageMode();
   const isQuotaExceeded = isFirestoreQuotaExceeded();
   const isPermissionDenied = isAdminPermissionDenied();
@@ -2293,13 +2293,38 @@ apiRouter.get(
 // FEATURE: IN-HOUSE SYSTEM HEALTH & CRASH DIAGNOSTICS (ADMIN ONLY)
 // ==========================================
 
-// Public lightweight ingestion endpoint (used by client telemetry)
-apiRouter.post("/telemetry/event", async (req, res) => {
+// Lightweight ingestion endpoint (used by client telemetry)
+// SECURITY (1 Oct 2026 audit SEC-008): Previously unauthenticated + no per-IP
+// throttle. Attackers could spam admin's Telegram with fake crash alerts and
+// bloat local diagnostics.json. Now requires auth + per-IP throttle + strict
+// field whitelist (no spread of arbitrary req.body fields).
+apiRouter.post("/telemetry/event", aiRateLimiter, async (req, res) => {
   try {
     const uid = getReqUserId(req);
+    if (!uid || uid === 'guest') {
+      return res.status(401).json({ success: false, error: "Authentication required for telemetry." });
+    }
+    // Strict field whitelist — don't spread arbitrary req.body fields.
+    // Type-cast to the expected union types so TS doesn't reject our sanitization.
+    const body = req.body || {};
+    const rawType = String(body.type || '').substring(0, 45).toUpperCase() as any;
+    const validTypes = ['ERROR', 'PERFORMANCE', 'WEB_VITAL', 'API_METRIC', 'DEVICE_INFO'];
+    const type = validTypes.includes(rawType) ? rawType : 'ERROR';
+    const rawSeverity = String(body.error?.severity || 'ERROR').substring(0, 45).toUpperCase() as any;
+    const validSeverities = ['CRITICAL', 'ERROR', 'WARNING'];
+    const severity = validSeverities.includes(rawSeverity) ? rawSeverity : 'ERROR';
     const event = await recordTelemetry({
-      ...req.body,
-      userId: uid !== 'guest' ? uid : undefined
+      type,
+      userId: uid,
+      device: body.device && typeof body.device === 'object' ? body.device : undefined,
+      performance: body.performance && typeof body.performance === 'object' ? body.performance : undefined,
+      error: body.error && typeof body.error === 'object' ? {
+        message: String(body.error.message || '').substring(0, 990),
+        stack: body.error.stack ? String(body.error.stack).substring(0, 4900) : undefined,
+        severity,
+        url: body.error.url ? String(body.error.url).substring(0, 490) : undefined,
+      } : undefined,
+      api: body.api && typeof body.api === 'object' ? body.api : undefined,
     });
     res.json({ success: true, eventId: event.id });
   } catch (err: any) {
@@ -2432,7 +2457,7 @@ apiRouter.post("/admin/diagnostics/toggle-mute-alerts", requireAdmin, async (req
 // ==========================================
 
 // Audit status of all 20 launch security items
-apiRouter.get("/security/audit", async (req, res) => {
+apiRouter.get("/security/audit", requireAdmin, async (req, res) => {
   try {
     const user = (req as any).user;
     const auditReport = await runSecurityAudit(user);
