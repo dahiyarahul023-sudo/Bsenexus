@@ -1130,7 +1130,16 @@ export async function getStockResultsHistory(
   for (const [dateStr, filings] of dateMap.entries()) {
     filings.sort((a, b) => a.ts - b.ts);
 
-    const outcomeFiling = filings.find(f => isPureResultOutcomeFiling(f.subject, f.details));
+    // Declaration rule (Rohit, 1 Oct 2026): date from the results calendar,
+    // time from the filings — on the results date, the earliest result filing
+    // IS the declaration; no unaudited-vs-financial-vs-outcome subject check,
+    // and the day's remaining filings stay one tap away as follow-ups.
+    // (Filings are time-sorted ascending above.) Board-meeting archive
+    // placeholders (bm_* ids, date-only) are meeting notices, not filings of
+    // the day, so they can never take the declaration slot.
+    const isMeetingPlaceholder = (f: any) => String(f.newsId || '').startsWith('bm_');
+    const resultPool = filings.filter(f => !isMeetingPlaceholder(f) && (f.category === 'RESULTS' || isPureResultOutcomeFiling(f.subject, f.details)));
+    const outcomeFiling = resultPool[0] || filings.find(f => !isMeetingPlaceholder(f));
     if (outcomeFiling) {
       const { quarterKey, periodLabel } = parseQuarterPeriod(`${outcomeFiling.subject} ${outcomeFiling.details}`, outcomeFiling.ts);
 
@@ -1379,8 +1388,11 @@ export async function fetchDeepHistoricalResultsForStock(
 
     const batchResults = await Promise.all(
       pageNumbers.map(async (page) => {
-        const prevDate = getBseISTDate(180);
-        const toDate = getBseISTDate(0);
+        // Slide the 180-day window backwards page by page. Previously every
+        // page queried the same last-180-days window, so result filings older
+        // than ~6 months could never be reached no matter the years asked.
+        const toDate = getBseISTDate(180 * (page - 1));
+        const prevDate = getBseISTDate(180 * page);
         try {
           const url = `https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w?pageno=${page}&strCat=Result&strPrevDate=${prevDate}&strScrip=${targetScrip}&strSearch=P&strToDate=${toDate}&strType=C`;
           const res = await fetch(url, {
@@ -1436,7 +1448,10 @@ export async function fetchDeepHistoricalResultsForStock(
         const parsedTs = parseBseDate(rawTime);
 
         if (parsedTs > 0 && parsedTs < cutoffTimestamp) {
+          // Before the requested years horizon: stop paging further back and
+          // don't store filings the user didn't ask for.
           reachedCutoff = true;
+          continue;
         }
 
         historicalAnnouncements.push({

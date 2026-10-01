@@ -7,4 +7,4 @@
 // NOTE for local dev: running `npm run build` locally also bumps this file.
 // Revert it (git checkout -- src/version.ts) before pushing, so GitHub
 // keeps the base and only real publishes advance the number.
-export const APP_VERSION = '2.6.31';
+export const APP_VERSION = '2.6.32';
