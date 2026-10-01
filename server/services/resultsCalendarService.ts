@@ -1751,7 +1751,7 @@ function generateServerGoogleCalUrl(item: { symbol: string; companyName: string;
   const q = new URLSearchParams({
     action: 'TEMPLATE',
     text: `BSE: ${item.symbol} Board Meeting (${item.purpose})`,
-    details: `Company: ${item.companyName}\nSymbol: ${item.symbol} (BSE: ${item.scripCode})\nMeeting Purpose: ${item.purpose}\nScheduled Date: ${item.meetingDate}\n\nTrack real-time outcomes on BSE Nexus.`,
+    details: `Company: ${item.companyName}\nSymbol: ${item.symbol} (BSE: ${item.scripCode})\nMeeting Purpose: ${item.purpose}\nScheduled Date: ${item.meetingDate}\n\nTrack real-time outcomes on Bsenexus.`,
     location: 'BSE India / Corporate Headquarters',
     dates: `${startIso}/${endIso}`
   });

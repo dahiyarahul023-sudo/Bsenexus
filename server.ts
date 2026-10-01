@@ -316,7 +316,7 @@ function renderAnnouncementPage(announcement: any, newsId: string, canonicalOver
 
   const canonicalUrl = canonicalOverride
     || `https://bsenexus.in/announcement/${encodeURIComponent(newsId)}`;
-  const pageTitle = `${companyName} — ${subject} | BSE Nexus`;
+  const pageTitle = `${companyName} — ${subject} | Bsenexus`;
   const isBatchTest = newsId.toLowerCase().includes('batch_test_');
   const robotsMeta = isBatchTest
     ? '<meta name="robots" content="noindex, nofollow">'
@@ -334,7 +334,7 @@ function renderAnnouncementPage(announcement: any, newsId: string, canonicalOver
     "url": canonicalUrl,
     "publisher": {
       "@type": "Organization",
-      "name": "BSE Nexus",
+      "name": "Bsenexus",
       "url": "https://bsenexus.in",
       "logo": {
         "@type": "ImageObject",
@@ -365,7 +365,7 @@ ${AI_STUDIO_REDIRECT_SCRIPT}
   <meta property="og:type" content="article">
   <meta property="og:url" content="${escapeHtmlAttr(canonicalUrl)}">
   <meta property="og:image" content="https://bsenexus.in/og-image.png">
-  <meta property="og:site_name" content="BSE Nexus">
+  <meta property="og:site_name" content="Bsenexus">
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
@@ -582,10 +582,10 @@ ${JSON.stringify(jsonLd, null, 2)}
 <body>
   <header class="top-banner">
     <a href="https://bsenexus.in/" class="top-brand">
-      BSE Nexus <span>Terminal</span>
+      Bsenexus <span>Terminal</span>
     </a>
     <a href="https://bsenexus.in/?tab=announcements" class="app-btn">
-      Open in BSE Nexus App &rarr;
+      Open in Bsenexus App &rarr;
     </a>
   </header>
 
@@ -622,7 +622,7 @@ ${JSON.stringify(jsonLd, null, 2)}
         </a>
         ` : ''}
         <a href="https://bsenexus.in/?tab=announcements" class="terminal-link">
-          Explore Live BSE Corporate Disclosures on BSE Nexus &rarr;
+          Explore Live BSE Corporate Disclosures on Bsenexus &rarr;
         </a>
       </div>
     </article>
@@ -643,8 +643,8 @@ function renderCompanyPage(data: any, symbol: string, scripCode: string): string
   const recentFilings: any[] = Array.isArray(data.recentFilings) ? data.recentFilings : [];
   const aiSnapshot = (data.aiSnapshot || '').trim();
 
-  // Programmatic Stock Page Title formula: <Company Name> (<SYMBOL>) — BSE Announcements, Results & Corporate Actions | BSE Nexus
-  const pageTitle = `${companyName} (${symbol}) — BSE Announcements, Results & Corporate Actions | BSE Nexus`;
+  // Programmatic Stock Page Title formula: <Company Name> (<SYMBOL>) — BSE Announcements, Results & Corporate Actions | Bsenexus
+  const pageTitle = `${companyName} (${symbol}) — BSE Announcements, Results & Corporate Actions | Bsenexus`;
   const canonicalUrl = `https://bsenexus.in/company/${encodeURIComponent(symbol)}`;
 
   const latestFiling = recentFilings[0];
@@ -652,7 +652,7 @@ function renderCompanyPage(data: any, symbol: string, scripCode: string): string
 
   let description = latestAnnouncementText
     ? `Track ${companyName} (${symbol} / BSE:${scripCode || ''}) announcements, results & corporate actions. Latest disclosure: ${latestAnnouncementText}`.trim()
-    : `Track ${companyName} (${symbol} / BSE:${scripCode || ''}) announcements, quarterly results, board meetings, and corporate actions live on BSE Nexus.`.trim();
+    : `Track ${companyName} (${symbol} / BSE:${scripCode || ''}) announcements, quarterly results, board meetings, and corporate actions live on Bsenexus.`.trim();
   if (description.length > 155) {
     description = description.slice(0, 152).trim() + '...';
   }
@@ -672,18 +672,18 @@ function renderCompanyPage(data: any, symbol: string, scripCode: string): string
     {
       q: `What is the latest BSE announcement by ${companyName}?`,
       a: safeHeadline
-        ? `The latest BSE disclosure by ${companyName} (${symbol})${latestFilingDate ? `, filed on ${latestFilingDate},` : ''} is: "${safeHeadline}". BSE Nexus tracks every official filing for ${companyName} with AI-powered summaries on its announcements feed.`
-        : `${companyName} (${symbol}) disclosures are tracked on BSE Nexus, which structures every official BSE filing with AI-powered summaries.`
+        ? `The latest BSE disclosure by ${companyName} (${symbol})${latestFilingDate ? `, filed on ${latestFilingDate},` : ''} is: "${safeHeadline}". Bsenexus tracks every official filing for ${companyName} with AI-powered summaries on its announcements feed.`
+        : `${companyName} (${symbol}) disclosures are tracked on Bsenexus, which structures every official BSE filing with AI-powered summaries.`
     },
     {
       q: `When is ${companyName}'s next board meeting?`,
       a: upcomingEvent
         ? `${companyName} has a board meeting scheduled for ${upcomingEvent.meetingDate || 'an announced date'}${meetingWhen ? ` (${meetingWhen})` : ''}${upcomingEvent.purpose ? ` to consider: ${upcomingEvent.purpose}` : ''}.`
-        : `No upcoming board meeting is currently tracked for ${companyName}. Companies disclose meeting intimations under SEBI LODR, and scheduled dates appear on the BSE Nexus Results Calendar.`
+        : `No upcoming board meeting is currently tracked for ${companyName}. Companies disclose meeting intimations under SEBI LODR, and scheduled dates appear on the Bsenexus Results Calendar.`
     },
     {
       q: `When does ${companyName} declare quarterly results?`,
-      a: `Under SEBI (LODR) Regulation 33, listed companies submit quarterly unaudited results within 45 days of the quarter ending, and annual audited figures within 60 days.${quarterlyResults.length > 0 ? ` ${companyName}'s recent results history is tabulated above.` : ''} Track scheduled board meetings on the BSE Nexus Results Calendar.`
+      a: `Under SEBI (LODR) Regulation 33, listed companies submit quarterly unaudited results within 45 days of the quarter ending, and annual audited figures within 60 days.${quarterlyResults.length > 0 ? ` ${companyName}'s recent results history is tabulated above.` : ''} Track scheduled board meetings on the Bsenexus Results Calendar.`
     }
   ];
 
@@ -790,7 +790,7 @@ ${AI_STUDIO_REDIRECT_SCRIPT}
   <meta property="og:type" content="website">
   <meta property="og:url" content="${escapeHtmlAttr(canonicalUrl)}">
   <meta property="og:image" content="https://bsenexus.in/og-image.png">
-  <meta property="og:site_name" content="BSE Nexus">
+  <meta property="og:site_name" content="Bsenexus">
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
@@ -1208,10 +1208,10 @@ ${jsonLd}
 <body>
   <header class="top-banner">
     <a href="https://bsenexus.in/" class="top-brand">
-      BSE Nexus <span>Terminal</span>
+      Bsenexus <span>Terminal</span>
     </a>
     <a href="https://bsenexus.in/?tab=watchlists" class="app-btn">
-      Open in BSE Nexus App &rarr;
+      Open in Bsenexus App &rarr;
     </a>
   </header>
 
@@ -1380,13 +1380,13 @@ ${jsonLd}
 
       <div class="bottom-cta">
         <a href="https://bsenexus.in/?tab=announcements" class="terminal-link">
-          Track ${escapeHtmlText(companyName)} Announcements on BSE Nexus Live Terminal &rarr;
+          Track ${escapeHtmlText(companyName)} Announcements on Bsenexus Live Terminal &rarr;
         </a>
       </div>
     </article>
 
     <footer>
-      BSE Nexus Financial Intelligence &middot; Real-time regulatory filings, board meetings &amp; quarterly results direct from BSE India public feeds.
+      Bsenexus Financial Intelligence &middot; Real-time regulatory filings, board meetings &amp; quarterly results direct from BSE India public feeds.
     </footer>
   </main>
 </body>
@@ -1399,7 +1399,7 @@ function renderCompany404Page(symbol: string): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Company Not Found | BSE Nexus</title>
+  <title>Company Not Found | Bsenexus</title>
   <meta name="robots" content="noindex, follow">
 ${AI_STUDIO_REDIRECT_SCRIPT}
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1458,7 +1458,7 @@ ${AI_STUDIO_REDIRECT_SCRIPT}
   <div class="card">
     <h1>Company Not Found</h1>
     <p>We could not find listed company details for ${symbol ? `"${escapeHtmlText(symbol)}"` : 'the requested stock'}. Check the stock symbol or browse live market watchlists in the app.</p>
-    <a href="https://bsenexus.in/?tab=watchlists" class="btn">Open in BSE Nexus App &rarr;</a>
+    <a href="https://bsenexus.in/?tab=watchlists" class="btn">Open in Bsenexus App &rarr;</a>
   </div>
 </body>
 </html>`;
@@ -1470,7 +1470,7 @@ function renderAnnouncement404Page(isBatchTest: boolean = false): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Announcement Not Found | BSE Nexus</title>
+  <title>Announcement Not Found | Bsenexus</title>
   <meta name="robots" content="${isBatchTest ? 'noindex, nofollow' : 'noindex, follow'}">
 ${AI_STUDIO_REDIRECT_SCRIPT}
   <style>
@@ -1515,41 +1515,41 @@ ${AI_STUDIO_REDIRECT_SCRIPT}
   <div class="card">
     <h1>Announcement Not Found</h1>
     <p>The requested BSE corporate announcement or disclosure could not be located or may have expired.</p>
-    <a href="https://bsenexus.in/?tab=announcements" class="btn">Open in BSE Nexus App &rarr;</a>
+    <a href="https://bsenexus.in/?tab=announcements" class="btn">Open in Bsenexus App &rarr;</a>
   </div>
 </body>
 </html>`;
 }
 
 export function renderFaqPage(): string {
-  const pageTitle = "BSE Corporate Announcements & Disclosures FAQ | BSE Nexus";
+  const pageTitle = "BSE Corporate Announcements & Disclosures FAQ | Bsenexus";
   const canonicalUrl = "https://bsenexus.in/faq";
   const description = "Answers to top questions about BSE corporate filings, board meeting intimations, quarterly financial results, SEBI LODR Regulation 30, and live alert feeds.";
 
   const faqs = [
     {
       q: "How to get BSE corporate announcements before market opens?",
-      a: "BSE-listed companies frequently submit market-sensitive announcements, board meeting outcomes, and quarterly reports overnight or early in the morning between 6:00 AM and 8:45 AM IST. BSE Nexus continuously polls BSE public disclosure feeds every 15 seconds 24 hours a day. By enabling instant Telegram alerts on BSE Nexus, investors and traders receive push notifications with AI-extracted highlights directly on their phones before the 9:00 AM pre-open market session begins."
+      a: "BSE-listed companies frequently submit market-sensitive announcements, board meeting outcomes, and quarterly reports overnight or early in the morning between 6:00 AM and 8:45 AM IST. Bsenexus continuously polls BSE public disclosure feeds every 15 seconds 24 hours a day. By enabling instant Telegram alerts on Bsenexus, investors and traders receive push notifications with AI-extracted highlights directly on their phones before the 9:00 AM pre-open market session begins."
     },
     {
       q: "Where to find company board meeting outcome on BSE?",
-      a: "Under Regulation 30 of the SEBI (Listing Obligations and Disclosure Requirements) Regulations, 2015, listed entities are legally mandated to disclose board meeting outcomes (such as dividends, bonus issues, rights issues, capital expenditure, and quarterly financial statements) within 30 minutes of the closure of the board meeting. On BSE Nexus, you can view real-time board outcomes in the Live Announcements stream or click on any individual stock (e.g. /company/RELIANCE) to review scheduled intimations and historical meeting outcomes."
+      a: "Under Regulation 30 of the SEBI (Listing Obligations and Disclosure Requirements) Regulations, 2015, listed entities are legally mandated to disclose board meeting outcomes (such as dividends, bonus issues, rights issues, capital expenditure, and quarterly financial statements) within 30 minutes of the closure of the board meeting. On Bsenexus, you can view real-time board outcomes in the Live Announcements stream or click on any individual stock (e.g. /company/RELIANCE) to review scheduled intimations and historical meeting outcomes."
     },
     {
       q: "How to check quarterly results submission time for BSE stocks?",
-      a: "As per Regulation 33 of SEBI LODR, companies must submit un-audited quarterly financial results (Q1, Q2, Q3) within 45 days of the quarter end, and audited annual results (Q4/FY) within 60 days of the financial year end. Companies file an advance intimation at least 5 working days prior to the meeting. The BSE Nexus Earnings Calendar compiles all scheduled board meeting dates and provides side-by-side YoY (Year-over-Year) and QoQ (Quarter-over-Quarter) revenue, operating profit, and net profit comparisons."
+      a: "As per Regulation 33 of SEBI LODR, companies must submit un-audited quarterly financial results (Q1, Q2, Q3) within 45 days of the quarter end, and audited annual results (Q4/FY) within 60 days of the financial year end. Companies file an advance intimation at least 5 working days prior to the meeting. The Bsenexus Earnings Calendar compiles all scheduled board meeting dates and provides side-by-side YoY (Year-over-Year) and QoQ (Quarter-over-Quarter) revenue, operating profit, and net profit comparisons."
     },
     {
       q: "Difference between NSE and BSE corporate disclosures?",
-      a: "While dual-listed equities (such as Nifty 50 constituents) file disclosures simultaneously to both exchanges, there are over 1,500+ small-cap, micro-cap, SME, and exclusive equities listed solely on BSE. BSE disclosure feeds typically publish raw XBRL data packages, financial PDFs, and investor presentations with microsecond latency. BSE Nexus processes native BSE announcements to ensure comprehensive market coverage."
+      a: "While dual-listed equities (such as Nifty 50 constituents) file disclosures simultaneously to both exchanges, there are over 1,500+ small-cap, micro-cap, SME, and exclusive equities listed solely on BSE. BSE disclosure feeds typically publish raw XBRL data packages, financial PDFs, and investor presentations with microsecond latency. Bsenexus processes native BSE announcements to ensure comprehensive market coverage."
     },
     {
       q: "How to track promoter pledge and insider trading alerts online?",
-      a: "Promoter shareholding changes, pledges, and insider dealings are governed by the SEBI (Prohibition of Insider Trading) Regulations and SEBI (Substantial Acquisition of Shares and Takeovers) Regulations (SAST Reg 29 & 31). BSE Nexus automatically flags corporate governance intimations, promoter transactions, and acquisition disclosures with HIGH priority badges and instant Telegram dispatches so you never miss insider movements."
+      a: "Promoter shareholding changes, pledges, and insider dealings are governed by the SEBI (Prohibition of Insider Trading) Regulations and SEBI (Substantial Acquisition of Shares and Takeovers) Regulations (SAST Reg 29 & 31). Bsenexus automatically flags corporate governance intimations, promoter transactions, and acquisition disclosures with HIGH priority badges and instant Telegram dispatches so you never miss insider movements."
     },
     {
       q: "Best API or alert tracker for BSE corporate announcements?",
-      a: "BSE Nexus provides an independent, low-latency financial intelligence terminal featuring real-time automated 15s BSE polling, neural Gemini AI metric extraction, custom watchlists, Telegram bot webhooks, and embeddable widgets. You can track all corporate announcements for free without requiring custom programming or expensive financial terminals."
+      a: "Bsenexus provides an independent, low-latency financial intelligence terminal featuring real-time automated 15s BSE polling, neural Gemini AI metric extraction, custom watchlists, Telegram bot webhooks, and embeddable widgets. You can track all corporate announcements for free without requiring custom programming or expensive financial terminals."
     }
   ];
 
@@ -1574,7 +1574,7 @@ export function renderFaqPage(): string {
       {
         "@type": "BreadcrumbList",
         "itemListElement": [
-          { "@type": "ListItem", "position": 1, "name": "BSE Nexus", "item": "https://bsenexus.in/" },
+          { "@type": "ListItem", "position": 1, "name": "Bsenexus", "item": "https://bsenexus.in/" },
           { "@type": "ListItem", "position": 2, "name": "FAQ", "item": canonicalUrl }
         ]
       }
@@ -1598,7 +1598,7 @@ ${AI_STUDIO_REDIRECT_SCRIPT}
   <meta property="og:type" content="article">
   <meta property="og:url" content="${escapeHtmlAttr(canonicalUrl)}">
   <meta property="og:image" content="https://bsenexus.in/og-image.png">
-  <meta property="og:site_name" content="BSE Nexus">
+  <meta property="og:site_name" content="Bsenexus">
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
@@ -1778,7 +1778,7 @@ ${jsonLd}
 <body>
   <header class="top-banner">
     <a href="https://bsenexus.in/" class="top-brand">
-      BSE Nexus <span>Terminal</span>
+      Bsenexus <span>Terminal</span>
     </a>
     <a href="https://bsenexus.in/?tab=announcements" class="app-btn">
       Launch Live App &rarr;
@@ -1803,7 +1803,7 @@ ${jsonLd}
 
     <div class="cta-card">
       <h3>Ready to track BSE announcements in real time?</h3>
-      <p>Launch the free BSE Nexus live terminal, set up custom watchlists, and get instant Telegram alerts for every corporate disclosure.</p>
+      <p>Launch the free Bsenexus live terminal, set up custom watchlists, and get instant Telegram alerts for every corporate disclosure.</p>
       <div class="cta-btns">
         <a href="https://bsenexus.in/?tab=announcements" class="btn-white">Open Live Terminal &rarr;</a>
         <a href="https://bsenexus.in/?tab=results-calendar" class="btn-outline">Earnings Calendar</a>
@@ -1812,7 +1812,7 @@ ${jsonLd}
     </div>
 
     <footer>
-      <div>&copy; ${new Date().getFullYear()} BSE Nexus &middot; Real-time BSE corporate filings intelligence and algorithmic disclosure tracking.</div>
+      <div>&copy; ${new Date().getFullYear()} Bsenexus &middot; Real-time BSE corporate filings intelligence and algorithmic disclosure tracking.</div>
       <div style="margin-top: 10px;">
         <a href="https://bsenexus.in/">Home</a> &middot;
         <a href="https://bsenexus.in/about">About</a> &middot;
@@ -1831,9 +1831,9 @@ ${jsonLd}
 }
 
 export function renderPricingPage(): string {
-  const pageTitle = "Pricing — Pro Plans from ₹59 | BSE Nexus";
+  const pageTitle = "Pricing — Pro Plans from ₹59 | Bsenexus";
   const canonicalUrl = "https://bsenexus.in/pricing";
-  const description = "BSE Nexus Pro plans: Weekly ₹59, Monthly ₹199, 6-Month ₹999, Yearly ₹1,799. One-time payments via Cashfree — no auto-renewal. 1st week free, no card required. Free vs Pro comparison.";
+  const description = "Bsenexus Pro plans: Weekly ₹59, Monthly ₹199, 6-Month ₹999, Yearly ₹1,799. One-time payments via Cashfree — no auto-renewal. 1st week free, no card required. Free vs Pro comparison.";
 
   const proOffers = [
     { name: "Pro Weekly", price: "59", desc: "7 days of Pro via one-time Cashfree payment." },
@@ -1848,12 +1848,12 @@ export function renderPricingPage(): string {
       {
         "@type": "Product",
         "@id": "https://bsenexus.in/pricing#product",
-        "name": "BSE Nexus Financial Intelligence Terminal",
+        "name": "Bsenexus Financial Intelligence Terminal",
         "description": description,
         "image": "https://bsenexus.in/og-image.png",
         "brand": {
           "@type": "Brand",
-          "name": "BSE Nexus"
+          "name": "Bsenexus"
         },
         "offers": [
           {
@@ -1881,7 +1881,7 @@ export function renderPricingPage(): string {
       {
         "@type": "BreadcrumbList",
         "itemListElement": [
-          { "@type": "ListItem", "position": 1, "name": "BSE Nexus", "item": "https://bsenexus.in/" },
+          { "@type": "ListItem", "position": 1, "name": "Bsenexus", "item": "https://bsenexus.in/" },
           { "@type": "ListItem", "position": 2, "name": "Pricing", "item": canonicalUrl }
         ]
       }
@@ -1905,7 +1905,7 @@ ${AI_STUDIO_REDIRECT_SCRIPT}
   <meta property="og:type" content="website">
   <meta property="og:url" content="${escapeHtmlAttr(canonicalUrl)}">
   <meta property="og:image" content="https://bsenexus.in/og-image.png">
-  <meta property="og:site_name" content="BSE Nexus">
+  <meta property="og:site_name" content="Bsenexus">
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
@@ -2232,7 +2232,7 @@ ${jsonLd}
 <body>
   <header class="top-banner">
     <a href="https://bsenexus.in/" class="top-brand">
-      BSE Nexus <span>Terminal</span>
+      Bsenexus <span>Terminal</span>
     </a>
     <nav class="nav-links">
       <a href="https://bsenexus.in/pricing" class="nav-link active">Pricing</a>
@@ -2398,7 +2398,7 @@ ${jsonLd}
     </div>
 
     <footer>
-      <div>&copy; ${new Date().getFullYear()} BSE Nexus &middot; BSE corporate announcements intelligence and transparent pricing.</div>
+      <div>&copy; ${new Date().getFullYear()} Bsenexus &middot; BSE corporate announcements intelligence and transparent pricing.</div>
       <div style="margin-top: 10px;">
         <a href="https://bsenexus.in/">Home</a> &middot;
         <a href="https://bsenexus.in/about">About</a> &middot;
@@ -2417,7 +2417,7 @@ ${jsonLd}
 }
 
 export function renderGuidesIndexPage(): string {
-  const pageTitle = "Indian Equity Research Guides & Market Intelligence | BSE Nexus";
+  const pageTitle = "Indian Equity Research Guides & Market Intelligence | Bsenexus";
   const canonicalUrl = "https://bsenexus.in/guides";
   const description = "Practical guides and research insights for Indian stock market investors covering BSE filings, corporate actions, SEBI LODR disclosures, and equity analytics.";
 
@@ -2443,7 +2443,7 @@ export function renderGuidesIndexPage(): string {
       {
         "@type": "BreadcrumbList",
         "itemListElement": [
-          { "@type": "ListItem", "position": 1, "name": "BSE Nexus", "item": "https://bsenexus.in/" },
+          { "@type": "ListItem", "position": 1, "name": "Bsenexus", "item": "https://bsenexus.in/" },
           { "@type": "ListItem", "position": 2, "name": "Market Guides", "item": canonicalUrl }
         ]
       }
@@ -2467,7 +2467,7 @@ ${AI_STUDIO_REDIRECT_SCRIPT}
   <meta property="og:type" content="website">
   <meta property="og:url" content="${escapeHtmlAttr(canonicalUrl)}">
   <meta property="og:image" content="https://bsenexus.in/og-image.png">
-  <meta property="og:site_name" content="BSE Nexus">
+  <meta property="og:site_name" content="Bsenexus">
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
@@ -2707,7 +2707,7 @@ ${jsonLd}
 <body>
   <header class="top-banner">
     <a href="https://bsenexus.in/" class="top-brand">
-      BSE Nexus <span>Terminal</span>
+      Bsenexus <span>Terminal</span>
     </a>
     <nav class="nav-links">
       <a href="https://bsenexus.in/pricing" class="nav-link">Pricing</a>
@@ -2742,7 +2742,7 @@ ${jsonLd}
             <p class="guide-excerpt">${escapeHtmlText(guide.summary || guide.excerpt || '')}</p>
           </div>
           <div class="card-footer">
-            <span class="author-info">${escapeHtmlText(guide.author?.name || 'BSE Nexus Intelligence Desk')}</span>
+            <span class="author-info">${escapeHtmlText(guide.author?.name || 'Bsenexus Intelligence Desk')}</span>
             <a href="https://bsenexus.in/guides/${escapeHtmlAttr(guide.slug || guide.id)}" class="read-link">
               Read Guide &rarr;
             </a>
@@ -2753,7 +2753,7 @@ ${jsonLd}
 
     <div class="cta-box">
       <h2>Put Research Into Practice With Real-Time Data</h2>
-      <p>BSE Nexus polls the exchange every 15 seconds to deliver instant announcement analysis and high-priority Telegram alerts directly to your phone.</p>
+      <p>Bsenexus polls the exchange every 15 seconds to deliver instant announcement analysis and high-priority Telegram alerts directly to your phone.</p>
       <div class="cta-actions">
         <a href="https://bsenexus.in/?tab=announcements" class="btn-white">Open Live Terminal &rarr;</a>
         <a href="https://bsenexus.in/pricing" class="btn-outline">View Free Launch Access</a>
@@ -2762,7 +2762,7 @@ ${jsonLd}
     </div>
 
     <footer>
-      <div>&copy; ${new Date().getFullYear()} BSE Nexus &middot; Indian Equity Research Guides, SEBI LODR Regulation 30 intelligence, and corporate disclosure analytics.</div>
+      <div>&copy; ${new Date().getFullYear()} Bsenexus &middot; Indian Equity Research Guides, SEBI LODR Regulation 30 intelligence, and corporate disclosure analytics.</div>
       <div style="margin-top: 10px;">
         <a href="https://bsenexus.in/">Home</a> &middot;
         <a href="https://bsenexus.in/about">About</a> &middot;
@@ -2781,7 +2781,7 @@ ${jsonLd}
 }
 
 export function renderCompaniesDirectoryPage(): string {
-  const pageTitle = "BSE Listed Companies — Company Profiles, Results & Filings | BSE Nexus";
+  const pageTitle = "BSE Listed Companies — Company Profiles, Results & Filings | Bsenexus";
   const canonicalUrl = "https://bsenexus.in/companies";
   const description = "Comprehensive directory of India's top 26 BSE listed companies. Access real-time corporate filings, quarterly financial results, SEBI LODR disclosures, and AI analysis.";
 
@@ -2838,7 +2838,7 @@ export function renderCompaniesDirectoryPage(): string {
       {
         "@type": "BreadcrumbList",
         "itemListElement": [
-          { "@type": "ListItem", "position": 1, "name": "BSE Nexus", "item": "https://bsenexus.in/" },
+          { "@type": "ListItem", "position": 1, "name": "Bsenexus", "item": "https://bsenexus.in/" },
           { "@type": "ListItem", "position": 2, "name": "Companies Directory", "item": canonicalUrl }
         ]
       }
@@ -2862,7 +2862,7 @@ ${AI_STUDIO_REDIRECT_SCRIPT}
   <meta property="og:type" content="website">
   <meta property="og:url" content="${escapeHtmlAttr(canonicalUrl)}">
   <meta property="og:image" content="https://bsenexus.in/og-image.png">
-  <meta property="og:site_name" content="BSE Nexus">
+  <meta property="og:site_name" content="Bsenexus">
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
@@ -3162,7 +3162,7 @@ ${jsonLd}
   <header class="top-banner">
     <a href="https://bsenexus.in/" class="top-brand">
       <div class="brand-icon">N</div>
-      BSE Nexus <span>Companies</span>
+      Bsenexus <span>Companies</span>
     </a>
     <nav class="nav-links">
       <a href="https://bsenexus.in/announcements" class="nav-link">Announcements</a>
@@ -3217,7 +3217,7 @@ ${jsonLd}
 
     <div class="cta-box">
       <h2>Continuous Sub-Minute BSE Ingestion for All 26 Heavyweights</h2>
-      <p>BSE Nexus monitors BSE announcements every 15 seconds to deliver instant AI metric extraction and instant Telegram alerts directly to your trading desk.</p>
+      <p>Bsenexus monitors BSE announcements every 15 seconds to deliver instant AI metric extraction and instant Telegram alerts directly to your trading desk.</p>
       <div class="cta-actions">
         <a href="https://bsenexus.in/?tab=announcements" class="btn-emerald">Open Live Terminal &rarr;</a>
         <a href="https://bsenexus.in/results-calendar" class="btn-outline">View Earnings Calendar</a>
@@ -3226,7 +3226,7 @@ ${jsonLd}
     </div>
 
     <footer>
-      <div>&copy; ${new Date().getFullYear()} BSE Nexus &middot; Real-time Indian Equity Intelligence</div>
+      <div>&copy; ${new Date().getFullYear()} Bsenexus &middot; Real-time Indian Equity Intelligence</div>
       <div style="margin-top: 10px;">
         <a href="https://bsenexus.in/">Home</a>
         <a href="https://bsenexus.in/about">About</a>
@@ -3246,9 +3246,9 @@ ${jsonLd}
 }
 
 export function renderGeneral404Page(requestedPath: string = ""): string {
-  const pageTitle = "404 — Page Not Found | BSE Nexus";
+  const pageTitle = "404 — Page Not Found | Bsenexus";
   const canonicalUrl = "https://bsenexus.in/404";
-  const description = "The requested page could not be found on BSE Nexus. Return to live corporate announcements, market research guides, or FAQ.";
+  const description = "The requested page could not be found on Bsenexus. Return to live corporate announcements, market research guides, or FAQ.";
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -3388,7 +3388,7 @@ ${AI_STUDIO_REDIRECT_SCRIPT}
 <body>
   <header class="top-banner">
     <a href="https://bsenexus.in/" class="top-brand">
-      BSE Nexus <span>Terminal</span>
+      Bsenexus <span>Terminal</span>
     </a>
     <a href="https://bsenexus.in/?tab=announcements" style="color: #34D399; font-size: 0.8125rem; font-weight: 600; text-decoration: none;">
       Launch Terminal &rarr;
@@ -3411,7 +3411,7 @@ ${AI_STUDIO_REDIRECT_SCRIPT}
   </div>
 
   <footer>
-    <div>&copy; ${new Date().getFullYear()} BSE Nexus &middot; Real-time BSE corporate disclosures &amp; algorithmic market intelligence.</div>
+    <div>&copy; ${new Date().getFullYear()} Bsenexus &middot; Real-time BSE corporate disclosures &amp; algorithmic market intelligence.</div>
     <div style="margin-top: 10px;">
       <a href="https://bsenexus.in/" style="color: var(--muted); text-decoration: none; margin: 0 6px;">Home</a> &middot;
       <a href="https://bsenexus.in/about" style="color: var(--muted); text-decoration: none; margin: 0 6px;">About</a> &middot;
@@ -3450,7 +3450,7 @@ ${AI_STUDIO_REDIRECT_SCRIPT}
 
   <!-- OpenGraph Meta Tags -->
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="BSE Nexus">
+  <meta property="og:site_name" content="Bsenexus">
   <meta property="og:title" content="${escapeHtmlAttr(options.title)}">
   <meta property="og:description" content="${escapeHtmlAttr(options.description)}">
   <meta property="og:url" content="${escapeHtmlAttr(options.canonicalUrl)}">
@@ -3818,8 +3818,8 @@ ${AI_STUDIO_REDIRECT_SCRIPT}
         <a href="https://bsenexus.in/guides">Guides</a>
         <a href="https://bsenexus.in/sitemap.xml" target="_blank" rel="noopener">Sitemap</a>
       </div>
-      <p class="footer-copy">&copy; ${new Date().getFullYear()} BSE Nexus. Independent BSE Disclosures Aggregator. Operator: Rahul Dahiya (<a href="mailto:admin@bsenexus.in" style="color: var(--accent); text-decoration: none;">admin@bsenexus.in</a>).</p>
-      <p class="footer-disc">BSE Nexus is not affiliated with BSE India Ltd, SEBI, or any exchange; informational use only; not investment advice; verify filings on bseindia.com.</p>
+      <p class="footer-copy">&copy; ${new Date().getFullYear()} Bsenexus. Independent BSE Disclosures Aggregator. Operator: Rahul Dahiya (<a href="mailto:admin@bsenexus.in" style="color: var(--accent); text-decoration: none;">admin@bsenexus.in</a>).</p>
+      <p class="footer-disc">Bsenexus is not affiliated with BSE India Ltd, SEBI, or any exchange; informational use only; not investment advice; verify filings on bseindia.com.</p>
     </div>
   </footer>
 </body>
@@ -3832,12 +3832,12 @@ function renderAboutPage(): string {
     "@type": "AboutPage",
     "@id": "https://bsenexus.in/about#webpage",
     "url": "https://bsenexus.in/about",
-    "name": "About BSE Nexus — Independent BSE Corporate Disclosures Aggregator",
-    "description": "BSE Nexus is an independent BSE corporate announcement aggregator run by Rahul Dahiya, contact admin@bsenexus.in. One honest paragraph, no hype.",
+    "name": "About Bsenexus — Independent BSE Corporate Disclosures Aggregator",
+    "description": "Bsenexus is an independent BSE corporate announcement aggregator run by Rahul Dahiya, contact admin@bsenexus.in. One honest paragraph, no hype.",
     "publisher": {
       "@type": "Organization",
       "@id": "https://bsenexus.in/#organization",
-      "name": "BSE Nexus",
+      "name": "Bsenexus",
       "url": "https://bsenexus.in/",
       "founder": {
         "@type": "Person",
@@ -3855,7 +3855,7 @@ function renderAboutPage(): string {
     <div class="callout-box">
       <div class="callout-title">✦ Who We Are &amp; What We Do</div>
       <p class="callout-text">
-        BSE Nexus is an independent BSE corporate announcement aggregator run by Rahul Dahiya, contact <a href="mailto:admin@bsenexus.in">admin@bsenexus.in</a>.
+        Bsenexus is an independent BSE corporate announcement aggregator run by Rahul Dahiya, contact <a href="mailto:admin@bsenexus.in">admin@bsenexus.in</a>.
       </p>
     </div>
 
@@ -3865,7 +3865,7 @@ function renderAboutPage(): string {
         Every trading day, thousands of public listed companies file regulatory disclosures with the Bombay Stock Exchange (BSE India)—including quarterly financial results, SEBI LODR Regulation 30 corporate actions, board meeting intimations, dividend announcements, and auditor disclosures.
       </p>
       <p>
-        BSE Nexus was engineered to make these critical exchange filings instantly discoverable, structured, and searchable for independent investors, equity researchers, analysts, and market participants across India.
+        Bsenexus was engineered to make these critical exchange filings instantly discoverable, structured, and searchable for independent investors, equity researchers, analysts, and market participants across India.
       </p>
     </div>
 
@@ -3894,17 +3894,17 @@ function renderAboutPage(): string {
     <div class="content-sec" style="margin-top: 32px;">
       <h2>Operator &amp; Governance</h2>
       <p>
-        BSE Nexus is independently designed, maintained, and operated by <strong>Rahul Dahiya</strong>. For partnerships, developer inquiries, or data feedback, email <a href="mailto:admin@bsenexus.in" style="color: var(--accent);">admin@bsenexus.in</a>.
+        Bsenexus is independently designed, maintained, and operated by <strong>Rahul Dahiya</strong>. For partnerships, developer inquiries, or data feedback, email <a href="mailto:admin@bsenexus.in" style="color: var(--accent);">admin@bsenexus.in</a>.
       </p>
     </div>
   `;
 
   return renderTrustPageLayout({
-    title: "About BSE Nexus — Independent BSE Corporate Disclosures Aggregator",
-    description: "BSE Nexus is an independent BSE corporate announcement aggregator run by Rahul Dahiya, contact admin@bsenexus.in. One honest paragraph, no hype.",
+    title: "About Bsenexus — Independent BSE Corporate Disclosures Aggregator",
+    description: "Bsenexus is an independent BSE corporate announcement aggregator run by Rahul Dahiya, contact admin@bsenexus.in. One honest paragraph, no hype.",
     canonicalUrl: "https://bsenexus.in/about",
     badge: "About Us",
-    heading: "About BSE Nexus",
+    heading: "About Bsenexus",
     subheading: "Independent real-time corporate announcements indexer for Indian capital markets.",
     breadcrumbs: "About",
     contentHtml,
@@ -3918,12 +3918,12 @@ function renderContactPage(): string {
     "@type": "ContactPage",
     "@id": "https://bsenexus.in/contact#webpage",
     "url": "https://bsenexus.in/contact",
-    "name": "Contact Us | BSE Nexus",
-    "description": "Contact Rahul Dahiya and the BSE Nexus team for support, API inquiries, feedback, and disclosures intelligence at admin@bsenexus.in.",
+    "name": "Contact Us | Bsenexus",
+    "description": "Contact Rahul Dahiya and the Bsenexus team for support, API inquiries, feedback, and disclosures intelligence at admin@bsenexus.in.",
     "mainEntity": {
       "@type": "Organization",
       "@id": "https://bsenexus.in/#organization",
-      "name": "BSE Nexus",
+      "name": "Bsenexus",
       "founder": {
         "@type": "Person",
         "name": "Rahul Dahiya"
@@ -3985,11 +3985,11 @@ function renderContactPage(): string {
   `;
 
   return renderTrustPageLayout({
-    title: "Contact Us | BSE Nexus",
-    description: "Contact Rahul Dahiya and the BSE Nexus team for support, API inquiries, feedback, and disclosures intelligence at admin@bsenexus.in.",
+    title: "Contact Us | Bsenexus",
+    description: "Contact Rahul Dahiya and the Bsenexus team for support, API inquiries, feedback, and disclosures intelligence at admin@bsenexus.in.",
     canonicalUrl: "https://bsenexus.in/contact",
     badge: "Contact Information",
-    heading: "Contact Rahul Dahiya / BSE Nexus",
+    heading: "Contact Rahul Dahiya / Bsenexus",
     subheading: "We welcome inquiries, feedback, and data suggestions from users and market participants.",
     breadcrumbs: "Contact",
     contentHtml,
@@ -4003,29 +4003,29 @@ function renderDisclaimerPage(): string {
     "@type": "WebPage",
     "@id": "https://bsenexus.in/disclaimer#webpage",
     "url": "https://bsenexus.in/disclaimer",
-    "name": "Disclaimer & Entity Clarity | BSE Nexus",
-    "description": "BSE Nexus is not affiliated with BSE India Ltd, SEBI, or any exchange; informational use only; not investment advice; verify filings on bseindia.com."
+    "name": "Disclaimer & Entity Clarity | Bsenexus",
+    "description": "Bsenexus is not affiliated with BSE India Ltd, SEBI, or any exchange; informational use only; not investment advice; verify filings on bseindia.com."
   }, null, 2);
 
   const contentHtml = `
     <div class="callout-box amber">
       <div class="callout-title amber">⚠ Official Independence &amp; Non-Affiliation Statement</div>
       <p class="callout-text">
-        BSE Nexus is not affiliated with BSE India Ltd, SEBI, or any exchange; informational use only; not investment advice; verify filings on <a href="https://www.bseindia.com" target="_blank" rel="noopener noreferrer">bseindia.com</a>.
+        Bsenexus is not affiliated with BSE India Ltd, SEBI, or any exchange; informational use only; not investment advice; verify filings on <a href="https://www.bseindia.com" target="_blank" rel="noopener noreferrer">bseindia.com</a>.
       </p>
     </div>
 
     <div class="content-sec">
       <h2>1. Informational &amp; Research Purpose Only</h2>
       <p>
-        All data, corporate announcements, financial metric summaries, earnings dates, and AI analysis presented on BSE Nexus are provided strictly for informational and educational purposes. Nothing on this website constitutes a recommendation, endorsement, solicitation, or offer to buy or sell securities, derivatives, or financial instruments.
+        All data, corporate announcements, financial metric summaries, earnings dates, and AI analysis presented on Bsenexus are provided strictly for informational and educational purposes. Nothing on this website constitutes a recommendation, endorsement, solicitation, or offer to buy or sell securities, derivatives, or financial instruments.
       </p>
     </div>
 
     <div class="content-sec">
       <h2>2. Not SEBI-Registered Investment Advice</h2>
       <p>
-        BSE Nexus and its operator Rahul Dahiya are not registered as investment advisors, research analysts, or portfolio managers under SEBI (Investment Advisers) Regulations, 2013 or SEBI (Research Analysts) Regulations, 2014. Users must consult a qualified SEBI-registered financial advisor before making any investment or trading decisions.
+        Bsenexus and its operator Rahul Dahiya are not registered as investment advisors, research analysts, or portfolio managers under SEBI (Investment Advisers) Regulations, 2013 or SEBI (Research Analysts) Regulations, 2014. Users must consult a qualified SEBI-registered financial advisor before making any investment or trading decisions.
       </p>
     </div>
 
@@ -4039,14 +4039,14 @@ function renderDisclaimerPage(): string {
     <div class="content-sec">
       <h2>4. Distinct Entity Notice</h2>
       <p>
-        BSE Nexus is an independent technology project and has no corporate, commercial, or operational connection with <strong>Nexus Select Trust</strong> (BSE Scrip Code: 543913), BSE Limited (Bombay Stock Exchange), or National Stock Exchange of India (NSE).
+        Bsenexus is an independent technology project and has no corporate, commercial, or operational connection with <strong>Nexus Select Trust</strong> (BSE Scrip Code: 543913), BSE Limited (Bombay Stock Exchange), or National Stock Exchange of India (NSE).
       </p>
     </div>
   `;
 
   return renderTrustPageLayout({
-    title: "Disclaimer & Entity Clarity | BSE Nexus",
-    description: "BSE Nexus is not affiliated with BSE India Ltd, SEBI, or any exchange; informational use only; not investment advice; verify filings on bseindia.com.",
+    title: "Disclaimer & Entity Clarity | Bsenexus",
+    description: "Bsenexus is not affiliated with BSE India Ltd, SEBI, or any exchange; informational use only; not investment advice; verify filings on bseindia.com.",
     canonicalUrl: "https://bsenexus.in/disclaimer",
     badge: "Legal & Regulatory",
     heading: "Disclaimer & Entity Clarity",
@@ -4063,15 +4063,15 @@ function renderPrivacyPolicyPage(): string {
     "@type": "WebPage",
     "@id": "https://bsenexus.in/privacy-policy#webpage",
     "url": "https://bsenexus.in/privacy-policy",
-    "name": "Privacy Policy | BSE Nexus",
-    "description": "Read the BSE Nexus privacy policy. Learn how we safeguard your data, preferences, watchlists, and communications."
+    "name": "Privacy Policy | Bsenexus",
+    "description": "Read the Bsenexus privacy policy. Learn how we safeguard your data, preferences, watchlists, and communications."
   }, null, 2);
 
   const contentHtml = `
     <div class="callout-box">
       <div class="callout-title">🔒 Our Core Privacy Commitment</div>
       <p class="callout-text">
-        BSE Nexus does not sell, rent, monetize, or trade your personal data. We collect only what is strictly necessary to provide real-time equity market tools and Telegram alert dispatches.
+        Bsenexus does not sell, rent, monetize, or trade your personal data. We collect only what is strictly necessary to provide real-time equity market tools and Telegram alert dispatches.
       </p>
     </div>
 
@@ -4088,14 +4088,14 @@ function renderPrivacyPolicyPage(): string {
     <div class="content-sec">
       <h2>2. How Information Is Used</h2>
       <p>
-        We use the information collected exclusively to operate, maintain, and enhance the BSE Nexus terminal, dispatch user-requested alerts, monitor system performance, and prevent fraudulent abuse.
+        We use the information collected exclusively to operate, maintain, and enhance the Bsenexus terminal, dispatch user-requested alerts, monitor system performance, and prevent fraudulent abuse.
       </p>
     </div>
 
     <div class="content-sec">
       <h2>3. Cookies &amp; Local Storage</h2>
       <p>
-        BSE Nexus uses functional cookies and browser LocalStorage to remember your active tabs, sound alert toggles, filter preferences, and session tokens. We do not use third-party behavioral advertising cookies.
+        Bsenexus uses functional cookies and browser LocalStorage to remember your active tabs, sound alert toggles, filter preferences, and session tokens. We do not use third-party behavioral advertising cookies.
       </p>
     </div>
 
@@ -4108,8 +4108,8 @@ function renderPrivacyPolicyPage(): string {
   `;
 
   return renderTrustPageLayout({
-    title: "Privacy Policy | BSE Nexus",
-    description: "Read the BSE Nexus privacy policy. Learn how we safeguard your data, preferences, watchlists, and communications.",
+    title: "Privacy Policy | Bsenexus",
+    description: "Read the Bsenexus privacy policy. Learn how we safeguard your data, preferences, watchlists, and communications.",
     canonicalUrl: "https://bsenexus.in/privacy-policy",
     badge: "Privacy & Data Protection",
     heading: "Privacy Policy",
@@ -4126,36 +4126,36 @@ function renderTermsPage(): string {
     "@type": "WebPage",
     "@id": "https://bsenexus.in/terms#webpage",
     "url": "https://bsenexus.in/terms",
-    "name": "Terms of Service | BSE Nexus",
-    "description": "Review the terms and conditions for accessing BSE Nexus live corporate announcements, AI summaries, and alert integrations."
+    "name": "Terms of Service | Bsenexus",
+    "description": "Review the terms and conditions for accessing Bsenexus live corporate announcements, AI summaries, and alert integrations."
   }, null, 2);
 
   const contentHtml = `
     <div class="content-sec">
       <h2>1. Acceptance of Terms</h2>
       <p>
-        By accessing or using BSE Nexus (bsenexus.in), you agree to be bound by these Terms of Service. If you do not agree with these terms, please discontinue use of the platform.
+        By accessing or using Bsenexus (bsenexus.in), you agree to be bound by these Terms of Service. If you do not agree with these terms, please discontinue use of the platform.
       </p>
     </div>
 
     <div class="content-sec">
       <h2>2. Nature of the Service</h2>
       <p>
-        BSE Nexus is an automated information indexing terminal designed to aggregate public disclosures made by listed companies on the Bombay Stock Exchange (BSE India). BSE Nexus is not an exchange, broker, dealer, or financial advisory firm.
+        Bsenexus is an automated information indexing terminal designed to aggregate public disclosures made by listed companies on the Bombay Stock Exchange (BSE India). Bsenexus is not an exchange, broker, dealer, or financial advisory firm.
       </p>
     </div>
 
     <div class="content-sec">
       <h2>3. Acceptable Use Policy</h2>
       <p>
-        You agree to use BSE Nexus solely for lawful purposes. You shall not attempt to reverse engineer, scrape at abusive frequencies, disrupt server infrastructure, or circumvent rate limits.
+        You agree to use Bsenexus solely for lawful purposes. You shall not attempt to reverse engineer, scrape at abusive frequencies, disrupt server infrastructure, or circumvent rate limits.
       </p>
     </div>
 
     <div class="content-sec">
       <h2>4. Limitation of Liability</h2>
       <p>
-        BSE Nexus, its operator Rahul Dahiya, and affiliates shall not be held liable for any direct, indirect, incidental, or consequential damages resulting from reliance on data, delays in exchange feeds, AI extraction discrepancies, or downtime.
+        Bsenexus, its operator Rahul Dahiya, and affiliates shall not be held liable for any direct, indirect, incidental, or consequential damages resulting from reliance on data, delays in exchange feeds, AI extraction discrepancies, or downtime.
       </p>
     </div>
 
@@ -4168,12 +4168,12 @@ function renderTermsPage(): string {
   `;
 
   return renderTrustPageLayout({
-    title: "Terms of Service | BSE Nexus",
-    description: "Review the terms and conditions for accessing BSE Nexus live corporate announcements, AI summaries, and alert integrations.",
+    title: "Terms of Service | Bsenexus",
+    description: "Review the terms and conditions for accessing Bsenexus live corporate announcements, AI summaries, and alert integrations.",
     canonicalUrl: "https://bsenexus.in/terms",
     badge: "Terms of Service",
     heading: "Terms of Service",
-    subheading: "Last updated: September 2026 • Terms and conditions for using BSE Nexus.",
+    subheading: "Last updated: September 2026 • Terms and conditions for using Bsenexus.",
     breadcrumbs: "Terms of Service",
     contentHtml,
     schemaJson: schema
@@ -4315,7 +4315,7 @@ function renderEmbedWidget(data: {
         <div class="filing-sub">${escapeHtmlText(sub)}</div>
         <div class="filing-meta">
           <span>📅 ${escapeHtmlText(time)}</span>
-          <span>BSE Nexus &nearr;</span>
+          <span>Bsenexus &nearr;</span>
         </div>
       </a>`;
     }).join('\n') : `<div style="padding: 12px; text-align: center; color: var(--muted);">No recent announcements found.</div>`}
@@ -4323,7 +4323,7 @@ function renderEmbedWidget(data: {
 
   <div class="widget-footer">
     <a href="${escapeHtmlAttr(targetUrl)}" target="_blank" rel="noopener" class="backlink">
-      ⚡ Powered by BSE Nexus — Real-Time BSE Filings
+      ⚡ Powered by Bsenexus — Real-Time BSE Filings
     </a>
   </div>
 </body>
@@ -4402,7 +4402,7 @@ function getRelatedCompaniesForGuide(slug: string): Array<{ symbol: string; name
 
 function renderGuidePage(guide: MarketGuide): string {
   const slug = guide.slug || guide.id;
-  const pageTitle = `${guide.title} | BSE Nexus`;
+  const pageTitle = `${guide.title} | Bsenexus`;
 
   let description = (guide.summary || guide.excerpt || '').trim().replace(/\s+/g, ' ');
   if (description.length > 155) {
@@ -4429,12 +4429,12 @@ function renderGuidePage(guide: MarketGuide): string {
     "datePublished": publishedIso,
     "author": {
       "@type": "Person",
-      "name": guide.author?.name || "BSE Nexus Research",
+      "name": guide.author?.name || "Bsenexus Research",
       ...(guide.author?.role ? { "jobTitle": guide.author.role } : {})
     },
     "publisher": {
       "@type": "Organization",
-      "name": "BSE Nexus",
+      "name": "Bsenexus",
       "url": "https://bsenexus.in",
       "logo": {
         "@type": "ImageObject",
@@ -4545,7 +4545,7 @@ ${AI_STUDIO_REDIRECT_SCRIPT}
   <meta property="og:type" content="article">
   <meta property="og:url" content="${escapeHtmlAttr(canonicalUrl)}">
   <meta property="og:image" content="https://bsenexus.in/og-image.png">
-  <meta property="og:site_name" content="BSE Nexus">
+  <meta property="og:site_name" content="Bsenexus">
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
@@ -4944,7 +4944,7 @@ ${jsonLd}
       BSE <span>Nexus</span>
     </a>
     <a href="https://bsenexus.in/?tab=guides" class="app-btn">
-      Open in BSE Nexus App &rarr;
+      Open in Bsenexus App &rarr;
     </a>
   </nav>
 
@@ -4986,10 +4986,10 @@ ${jsonLd}
 
       <div class="cta-row">
         <a href="https://bsenexus.in/?tab=guides" class="app-btn-large">
-          Open in BSE Nexus App &rarr;
+          Open in Bsenexus App &rarr;
         </a>
         <a href="https://bsenexus.in/?tab=announcements" class="terminal-link">
-          Explore Live BSE Corporate Disclosures on BSE Nexus &rarr;
+          Explore Live BSE Corporate Disclosures on Bsenexus &rarr;
         </a>
       </div>
     </article>
@@ -5008,7 +5008,7 @@ function renderGuide404Page(slug: string): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Guide Not Found | BSE Nexus</title>
+  <title>Guide Not Found | Bsenexus</title>
   <meta name="robots" content="noindex, follow">
 ${AI_STUDIO_REDIRECT_SCRIPT}
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -5141,7 +5141,7 @@ app.get(['/rss.xml', '/rss', '/feed.xml', '/feed'], async (_req, res) => {
     const rssXml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>BSE Nexus Announcements Feed</title>
+    <title>Bsenexus Announcements Feed</title>
     <link>https://bsenexus.in/</link>
     <description>Latest BSE India corporate announcements, financial results, board meetings, and regulatory disclosures in real-time.</description>
     <language>en-in</language>
@@ -5406,13 +5406,13 @@ function renderResultsPage(data: ResolvedResultPage, symbol: string, canonicalUr
   const subject = String(item.subject || item.declarationSubject || item.purpose || `${quarterLabel} financial results`).trim();
   const metrics = item.financialMetrics || {};
 
-  const pageTitle = `${companyName} (${symbol}) — ${quarterLabel} Results | BSE Nexus`;
+  const pageTitle = `${companyName} (${symbol}) — ${quarterLabel} Results | Bsenexus`;
 
   let description = '';
   if (aiSummary) {
     description = aiSummary.replace(/\s+/g, ' ');
   } else {
-    description = `${companyName} (${symbol}) ${quarterLabel} quarterly results${meetingDate ? ` — board meeting on ${meetingDate}` : ''}. Track declared numbers, AI summaries and filings on BSE Nexus.`;
+    description = `${companyName} (${symbol}) ${quarterLabel} quarterly results${meetingDate ? ` — board meeting on ${meetingDate}` : ''}. Track declared numbers, AI summaries and filings on Bsenexus.`;
   }
   if (description.length > 155) {
     description = description.slice(0, 152).trim() + '...';
@@ -5458,7 +5458,7 @@ function renderResultsPage(data: ResolvedResultPage, symbol: string, canonicalUr
   <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
   <link rel="canonical" href="${escapeHtmlAttr(canonicalUrl)}">
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="BSE Nexus">
+  <meta property="og:site_name" content="Bsenexus">
   <meta property="og:title" content="${escapeHtmlAttr(pageTitle)}">
   <meta property="og:description" content="${escapeHtmlAttr(description)}">
   <meta property="og:url" content="${escapeHtmlAttr(canonicalUrl)}">
@@ -5560,7 +5560,7 @@ function renderResults404Page(symbol: string, quarterKey: string): string {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Results not found | BSE Nexus</title>
+  <title>Results not found | Bsenexus</title>
   <meta name="robots" content="noindex, nofollow">
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #F8FAFC; color: #0F172A; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
@@ -6124,68 +6124,68 @@ interface TabSeoMeta {
 
 const TAB_SEO_CONFIG: Record<string, TabSeoMeta> = {
   default: {
-    title: "BSE Nexus — BSE Corporate Announcements & Disclosures",
-    description: "Track latest BSE corporate announcements, board meeting outcomes, financial results, and regulatory filings on BSE Nexus.",
+    title: "Bsenexus — BSE Corporate Announcements & Disclosures",
+    description: "Track latest BSE corporate announcements, board meeting outcomes, financial results, and regulatory filings on Bsenexus.",
     canonical: "https://bsenexus.in/",
   },
   announcements: {
-    title: "Live BSE Announcements & Corporate Filings | BSE Nexus",
-    description: "Track BSE corporate announcements, board meetings, financial disclosures, and regulatory filings with AI-powered financial summaries on BSE Nexus.",
+    title: "Live BSE Announcements & Corporate Filings | Bsenexus",
+    description: "Track BSE corporate announcements, board meetings, financial disclosures, and regulatory filings with AI-powered financial summaries on Bsenexus.",
     canonical: "https://bsenexus.in/announcements",
   },
   "results-calendar": {
-    title: "BSE Results Calendar — Upcoming Quarterly Results & Earnings Dates | BSE Nexus",
-    description: "Track upcoming BSE quarterly results, board meeting dates, earnings releases, and financial result disclosures for Indian listed companies live on BSE Nexus.",
+    title: "BSE Results Calendar — Upcoming Quarterly Results & Earnings Dates | Bsenexus",
+    description: "Track upcoming BSE quarterly results, board meeting dates, earnings releases, and financial result disclosures for Indian listed companies live on Bsenexus.",
     canonical: "https://bsenexus.in/results-calendar",
   },
   watchlists: {
-    title: "Custom Stock Watchlists & Telegram Alerts | BSE Nexus",
-    description: "Create custom BSE equity watchlists, monitor priority disclosures, and receive Telegram alerts for company announcements on BSE Nexus.",
+    title: "Custom Stock Watchlists & Telegram Alerts | Bsenexus",
+    description: "Create custom BSE equity watchlists, monitor priority disclosures, and receive Telegram alerts for company announcements on Bsenexus.",
     canonical: "https://bsenexus.in/watchlist",
   },
   guides: {
-    title: "Indian Equity Research Guides & Market Intelligence | BSE Nexus",
-    description: "Practical guides and research insights for Indian stock market investors covering BSE filings, corporate actions, SEBI LODR disclosures, and equity analytics on BSE Nexus.",
+    title: "Indian Equity Research Guides & Market Intelligence | Bsenexus",
+    description: "Practical guides and research insights for Indian stock market investors covering BSE filings, corporate actions, SEBI LODR disclosures, and equity analytics on Bsenexus.",
     canonical: "https://bsenexus.in/guides",
   },
   pricing: {
-    title: "Pricing & Plans — 100% Free Launch Access | BSE Nexus",
-    description: "Explore BSE Nexus transparent pricing. 100% Free access to Community and Pro intelligence features during launch: latest BSE filings, Gemini AI summaries, and Telegram alerts on BSE Nexus.",
+    title: "Pricing & Plans — 100% Free Launch Access | Bsenexus",
+    description: "Explore Bsenexus transparent pricing. 100% Free access to Community and Pro intelligence features during launch: latest BSE filings, Gemini AI summaries, and Telegram alerts on Bsenexus.",
     canonical: "https://bsenexus.in/pricing",
   },
   companies: {
-    title: "BSE Listed Companies — Company Profiles, Results & Filings | BSE Nexus",
-    description: "Explore all 26 premier BSE listed companies on BSE Nexus. Access live corporate announcements, quarterly earnings results, SEBI LODR disclosures, and AI intelligence.",
+    title: "BSE Listed Companies — Company Profiles, Results & Filings | Bsenexus",
+    description: "Explore all 26 premier BSE listed companies on Bsenexus. Access live corporate announcements, quarterly earnings results, SEBI LODR disclosures, and AI intelligence.",
     canonical: "https://bsenexus.in/companies",
   },
   about: {
-    title: "About BSE Nexus — Independent BSE Corporate Disclosures Aggregator",
-    description: "BSE Nexus is an independent BSE corporate announcement aggregator run by Rahul Dahiya, contact admin@bsenexus.in. One honest paragraph, no hype.",
+    title: "About Bsenexus — Independent BSE Corporate Disclosures Aggregator",
+    description: "Bsenexus is an independent BSE corporate announcement aggregator run by Rahul Dahiya, contact admin@bsenexus.in. One honest paragraph, no hype.",
     canonical: "https://bsenexus.in/about",
   },
   contact: {
-    title: "Contact Us | BSE Nexus",
-    description: "Contact Rahul Dahiya and the BSE Nexus team for support, API inquiries, feedback, and disclosures intelligence at admin@bsenexus.in.",
+    title: "Contact Us | Bsenexus",
+    description: "Contact Rahul Dahiya and the Bsenexus team for support, API inquiries, feedback, and disclosures intelligence at admin@bsenexus.in.",
     canonical: "https://bsenexus.in/contact",
   },
   disclaimer: {
-    title: "Disclaimer & Entity Clarity | BSE Nexus",
-    description: "BSE Nexus is not affiliated with BSE India Ltd, SEBI, or any exchange; informational use only; not investment advice; verify filings on bseindia.com.",
+    title: "Disclaimer & Entity Clarity | Bsenexus",
+    description: "Bsenexus is not affiliated with BSE India Ltd, SEBI, or any exchange; informational use only; not investment advice; verify filings on bseindia.com.",
     canonical: "https://bsenexus.in/disclaimer",
   },
   privacy: {
-    title: "Privacy Policy | BSE Nexus",
-    description: "Read the BSE Nexus privacy policy. Learn how we safeguard your data, preferences, watchlists, and communications.",
+    title: "Privacy Policy | Bsenexus",
+    description: "Read the Bsenexus privacy policy. Learn how we safeguard your data, preferences, watchlists, and communications.",
     canonical: "https://bsenexus.in/privacy-policy",
   },
   terms: {
-    title: "Terms of Service | BSE Nexus",
-    description: "Review the terms and conditions for accessing BSE Nexus live corporate announcements, AI summaries, and alert integrations.",
+    title: "Terms of Service | Bsenexus",
+    description: "Review the terms and conditions for accessing Bsenexus live corporate announcements, AI summaries, and alert integrations.",
     canonical: "https://bsenexus.in/terms",
   },
   holidays: {
-    title: "BSE & NSE Trading Holidays 2026 Calendar | BSE Nexus",
-    description: "Complete schedule of BSE and NSE stock market trading holidays, clearing dates, and special trading sessions for the calendar year 2026 on BSE Nexus.",
+    title: "BSE & NSE Trading Holidays 2026 Calendar | Bsenexus",
+    description: "Complete schedule of BSE and NSE stock market trading holidays, clearing dates, and special trading sessions for the calendar year 2026 on Bsenexus.",
     canonical: "https://bsenexus.in/",
   },
 };
@@ -6275,7 +6275,7 @@ function injectTabSeoMetadata(html: string, tabQuery?: string): string {
           "name": "How can I check upcoming BSE quarterly results and earnings dates?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "You can track scheduled board meeting notices and quarterly earnings announcements directly on the BSE Nexus Results Calendar with live dates, BSE scrip codes, and company updates."
+            "text": "You can track scheduled board meeting notices and quarterly earnings announcements directly on the Bsenexus Results Calendar with live dates, BSE scrip codes, and company updates."
           }
         },
         {
@@ -6299,7 +6299,7 @@ function injectTabSeoMetadata(html: string, tabQuery?: string): string {
           "name": "Where can I view official financial result PDF disclosures filed with BSE?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "BSE Nexus provides direct 1-click links to the official BSE India XBRL and PDF filings containing standalone and consolidated balance sheets, profit and loss statements, and investor presentations."
+            "text": "Bsenexus provides direct 1-click links to the official BSE India XBRL and PDF filings containing standalone and consolidated balance sheets, profit and loss statements, and investor presentations."
           }
         }
       ]
@@ -6539,7 +6539,7 @@ async function startServer() {
     // Restore the admin's durable storage mode and auto-recover from quota
     // fallback without waiting for a manual switch or Pacific midnight.
     startStorageRecoveryProbe();
-    try { await addLog('INFO', 'SYSTEM', 'BSE Nexus Server Started'); } catch(e) { console.error('DB connect err:', e); }
+    try { await addLog('INFO', 'SYSTEM', 'Bsenexus Server Started'); } catch(e) { console.error('DB connect err:', e); }
   });
 }
 

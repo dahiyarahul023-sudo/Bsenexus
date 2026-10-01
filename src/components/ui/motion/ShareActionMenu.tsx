@@ -220,7 +220,7 @@ export const ShareActionMenu: React.FC<ShareActionMenuProps> = ({
       effectiveTitle,
       effectiveHeadline ? `Subject: ${effectiveHeadline}` : null,
       '',
-      `View on BSE Nexus: ${canonicalWebUrl}`,
+      `View on Bsenexus: ${canonicalWebUrl}`,
       directPdfUrl ? `Official Filing (PDF): ${directPdfUrl}` : null,
     ].filter(l => l !== null).join('\n');
     copyToClipboard(lines, 'summary');
@@ -250,11 +250,11 @@ export const ShareActionMenu: React.FC<ShareActionMenuProps> = ({
       `*${effectiveTitle}*`,
       effectiveHeadline ? `📝 ${effectiveHeadline}` : null,
       '',
-      `🔗 *View on BSE Nexus:*`,
+      `🔗 *View on Bsenexus:*`,
       canonicalWebUrl,
       directPdfUrl ? `\n📄 *Official Filing (PDF):*\n${directPdfUrl}` : null,
       '',
-      `⚡ _Live BSE corporate disclosures on BSE Nexus_`
+      `⚡ _Live BSE corporate disclosures on Bsenexus_`
     ].filter(l => l !== null) as string[];
 
     const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(lines.join('\n'))}`;
@@ -268,7 +268,7 @@ export const ShareActionMenu: React.FC<ShareActionMenuProps> = ({
       `📢 ${effectiveTitle}`,
       effectiveHeadline ? `📝 ${effectiveHeadline}` : null,
       directPdfUrl ? `📄 Official PDF: ${directPdfUrl}` : null,
-      `⚡ Live disclosures on BSE Nexus`
+      `⚡ Live disclosures on Bsenexus`
     ].filter(Boolean) as string[];
 
     const tgUrl = `https://t.me/share/url?url=${encodeURIComponent(canonicalWebUrl)}&text=${encodeURIComponent(lines.join('\n'))}`;
@@ -499,7 +499,7 @@ export const ShareActionMenu: React.FC<ShareActionMenuProps> = ({
                     >
                       <span className="flex items-center gap-2.5">
                         {copiedState === 'web' ? <Check size={15} className="text-emerald-600" /> : <Globe size={15} className="text-emerald-500" />}
-                        <span>{copiedState === 'web' ? 'Web Link Copied!' : 'Copy BSE Nexus Web Link'}</span>
+                        <span>{copiedState === 'web' ? 'Web Link Copied!' : 'Copy Bsenexus Web Link'}</span>
                       </span>
                       <span className="text-[10px] font-mono opacity-60">Clean URL</span>
                     </motion.button>

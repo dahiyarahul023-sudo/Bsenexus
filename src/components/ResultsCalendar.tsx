@@ -516,10 +516,10 @@ export function ResultsCalendar() {
   };
 
   useEffect(() => {
-    document.title = 'BSE Results Calendar — Upcoming Quarterly Results & Earnings Dates | BSE Nexus';
+    document.title = 'BSE Results Calendar — Upcoming Quarterly Results & Earnings Dates | Bsenexus';
     const metaDesc = document.querySelector('meta[name="description"]');
     if (metaDesc) {
-      metaDesc.setAttribute('content', 'Track upcoming BSE quarterly results, board meeting dates, earnings releases, and financial result disclosures for Indian listed companies live on BSE Nexus.');
+      metaDesc.setAttribute('content', 'Track upcoming BSE quarterly results, board meeting dates, earnings releases, and financial result disclosures for Indian listed companies live on Bsenexus.');
     }
     let canonical = document.querySelector('link[rel="canonical"]');
     if (!canonical) {
@@ -624,7 +624,7 @@ export function ResultsCalendar() {
   const getCalendarLink = (item: ResultCalendarItem) => {
     return generateGoogleCalendarUrl({
       title: `BSE: ${item.symbol} Board Meeting (${item.purpose})`,
-      description: `Company: ${item.companyName}\nSymbol: ${item.symbol} (BSE: ${item.scripCode})\nMeeting Purpose: ${item.purpose}\nScheduled Date: ${item.meetingDate}\n\nTrack real-time outcomes on BSE Nexus.`,
+      description: `Company: ${item.companyName}\nSymbol: ${item.symbol} (BSE: ${item.scripCode})\nMeeting Purpose: ${item.purpose}\nScheduled Date: ${item.meetingDate}\n\nTrack real-time outcomes on Bsenexus.`,
       dateStr: item.meetingDate
     });
   };
@@ -697,7 +697,7 @@ Your 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${g
       `Scheduled Date: ${item.meetingDate}\n` +
       (holidayCheck.isClosed ? `Notice: Date falls on ${holidayCheck.holidayName || holidayCheck.weekendName} (Exchange closed)\n` : '') +
       `\n📅 Add to Google Calendar (1-Click):\n${calendarLink}\n\n` +
-      `Track real-time outcomes on BSE Nexus.\n`
+      `Track real-time outcomes on Bsenexus.\n`
     );
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
   };
@@ -753,7 +753,7 @@ Your 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${g
 
     const events = selectedItems.map(item => ({
       title: `BSE: ${item.symbol} Board Meeting (${item.purpose})`,
-      description: `Company: ${item.companyName}\nSymbol: ${item.symbol} (BSE: ${item.scripCode})\nAgenda: ${item.purpose}\nScheduled Date: ${item.meetingDate}\n\nTrack real-time outcomes on BSE Nexus.`,
+      description: `Company: ${item.companyName}\nSymbol: ${item.symbol} (BSE: ${item.scripCode})\nAgenda: ${item.purpose}\nScheduled Date: ${item.meetingDate}\n\nTrack real-time outcomes on Bsenexus.`,
       dateStr: item.meetingDate,
       location: 'BSE India / Corporate Headquarters'
     }));
@@ -2181,7 +2181,7 @@ Your 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${g
                               onClick={() => {
                                 downloadIcsCalendarFile({
                                   title: `BSE: ${item.symbol} Board Meeting (${item.purpose})`,
-                                  description: `Company: ${item.companyName}\nSymbol: ${item.symbol} (BSE: ${item.scripCode})\nAgenda: ${item.purpose}\n\nLive tracking via BSE Nexus.`,
+                                  description: `Company: ${item.companyName}\nSymbol: ${item.symbol} (BSE: ${item.scripCode})\nAgenda: ${item.purpose}\n\nLive tracking via Bsenexus.`,
                                   dateStr: item.meetingDate,
                                   filename: `${item.symbol}_BSE_Meeting_${item.meetingDate.replace(/[^a-zA-Z0-9]/g, '_')}.ics`
                                 });
@@ -2254,7 +2254,7 @@ Your 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${g
                             <button
                               type="button"
                               onClick={() => {
-                                const summaryText = `BSE Nexus Update: ${item.companyName} (${item.symbol}) declared ${item.purpose}.\nDate: ${item.meetingDate}\nLive tracking on BSE Nexus.`;
+                                const summaryText = `Bsenexus Update: ${item.companyName} (${item.symbol}) declared ${item.purpose}.\nDate: ${item.meetingDate}\nLive tracking on Bsenexus.`;
                                 navigator.clipboard.writeText(summaryText);
                                 setActionFeedback('Update text copied');
                                 setTimeout(() => { setActionFeedback(null); setActiveActionMenuId(null); }, 1500);
@@ -2845,7 +2845,7 @@ Your 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${g
                             <a
                               href={generateGoogleCalendarUrl({
                                 title: `BSE: ${selectedModalItem.symbol} Board Meeting (${selectedModalItem.purpose})`,
-                                description: `Company: ${selectedModalItem.companyName}\nSymbol: ${selectedModalItem.symbol} (BSE: ${selectedModalItem.scripCode})\nMeeting Purpose: ${selectedModalItem.purpose}\nScheduled Date: ${selectedModalItem.meetingDate}\n\nTrack real-time outcomes on BSE Nexus.`,
+                                description: `Company: ${selectedModalItem.companyName}\nSymbol: ${selectedModalItem.symbol} (BSE: ${selectedModalItem.scripCode})\nMeeting Purpose: ${selectedModalItem.purpose}\nScheduled Date: ${selectedModalItem.meetingDate}\n\nTrack real-time outcomes on Bsenexus.`,
                                 dateStr: selectedModalItem.meetingDate
                               })}
                               target="_blank"
@@ -2861,7 +2861,7 @@ Your 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${g
                               type="button"
                               onClick={() => downloadIcsCalendarFile({
                                 title: `BSE: ${selectedModalItem.symbol} Board Meeting (${selectedModalItem.purpose})`,
-                                description: `Company: ${selectedModalItem.companyName}\nSymbol: ${selectedModalItem.symbol} (BSE: ${selectedModalItem.scripCode})\nAgenda: ${selectedModalItem.purpose}\n\nLive tracking via BSE Nexus.`,
+                                description: `Company: ${selectedModalItem.companyName}\nSymbol: ${selectedModalItem.symbol} (BSE: ${selectedModalItem.scripCode})\nAgenda: ${selectedModalItem.purpose}\n\nLive tracking via Bsenexus.`,
                                 dateStr: selectedModalItem.meetingDate,
                                 filename: `${selectedModalItem.symbol}_BSE_Meeting_${selectedModalItem.meetingDate.replace(/[^a-zA-Z0-9]/g, '_')}.ics`
                               })}
@@ -2958,7 +2958,7 @@ Your 1-Week Free Pro trial has ended. Upgrade to Pro (one-time plans from ₹${g
                               <a
                                 href={generateGoogleCalendarUrl({
                                   title: `BSE: ${selectedModalItem.symbol} Board Meeting (${hist.details || hist.periodOrMeeting})`,
-                                  description: `Company: ${selectedModalItem.companyName}\nSymbol: ${selectedModalItem.symbol} (BSE: ${selectedModalItem.scripCode})\nAgenda: ${hist.details || hist.periodOrMeeting}\n\nLive tracking via BSE Nexus.`,
+                                  description: `Company: ${selectedModalItem.companyName}\nSymbol: ${selectedModalItem.symbol} (BSE: ${selectedModalItem.scripCode})\nAgenda: ${hist.details || hist.periodOrMeeting}\n\nLive tracking via Bsenexus.`,
                                   dateStr: hist.meetingDate || hist.declarationDate || selectedModalItem.meetingDate
                                 })}
                                 target="_blank"

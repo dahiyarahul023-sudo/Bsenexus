@@ -411,7 +411,7 @@ export function Layout({
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onTabChange('dashboard'); }}
-                aria-label="BSE Nexus Dashboard"
+                aria-label="Bsenexus Dashboard"
               >
                 <span className="font-extrabold text-sm sm:text-base tracking-tight text-slate-900 dark:text-white font-display">
                   BSE<span className="text-emerald-500">NEXUS</span>
@@ -963,7 +963,7 @@ export function Layout({
             className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-amber-600 dark:bg-amber-700 text-white px-4 py-2 rounded-xl shadow-lg flex items-center gap-2.5 text-xs font-bold"
           >
             <span className="w-2 h-2 rounded-full bg-white animate-ping" />
-            <span>⚠️ Network connection lost. Reconnecting to BSE Nexus live stream...</span>
+            <span>⚠️ Network connection lost. Reconnecting to Bsenexus live stream...</span>
           </motion.div>
         )}
       </AnimatePresence>
@@ -973,7 +973,7 @@ export function Layout({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-[11px]">
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span className="font-semibold text-slate-700 dark:text-slate-300">BSE Nexus Active</span>
+            <span className="font-semibold text-slate-700 dark:text-slate-300">Bsenexus Active</span>
             <span className="text-slate-400 dark:text-slate-500 hidden sm:inline">• Live Ingestion (~{bseHealth.latency || 85}ms)</span>
           </div>
 

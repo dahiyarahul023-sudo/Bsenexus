@@ -10,7 +10,7 @@ describe('Search Engine & Cross-Browser Discovery (Step 06: IndexNow & OpenSearc
     assert.ok(fs.existsSync(opensearchPath), 'public/opensearch.xml must exist');
 
     const content = fs.readFileSync(opensearchPath, 'utf8');
-    assert.ok(content.includes('<ShortName>BSE Nexus</ShortName>'));
+    assert.ok(content.includes('<ShortName>Bsenexus</ShortName>'));
     assert.ok(content.includes('template="https://bsenexus.in/?search={searchTerms}"'));
     assert.ok(content.includes('template="https://bsenexus.in/api/search-company?q={searchTerms}"'));
     assert.ok(content.includes('xmlns="http://a9.com/-/spec/opensearch/1.1/"'));
@@ -96,17 +96,17 @@ describe('Search Engine & Cross-Browser Discovery (Step 06: IndexNow & OpenSearc
     assert.ok(content.includes('<loc>https://bsenexus.in/company/RELIANCE</loc>'));
   });
 
-  test('index.html head title starts with BSE Nexus and meta description contains BSE Nexus', () => {
+  test('index.html head title starts with Bsenexus and meta description contains Bsenexus', () => {
     const indexHtmlPath = path.join(process.cwd(), 'index.html');
     const indexHtml = fs.readFileSync(indexHtmlPath, 'utf8');
 
     const titleMatch = indexHtml.match(/<title>(.*?)<\/title>/);
     assert.ok(titleMatch, 'index.html must have a title');
-    assert.ok(titleMatch[1].startsWith('BSE Nexus'), 'Title must start with BSE Nexus');
+    assert.ok(titleMatch[1].startsWith('Bsenexus'), 'Title must start with Bsenexus');
 
     const descMatch = indexHtml.match(/<meta\s+name="description"\s+content="([^"]*)"/);
     assert.ok(descMatch, 'index.html must have meta description');
-    assert.ok(descMatch[1].includes('BSE Nexus'), 'Meta description must contain BSE Nexus');
+    assert.ok(descMatch[1].includes('Bsenexus'), 'Meta description must contain Bsenexus');
 
     assert.ok(indexHtml.includes('<link rel="canonical" href="https://bsenexus.in/" />'));
     assert.ok(indexHtml.includes('property="og:title"'));
@@ -119,11 +119,11 @@ describe('Search Engine & Cross-Browser Discovery (Step 06: IndexNow & OpenSearc
     assert.ok(indexHtml.includes('"@type": "FAQPage"'));
   });
 
-  test('LandingPage contains semantic About BSE Nexus section', () => {
+  test('LandingPage contains semantic About Bsenexus section', () => {
     const landingPagePath = path.join(process.cwd(), 'src', 'components', 'LandingPage.tsx');
     const content = fs.readFileSync(landingPagePath, 'utf8');
 
     assert.ok(content.includes('id="about"'), 'LandingPage must include id="about"');
-    assert.ok(content.includes('About BSE Nexus'), 'LandingPage must contain About BSE Nexus');
+    assert.ok(content.includes('About Bsenexus'), 'LandingPage must contain About Bsenexus');
   });
 });

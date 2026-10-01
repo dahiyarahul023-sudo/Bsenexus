@@ -38,7 +38,7 @@ function WavyHero() {
           <BseNexusLogo className="w-7 h-7" />
         </div>
         <p className="mt-2 text-[11px] font-black tracking-[0.3em] text-slate-700">
-          BSE NEXUS
+          BSENEXUS
         </p>
         <p className="text-[10px] text-slate-500 mt-0.5">
           Capital Markets Intelligence

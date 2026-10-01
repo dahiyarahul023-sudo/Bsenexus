@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/web-manifest-combined.json",
   "id": "/",
-  "name": "BSE Nexus - Indian Corporate Disclosures",
-  "short_name": "BSE Nexus",
+  "name": "Bsenexus - Indian Corporate Disclosures",
+  "short_name": "Bsenexus",
   "description": "BSE corporate disclosures tracker with AI financial YoY/QoQ breakdown, custom watchlists, and Telegram alert integration.",
   "lang": "en",
   "dir": "ltr",
@@ -105,14 +105,14 @@
       "sizes": "1280x720",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "BSE Nexus Live Corporate Disclosures and Terminal View"
+      "label": "Bsenexus Live Corporate Disclosures and Terminal View"
     },
     {
       "src": "/screenshots/mobile.png",
       "sizes": "750x1334",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "BSE Nexus Mobile Announcements and Alert Monitor"
+      "label": "Bsenexus Mobile Announcements and Alert Monitor"
     }
   ],
   "shortcuts": [

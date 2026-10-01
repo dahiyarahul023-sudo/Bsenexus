@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 
 /**
- * Google reCAPTCHA Enterprise Utility for BSE Nexus
+ * Google reCAPTCHA Enterprise Utility for Bsenexus
  * 
  * Architecture Principle:
  * - Read key exclusively from environment variable (VITE_RECAPTCHA_SITE_KEY) - NEVER hardcoded.

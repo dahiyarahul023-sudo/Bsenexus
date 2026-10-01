@@ -41,7 +41,7 @@ export function HelpModal({ isOpen, onClose, onOpenSettings }: HelpModalProps) {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
       role: 'model',
-      text: "👋 Hello! I am the **BSE Nexus AI Assistant**. Ask me anything about using the terminal, setting up Telegram alerts, managing watchlists & priorities, reading AI financial summaries, or tracking previous results history!"
+      text: "👋 Hello! I am the **Bsenexus AI Assistant**. Ask me anything about using the terminal, setting up Telegram alerts, managing watchlists & priorities, reading AI financial summaries, or tracking previous results history!"
     }
   ]);
   const [inputQuestion, setInputQuestion] = useState('');
@@ -201,13 +201,13 @@ export function HelpModal({ isOpen, onClose, onOpenSettings }: HelpModalProps) {
                 <div className="flex items-center justify-between">
                   <h4 className="text-sm font-bold text-indigo-950 dark:text-indigo-200 flex items-center gap-2">
                     <Sparkles size={16} className="text-indigo-600 dark:text-indigo-400" />
-                    BSE Nexus AI Assistant
+                    Bsenexus AI Assistant
                   </h4>
                   <button
                     type="button"
                     onClick={() => setChatMessages([{
                       role: 'model',
-                      text: "👋 Hello! I am the **BSE Nexus AI Assistant**. Ask me anything about using the terminal, setting up Telegram alerts, managing watchlists & priorities, reading AI financial summaries, or tracking previous results history!"
+                      text: "👋 Hello! I am the **Bsenexus AI Assistant**. Ask me anything about using the terminal, setting up Telegram alerts, managing watchlists & priorities, reading AI financial summaries, or tracking previous results history!"
                     }])}
                     className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
                   >
@@ -298,8 +298,8 @@ export function HelpModal({ isOpen, onClose, onOpenSettings }: HelpModalProps) {
                   type="text"
                   value={inputQuestion}
                   onChange={e => setInputQuestion(e.target.value)}
-                  placeholder="Ask a question about BSE Nexus (e.g. How to get Telegram alerts?)..."
-                  aria-label="Ask a question about BSE Nexus"
+                  placeholder="Ask a question about Bsenexus (e.g. How to get Telegram alerts?)..."
+                  aria-label="Ask a question about Bsenexus"
                   disabled={isAskingAi}
                   className="flex-1 px-3.5 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 text-slate-900 dark:text-white"
                 />
@@ -325,10 +325,10 @@ export function HelpModal({ isOpen, onClose, onOpenSettings }: HelpModalProps) {
               <div className="p-4 rounded-2xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/60 dark:border-indigo-800/60 space-y-1.5">
                 <h4 className="text-sm font-bold text-indigo-950 dark:text-indigo-200 flex items-center gap-2">
                   <Zap size={16} className="text-indigo-600 dark:text-indigo-400" />
-                  What is BSE Nexus?
+                  What is Bsenexus?
                 </h4>
                 <p className="text-xs text-indigo-900/80 dark:text-indigo-300/80 leading-relaxed">
-                  BSE Nexus is an enterprise-grade live regulatory terminal tracking every public corporate filing from the Bombay Stock Exchange in sub-second intervals.
+                  Bsenexus is an enterprise-grade live regulatory terminal tracking every public corporate filing from the Bombay Stock Exchange in sub-second intervals.
                 </p>
               </div>
 
@@ -486,9 +486,9 @@ export function HelpModal({ isOpen, onClose, onOpenSettings }: HelpModalProps) {
               </div>
 
               <div className="p-3.5 bg-slate-50 dark:bg-slate-900/60 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-1">
-                <h5 className="font-bold text-slate-900 dark:text-white">Q: Is BSE Nexus SEBI registered?</h5>
+                <h5 className="font-bold text-slate-900 dark:text-white">Q: Is Bsenexus SEBI registered?</h5>
                 <p className="text-[11px] text-slate-500">
-                  BSE Nexus is an automated technology software and data visualization terminal. It is not an investment advisor or research analyst. Please read our Terms and Conditions for full details.
+                  Bsenexus is an automated technology software and data visualization terminal. It is not an investment advisor or research analyst. Please read our Terms and Conditions for full details.
                 </p>
               </div>
             </div>

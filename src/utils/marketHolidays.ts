@@ -323,7 +323,7 @@ export function downloadIcsCalendarFile(params: {
   const icsContent = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//BSE Nexus//Results Calendar//EN',
+    'PRODID:-//Bsenexus//Results Calendar//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     'BEGIN:VEVENT',
@@ -409,7 +409,7 @@ export function downloadMultiIcsCalendarFile(events: Array<{
   const icsContent = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//BSE Nexus//Results Calendar Multi-Export//EN',
+    'PRODID:-//Bsenexus//Results Calendar Multi-Export//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     ...vEvents,

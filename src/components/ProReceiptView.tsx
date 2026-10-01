@@ -124,7 +124,7 @@ function ThermalReceiptPaper({ r }: { r: PaymentReceipt }) {
         </div>
       </div>
 
-      <p className="text-center text-[15px] font-black tracking-[0.14em]">BSE NEXUS</p>
+      <p className="text-center text-[15px] font-black tracking-[0.14em]">BSENEXUS</p>
       <p className="text-center text-[10px] font-bold tracking-[0.28em] text-slate-500 mt-1">
         PRO MEMBERSHIP RECEIPT
       </p>
@@ -172,7 +172,7 @@ function ThermalReceiptPaper({ r }: { r: PaymentReceipt }) {
       <p className="text-center text-[10px] font-bold tracking-[0.22em] text-slate-500 leading-relaxed">
         THANK YOU FOR CHOOSING
         <br />
-        BSE NEXUS PRO
+        BSENEXUS PRO
       </p>
 
       <div className="mt-3">
@@ -188,7 +188,7 @@ function buildPlainTextReceipt(r: PaymentReceipt): string {
     : 'Pro Monthly (30 days)';
   const amount = `₹${Number(r.amount).toFixed(2)}`;
   return [
-    'BSE NEXUS - PRO MEMBERSHIP RECEIPT',
+    'BSENEXUS - PRO MEMBERSHIP RECEIPT',
     `Invoice: ${r.orderId}`,
     `Issued: ${formatReceiptDate(r.paidAt)}`,
     `Valid until: ${formatReceiptDate(new Date(r.validUntil).toISOString())}`,

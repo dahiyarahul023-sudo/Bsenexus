@@ -13,7 +13,7 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ onEnterTerminal }) => {
   const [selectedGuide, setSelectedGuide] = useState<MarketGuide | null>(null);
 
   useEffect(() => {
-    document.title = 'Indian Equity Research Guides & Market Intelligence | BSE Nexus';
+    document.title = 'Indian Equity Research Guides & Market Intelligence | Bsenexus';
     const metaDesc = document.querySelector('meta[name="description"]');
     if (metaDesc) {
       metaDesc.setAttribute('content', 'Practical guides and research insights for Indian stock market investors covering BSE filings, corporate actions, SEBI LODR disclosures, and equity analytics.');
@@ -121,10 +121,10 @@ export const GuidesPage: React.FC<GuidesPageProps> = ({ onEnterTerminal }) => {
             <SocialIconsRow size={20} />
           </div>
           <p className="text-[11px] text-slate-400 max-w-xl mx-auto">
-            BSE Nexus is an informational research terminal. We are not SEBI registered investment advisors. Financial metric summaries and AI extractions are for research purposes only.
+            Bsenexus is an informational research terminal. We are not SEBI registered investment advisors. Financial metric summaries and AI extractions are for research purposes only.
           </p>
           <p className="text-[11px] text-slate-400">
-            © {new Date().getFullYear()} BSE Nexus Technologies. Real-time Indian Equity Intelligence.
+            © {new Date().getFullYear()} Bsenexus Technologies. Real-time Indian Equity Intelligence.
           </p>
         </div>
       </footer>

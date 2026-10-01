@@ -102,7 +102,7 @@ export function SupportModal({ isOpen, onClose, onOpenHelp }: SupportModalProps)
                   <h3 id="support-sheet-title" className="text-sm sm:text-base font-bold text-slate-900 dark:text-white font-display">
                     Help & Support
                   </h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Direct assistance from the BSE Nexus team</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Direct assistance from the Bsenexus team</p>
                 </div>
               </div>
 
@@ -182,7 +182,7 @@ export function SupportModal({ isOpen, onClose, onOpenHelp }: SupportModalProps)
                         ? 'Describe the issue, stock name, or step that failed...'
                         : feedbackType === 'feature'
                         ? 'What new filing feature or analysis would you love to see?'
-                        : 'How can we improve your experience with BSE Nexus?'
+                        : 'How can we improve your experience with Bsenexus?'
                     }
                     className="w-full text-xs p-3 rounded-xl bg-slate-50 dark:bg-[#201E2E] border border-slate-200 dark:border-[#352F48] text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     required
@@ -214,7 +214,7 @@ export function SupportModal({ isOpen, onClose, onOpenHelp }: SupportModalProps)
               <a 
                 href="mailto:admin@bsenexus.in" 
                 className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-white transition-colors"
-                aria-label="Email BSE Nexus Support (admin@bsenexus.in)"
+                aria-label="Email Bsenexus Support (admin@bsenexus.in)"
               >
                 <Mail size={12} className="text-slate-400" />
                 <span>Email: <span className="underline font-medium">admin@bsenexus.in</span></span>

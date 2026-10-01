@@ -52,10 +52,10 @@ describe('FAQ bank', () => {
     ['What are Telegram alerts?', 'telegram-what'],
     ['Where does the data come from?', 'data-source'],
     ['How many companies are covered?', 'coverage'],
-    ['What is BSE Nexus?', 'what-is'],
+    ['What is Bsenexus?', 'what-is'],
     ['Are AI summaries in Hindi?', 'ai-language'],
     ['Can I export my watchlist as CSV?', 'export'],
-    ['Is BSE Nexus affiliated with BSE?', 'affiliated'],
+    ['Is Bsenexus affiliated with BSE?', 'affiliated'],
     ['What happens when my Pro expires?', 'pro-expire'],
     ['How can I contact support?', 'contact-support'],
   ];

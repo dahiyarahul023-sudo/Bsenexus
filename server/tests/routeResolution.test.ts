@@ -76,11 +76,11 @@ describe('Route Resolution & Dedicated Pages Architecture (/pricing, /guides, 40
 
     // Canonical & Title for pricing
     assert.ok(serverCode.includes('canonical: "https://bsenexus.in/pricing"'), 'Pricing canonical must be https://bsenexus.in/pricing');
-    assert.ok(serverCode.includes('Pricing & Plans — 100% Free Launch Access | BSE Nexus'), 'Pricing title must be defined');
+    assert.ok(serverCode.includes('Pricing & Plans — 100% Free Launch Access | Bsenexus'), 'Pricing title must be defined');
 
     // Canonical & Title for guides
     assert.ok(serverCode.includes('canonical: "https://bsenexus.in/guides"'), 'Guides canonical must be https://bsenexus.in/guides');
-    assert.ok(serverCode.includes('Indian Equity Research Guides & Market Intelligence | BSE Nexus'), 'Guides title must be defined');
+    assert.ok(serverCode.includes('Indian Equity Research Guides & Market Intelligence | Bsenexus'), 'Guides title must be defined');
 
     // Sitemap includes
     assert.ok(serverCode.includes('<loc>https://bsenexus.in/pricing</loc>'), 'Sitemap must contain /pricing');
@@ -94,9 +94,9 @@ describe('Route Resolution & Dedicated Pages Architecture (/pricing, /guides, 40
 
     // Test Pricing HTML
     const pricingHtml = renderPricingPage();
-    assert.ok(pricingHtml.includes('<title>Pricing &amp; Plans — 100% Free Launch Access | BSE Nexus</title>'), 'Pricing title must match');
+    assert.ok(pricingHtml.includes('<title>Pricing &amp; Plans — 100% Free Launch Access | Bsenexus</title>'), 'Pricing title must match');
     assert.ok(pricingHtml.includes('<link rel="canonical" href="https://bsenexus.in/pricing"'), 'Pricing canonical link');
-    assert.ok(pricingHtml.includes('<meta property="og:title" content="Pricing &amp; Plans — 100% Free Launch Access | BSE Nexus"'), 'Pricing OG title');
+    assert.ok(pricingHtml.includes('<meta property="og:title" content="Pricing &amp; Plans — 100% Free Launch Access | Bsenexus"'), 'Pricing OG title');
     assert.ok(pricingHtml.includes('<meta property="og:url" content="https://bsenexus.in/pricing"'), 'Pricing OG url');
     assert.ok(pricingHtml.includes('<h1>'), 'Pricing page must have an h1 element');
     assert.ok(pricingHtml.includes('₹499'), 'Pricing page must show ₹499 launch rate');
@@ -104,15 +104,15 @@ describe('Route Resolution & Dedicated Pages Architecture (/pricing, /guides, 40
 
     // Test Guides HTML
     const guidesHtml = renderGuidesIndexPage();
-    assert.ok(guidesHtml.includes('<title>Indian Equity Research Guides &amp; Market Intelligence | BSE Nexus</title>'), 'Guides title must match');
+    assert.ok(guidesHtml.includes('<title>Indian Equity Research Guides &amp; Market Intelligence | Bsenexus</title>'), 'Guides title must match');
     assert.ok(guidesHtml.includes('<link rel="canonical" href="https://bsenexus.in/guides"'), 'Guides canonical link');
-    assert.ok(guidesHtml.includes('<meta property="og:title" content="Indian Equity Research Guides &amp; Market Intelligence | BSE Nexus"'), 'Guides OG title');
+    assert.ok(guidesHtml.includes('<meta property="og:title" content="Indian Equity Research Guides &amp; Market Intelligence | Bsenexus"'), 'Guides OG title');
     assert.ok(guidesHtml.includes('<meta property="og:url" content="https://bsenexus.in/guides"'), 'Guides OG url');
     assert.ok(guidesHtml.includes('<h1>'), 'Guides page must have an h1 element');
 
     // Test 404 HTML
     const notFoundHtml = renderGeneral404Page('/invalid-random-url');
-    assert.ok(notFoundHtml.includes('<title>404 — Page Not Found | BSE Nexus</title>'), '404 title must match');
+    assert.ok(notFoundHtml.includes('<title>404 — Page Not Found | Bsenexus</title>'), '404 title must match');
     assert.ok(notFoundHtml.includes('/invalid-random-url'), '404 page must display requested invalid path');
     assert.ok(notFoundHtml.includes('404'), '404 page must display 404');
     assert.ok(notFoundHtml.includes('Back to Live Terminal'), '404 page must provide wayfinding back to terminal');

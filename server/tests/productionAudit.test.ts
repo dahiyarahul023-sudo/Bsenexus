@@ -59,7 +59,7 @@ describe('End-to-End System Audit & Final Production Verification (Step 08)', ()
     const llmsPath = path.join(process.cwd(), 'public', 'llms.txt');
     assert.ok(fs.existsSync(llmsPath), 'llms.txt must exist');
     const llmsContent = fs.readFileSync(llmsPath, 'utf8');
-    assert.ok(llmsContent.includes('BSE Nexus'));
+    assert.ok(llmsContent.includes('Bsenexus'));
   });
 
   test('Security & local storage fallback engine is resilient against cloud quota interruptions', () => {

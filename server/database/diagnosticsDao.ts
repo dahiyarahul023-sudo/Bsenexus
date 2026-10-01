@@ -304,7 +304,7 @@ export async function triggerCrashTelegramAlert(event: TelemetryEvent, force = f
       `<b>Screen:</b> ${screen}\n` +
       `<b>Page URL:</b> <code>${escapeHtml(url)}</code>` +
       breadcrumbText +
-      `\n\n<i>Reported live by BSE Nexus In-House Telemetry</i>`;
+      `\n\n<i>Reported live by Bsenexus In-House Telemetry</i>`;
 
     await sendToTelegram(message, settings.chatId);
     lastCrashAlertTime = now;

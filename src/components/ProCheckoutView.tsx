@@ -217,7 +217,7 @@ export function ProCheckoutView() {
               </Row>
 
               <Row label="To">
-                <p className="text-[13px] font-bold text-slate-900">BSE Nexus</p>
+                <p className="text-[13px] font-bold text-slate-900">Bsenexus</p>
                 <p className="text-[11px] font-medium text-slate-400">
                   {plan.label} · {plan.days} days
                 </p>

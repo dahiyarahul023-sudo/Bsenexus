@@ -1,4 +1,4 @@
-// BSE Nexus - Progressive Web App Service Worker
+// Bsenexus - Progressive Web App Service Worker
 // Version: 4.2.0
 
 const CACHE_NAME = 'bse-nexus-v4.2';
@@ -118,7 +118,7 @@ self.addEventListener('fetch', (event) => {
           if (cached) return cached;
           const fallback = await caches.match('/index.html');
           if (fallback) return fallback;
-          return new Response('Offline - BSE Nexus is available once connection resumes.', {
+          return new Response('Offline - Bsenexus is available once connection resumes.', {
             headers: { 'Content-Type': 'text/plain; charset=utf-8' }
           });
         })
@@ -265,7 +265,7 @@ self.addEventListener('periodicsync', (event) => {
 // 6. Push Notification Event (Real-time BSE Material Filings & Telegram alerts)
 self.addEventListener('push', (event) => {
   let data = {
-    title: 'BSE Nexus Alert',
+    title: 'Bsenexus Alert',
     body: 'New price-sensitive corporate disclosure published on BSE.',
     icon: '/android-chrome-192x192.png',
     badge: '/favicon-32x32.png',

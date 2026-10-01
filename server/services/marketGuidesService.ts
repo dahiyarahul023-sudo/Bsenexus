@@ -47,7 +47,7 @@ export const FALLBACK_MARKET_GUIDES: ServerMarketGuide[] = [
     date: '2026-09-10',
     publishedAt: '2026-09-10T09:00:00Z',
     author: {
-      name: 'BSE Nexus Intelligence Team',
+      name: 'Bsenexus Intelligence Team',
       role: 'Compliance & Equity Research',
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
     },
@@ -98,7 +98,7 @@ export const FALLBACK_MARKET_GUIDES: ServerMarketGuide[] = [
     date: '2026-09-08',
     publishedAt: '2026-09-08T09:00:00Z',
     author: {
-      name: 'BSE Nexus Intelligence Team',
+      name: 'Bsenexus Intelligence Team',
       role: 'Forensic Accounting & Analysis',
       avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80'
     },
@@ -144,7 +144,7 @@ export const FALLBACK_MARKET_GUIDES: ServerMarketGuide[] = [
     date: '2026-09-02',
     publishedAt: '2026-09-02T09:00:00Z',
     author: {
-      name: 'BSE Nexus Intelligence Team',
+      name: 'Bsenexus Intelligence Team',
       role: 'Governance & Risk Assessment',
       avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80'
     },
@@ -179,7 +179,7 @@ export const FALLBACK_MARKET_GUIDES: ServerMarketGuide[] = [
     date: '2026-08-28',
     publishedAt: '2026-08-28T09:00:00Z',
     author: {
-      name: 'BSE Nexus Intelligence Team',
+      name: 'Bsenexus Intelligence Team',
       role: 'Capital Markets & Trading Surveillance',
       avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80'
     },
@@ -214,7 +214,7 @@ export const FALLBACK_MARKET_GUIDES: ServerMarketGuide[] = [
     date: '2026-08-20',
     publishedAt: '2026-08-20T09:00:00Z',
     author: {
-      name: 'BSE Nexus Intelligence Team',
+      name: 'Bsenexus Intelligence Team',
       role: 'Forensic Accounting',
       avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=150&auto=format&fit=crop&q=80'
     },
@@ -249,7 +249,7 @@ export const FALLBACK_MARKET_GUIDES: ServerMarketGuide[] = [
     date: '2026-09-21',
     publishedAt: '2026-09-21T09:00:00Z',
     author: {
-      name: 'BSE Nexus Intelligence Team',
+      name: 'Bsenexus Intelligence Team',
       role: 'Equity Research & Earnings Analysis',
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
     },
@@ -305,11 +305,11 @@ export const FALLBACK_MARKET_GUIDES: ServerMarketGuide[] = [
           ]
         },
         {
-          heading: '5. How to Track BSE Upcoming Results Live on BSE Nexus',
-          title: '5. How to Track BSE Upcoming Results Live on BSE Nexus',
-          content: 'Navigating through hundreds of exchange PDFs during peak earnings season requires systematic filtering. The BSE Nexus Results Calendar terminal delivers instant clarity with zero latency:',
+          heading: '5. How to Track BSE Upcoming Results Live on Bsenexus',
+          title: '5. How to Track BSE Upcoming Results Live on Bsenexus',
+          content: 'Navigating through hundreds of exchange PDFs during peak earnings season requires systematic filtering. The Bsenexus Results Calendar terminal delivers instant clarity with zero latency:',
           body: [
-            'Live 15-Second Polling: BSE Nexus polls exchange servers every 15 seconds to capture board meeting announcements, date changes, and declared result PDFs within seconds of filing.',
+            'Live 15-Second Polling: Bsenexus polls exchange servers every 15 seconds to capture board meeting announcements, date changes, and declared result PDFs within seconds of filing.',
             'Comprehensive Scope Filters: Switch effortlessly between "Upcoming Board Meetings", "Today Results", and "Historical Ledger" to isolate scheduled events across your portfolio.',
             'Instant Calendar Sync: Download .ics calendar files or add upcoming board meeting dates directly to Google Calendar with a single click to ensure you never miss an earnings call.',
             'Telegram Push Notifications: Configure your private watchlist to receive instant push alerts on mobile the millisecond a board meeting outcome or quarterly PDF is posted.'
@@ -322,7 +322,7 @@ export const FALLBACK_MARKET_GUIDES: ServerMarketGuide[] = [
           body: [
             'Q1: How far in advance must an Indian company notify BSE before holding a results meeting? Answer: Under SEBI LODR Regulation 29, listed companies must provide at least two clear working days advance notice (excluding the intimation date and meeting date).',
             'Q2: What is the deadline for filing Q1, Q2, Q3, and Q4 financial results on BSE? Answer: Unaudited results for Q1 (June ending), Q2 (September ending), and Q3 (December ending) must be filed within 45 days of the quarter ending. Audited annual Q4 results (March ending) must be filed within 60 days.',
-            'Q3: Where can I find the exact board meeting outcome document on BSE? Answer: Companies upload the board meeting outcome as an official PDF under Regulation 30/33 within 30 minutes of the board meeting adjourning. On BSE Nexus, these are streamed live in the Announcements Terminal.',
+            'Q3: Where can I find the exact board meeting outcome document on BSE? Answer: Companies upload the board meeting outcome as an official PDF under Regulation 30/33 within 30 minutes of the board meeting adjourning. On Bsenexus, these are streamed live in the Announcements Terminal.',
             'Q4: What happens if a company fails to disclose quarterly results within 45 days? Answer: The exchange issues warning notices, levies per-day financial penalties under SEBI circulars, moves the stock to surveillance or Z-group categories, and may ultimately suspend trading if non-compliance persists.'
           ]
         }
@@ -334,7 +334,7 @@ export const FALLBACK_MARKET_GUIDES: ServerMarketGuide[] = [
         'Review auditor Limited Review Report for any qualifications or emphasis of matter.',
         'Check notes to financial accounts for one-off exceptional items inflating headline PAT.'
       ],
-      conclusion: 'The quarterly results calendar is Dalal Street’s ultimate reality check. By leveraging statutory timelines under SEBI LODR Regulation 33 and tracking board meeting dates via the BSE Nexus Results Calendar, investors can anticipate market volatility, audit operational momentum with institutional rigor, and make evidence-based capital allocation decisions.'
+      conclusion: 'The quarterly results calendar is Dalal Street’s ultimate reality check. By leveraging statutory timelines under SEBI LODR Regulation 33 and tracking board meeting dates via the Bsenexus Results Calendar, investors can anticipate market volatility, audit operational momentum with institutional rigor, and make evidence-based capital allocation decisions.'
     }
   },
   {
@@ -348,7 +348,7 @@ export const FALLBACK_MARKET_GUIDES: ServerMarketGuide[] = [
     date: '2026-09-21',
     publishedAt: '2026-09-21T09:00:00Z',
     author: {
-      name: 'BSE Nexus Intelligence Team',
+      name: 'Bsenexus Intelligence Team',
       role: 'Governance & Ownership Research',
       avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80'
     },

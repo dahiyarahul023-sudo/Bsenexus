@@ -138,7 +138,7 @@ export async function processAnnouncements() {
           isBseOutageActive = true;
           lastAlertTime = Date.now();
           const errDetail = getLastBseError();
-          const alertMsg = `⚠️ <b>BSE Nexus System Alert</b>\n\nUnable to fetch live feed from BSE India (${errDetail}). Both primary and backup endpoints failed.\n\n<b>Diagnostics:</b>\n• Exchange API unreachable or cloud IP filtered.\n• Exponential backoff retries active.\n• Recovery notification will be sent automatically upon reconnection.\n\n<i>No further outage alerts will be sent during this episode.</i>`;
+          const alertMsg = `⚠️ <b>Bsenexus System Alert</b>\n\nUnable to fetch live feed from BSE India (${errDetail}). Both primary and backup endpoints failed.\n\n<b>Diagnostics:</b>\n• Exchange API unreachable or cloud IP filtered.\n• Exponential backoff retries active.\n• Recovery notification will be sent automatically upon reconnection.\n\n<i>No further outage alerts will be sent during this episode.</i>`;
           await sendToTelegram(alertMsg);
           await addLog('CRITICAL', 'SYSTEM', `Sent BSE Outage Alert to Telegram: ${errDetail}`);
         }

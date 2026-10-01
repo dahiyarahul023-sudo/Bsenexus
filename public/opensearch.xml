@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/" xmlns:moz="http://www.mozilla.org/2006/browser/search/">
-  <ShortName>BSE Nexus</ShortName>
+  <ShortName>Bsenexus</ShortName>
   <Description>Real-time BSE Corporate Announcements, Financial Disclosures, and Stock Intelligence</Description>
   <InputEncoding>UTF-8</InputEncoding>
   <OutputEncoding>UTF-8</OutputEncoding>

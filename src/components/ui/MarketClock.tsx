@@ -216,7 +216,7 @@ Upgrade to Pro to broadcast official exchange circulars and trading schedules to
       (holiday.isMuhuratTrading ? `🪔 Special Muhurat Trading Session will be held: ${holiday.muhuratTiming || 'Evening'}\n` : '') +
       `⚡ F&O Expiry Note: Derivative contracts scheduled for this day will expire on the preceding trading session.\n\n` +
       `📅 Add to Google Calendar (1-Click):\n${calendarLink}\n\n` +
-      `Track real-time market updates on BSE Nexus.\n`
+      `Track real-time market updates on Bsenexus.\n`
     );
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
   };

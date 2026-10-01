@@ -10,7 +10,7 @@ import './noteIcons.css';
  * pastel tint is a separate layer, specular highlights ride the edges,
  * and the glyph sits ON the glass as a plain white fill fused to the
  * material (never glass-on-glass). Every glyph path is drawn fresh for
- * BSE Nexus — not copies of the reel's artwork files (never published).
+ * Bsenexus — not copies of the reel's artwork files (never published).
  */
 
 export interface NoteIconDef {

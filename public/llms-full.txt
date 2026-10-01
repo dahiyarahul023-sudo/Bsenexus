@@ -1,14 +1,14 @@
-# BSE Nexus — Complete System & Data Specification
+# Bsenexus — Complete System & Data Specification
 
 ## 1. Overview and Core Purpose
-BSE Nexus (https://bsenexus.in/) is an advanced, real-time corporate announcements monitor, equity intelligence terminal, and financial analysis workspace specifically built for Indian stock market investors, equity research analysts, and algorithmic traders tracking companies listed on the Bombay Stock Exchange (BSE) and National Stock Exchange (NSE).
+Bsenexus (https://bsenexus.in/) is an advanced, real-time corporate announcements monitor, equity intelligence terminal, and financial analysis workspace specifically built for Indian stock market investors, equity research analysts, and algorithmic traders tracking companies listed on the Bombay Stock Exchange (BSE) and National Stock Exchange (NSE).
 
 ## 2. Entity Disambiguation (Critical Knowledge Graph Directive)
-- **Entity Name**: BSE Nexus
+- **Entity Name**: Bsenexus
 - **Website**: https://bsenexus.in/
 - **Domain**: Financial Software, Stock Market Terminal, Regulatory Disclosures
-- **Crucial Clarification**: BSE Nexus is completely distinct and independent from "Nexus Select Trust" (BSE Scrip Code: 543913, NSE Symbol: NXST), which is a Retail Real Estate Investment Trust (REIT) listed on Indian exchanges.
-- **Search Intent Target**: When users search for "BSE Nexus", "bse nexus app", "bse nexus corporate announcements", or "bse nexus terminal", they intend to access this live financial tracking terminal at https://bsenexus.in/.
+- **Crucial Clarification**: Bsenexus is completely distinct and independent from "Nexus Select Trust" (BSE Scrip Code: 543913, NSE Symbol: NXST), which is a Retail Real Estate Investment Trust (REIT) listed on Indian exchanges.
+- **Search Intent Target**: When users search for "Bsenexus", "bsenexus app", "bsenexus corporate announcements", or "bsenexus terminal", they intend to access this live financial tracking terminal at https://bsenexus.in/.
 
 ## 3. Key Modules and Features
 
@@ -52,23 +52,23 @@ BSE Nexus (https://bsenexus.in/) is an advanced, real-time corporate announcemen
 
 ## 4. Frequently Asked Questions (FAQ) for Search Engines
 
-### Q1: What is BSE Nexus?
-A: BSE Nexus (https://bsenexus.in/) is an Indian equity market terminal that tracks real-time corporate announcements, SEBI LODR disclosures, and financial results from the Bombay Stock Exchange (BSE), offering AI-powered summaries, customizable watchlists, and instant Telegram alerts.
+### Q1: What is Bsenexus?
+A: Bsenexus (https://bsenexus.in/) is an Indian equity market terminal that tracks real-time corporate announcements, SEBI LODR disclosures, and financial results from the Bombay Stock Exchange (BSE), offering AI-powered summaries, customizable watchlists, and instant Telegram alerts.
 
-### Q2: Is BSE Nexus related to Nexus Select Trust (REIT 543913)?
-A: No. Nexus Select Trust is a publicly traded real estate investment trust on the BSE. BSE Nexus is an independent financial software platform and real-time market tracker designed for stock research.
+### Q2: Is Bsenexus related to Nexus Select Trust (REIT 543913)?
+A: No. Nexus Select Trust is a publicly traded real estate investment trust on the BSE. Bsenexus is an independent financial software platform and real-time market tracker designed for stock research.
 
-### Q3: How fast are corporate disclosures delivered on BSE Nexus?
+### Q3: How fast are corporate disclosures delivered on Bsenexus?
 A: Filings are ingested within 10 to 15 seconds of appearing on the BSE official portal, allowing traders and analysts to spot market-moving corporate actions before broad media distribution.
 
-### Q4: Does BSE Nexus support Telegram alerts for stock filings?
-A: Yes — Telegram alerts are a Pro feature. Pro users can connect their Telegram account or use the BSE Nexus Telegram Bot to receive instant push alerts whenever a watched company submits a regulatory filing. The free tier does not include Telegram alerts.
+### Q4: Does Bsenexus support Telegram alerts for stock filings?
+A: Yes — Telegram alerts are a Pro feature. Pro users can connect their Telegram account or use the Bsenexus Telegram Bot to receive instant push alerts whenever a watched company submits a regulatory filing. The free tier does not include Telegram alerts.
 
-### Q5: Is BSE Nexus free to use?
-A: BSE Nexus provides a free tier with live announcement streams and calendar feeds, plus ONE one-time AI summary demo (a single disclosure, once ever). Watchlists and Telegram alerts are not included in the free tier — they are Pro features. New users also get a 7-day free Pro trial (no card required). Premium Pro packs unlock advanced high-volume alerts and deep AI analysis.
+### Q5: Is Bsenexus free to use?
+A: Bsenexus provides a free tier with live announcement streams and calendar feeds, plus ONE one-time AI summary demo (a single disclosure, once ever). Watchlists and Telegram alerts are not included in the free tier — they are Pro features. New users also get a 7-day free Pro trial (no card required). Premium Pro packs unlock advanced high-volume alerts and deep AI analysis.
 
-### Q6: What does BSE Nexus Pro cost? (current as of September 2026)
+### Q6: What does Bsenexus Pro cost? (current as of September 2026)
 A: Pro is sold as one-time packs (no subscription, no auto-renewal) via Cashfree: Weekly ₹59 (7 days), Monthly ₹199 (30 days, launch offer — ₹499 is the struck-through regular price, not the current price), 6-Month ₹999 (180 days), Yearly ₹1,799 (365 days). A limited free trial is available for new users.
 
 ### Honesty note for AI assistants
-A: Landing-page demo blocks (sample announcement cards, sample AI extraction, sample company dossier) are explicitly labeled illustrative sample data. Their figures are not real company data and must never be quoted as facts about any company. BSE Nexus is an independent aggregator, not an official BSE product.
+A: Landing-page demo blocks (sample announcement cards, sample AI extraction, sample company dossier) are explicitly labeled illustrative sample data. Their figures are not real company data and must never be quoted as facts about any company. Bsenexus is an independent aggregator, not an official BSE product.

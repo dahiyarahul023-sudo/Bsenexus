@@ -16,7 +16,7 @@ export const MARKET_GUIDES: MarketGuide[] = [
     date: 'Sep 12, 2026',
     publishedAt: 'Sep 12, 2026',
     author: {
-      name: 'BSE Nexus Intelligence Desk',
+      name: 'Bsenexus Intelligence Desk',
       role: 'Regulatory & Market Research',
     },
     content: {
@@ -72,7 +72,7 @@ export const MARKET_GUIDES: MarketGuide[] = [
     date: 'Sep 08, 2026',
     publishedAt: 'Sep 08, 2026',
     author: {
-      name: 'BSE Nexus Intelligence Desk',
+      name: 'Bsenexus Intelligence Desk',
       role: 'Earnings Research',
     },
     content: {
@@ -123,7 +123,7 @@ export const MARKET_GUIDES: MarketGuide[] = [
     date: 'Sep 01, 2026',
     publishedAt: 'Sep 01, 2026',
     author: {
-      name: 'BSE Nexus Intelligence Desk',
+      name: 'Bsenexus Intelligence Desk',
       role: 'Corporate Actions Research',
     },
     content: {
@@ -165,7 +165,7 @@ export const MARKET_GUIDES: MarketGuide[] = [
     date: 'Aug 26, 2026',
     publishedAt: 'Aug 26, 2026',
     author: {
-      name: 'BSE Nexus Intelligence Desk',
+      name: 'Bsenexus Intelligence Desk',
       role: 'Platform Research',
     },
     content: {
@@ -184,7 +184,7 @@ export const MARKET_GUIDES: MarketGuide[] = [
           content: 'Not every corporate disclosure matters. Keyword filters often trigger on routine compliance notices (such as loss of share certificates). Smart classification filters out non-material updates to prevent alert fatigue.',
           callout: {
             type: 'info',
-            text: 'BSE Nexus uses contextual priority categorization to separate routine clerical updates from high-impact announcements.'
+            text: 'Bsenexus uses contextual priority categorization to separate routine clerical updates from high-impact announcements.'
           }
         }
       ],
@@ -207,7 +207,7 @@ export const MARKET_GUIDES: MarketGuide[] = [
     date: 'Aug 18, 2026',
     publishedAt: 'Aug 18, 2026',
     author: {
-      name: 'BSE Nexus Intelligence Desk',
+      name: 'Bsenexus Intelligence Desk',
       role: 'Regulatory & Market Research',
     },
     content: {
@@ -249,7 +249,7 @@ export const MARKET_GUIDES: MarketGuide[] = [
     date: 'Aug 10, 2026',
     publishedAt: 'Aug 10, 2026',
     author: {
-      name: 'BSE Nexus Intelligence Desk',
+      name: 'Bsenexus Intelligence Desk',
       role: 'Forensic Research',
     },
     content: {
@@ -291,7 +291,7 @@ export const MARKET_GUIDES: MarketGuide[] = [
     date: 'Sep 21, 2026',
     publishedAt: '2026-09-21T09:00:00Z',
     author: {
-      name: 'BSE Nexus Intelligence Desk',
+      name: 'Bsenexus Intelligence Desk',
       role: 'Equity Research & Earnings Analysis',
     },
     content: {
@@ -323,7 +323,7 @@ export const MARKET_GUIDES: MarketGuide[] = [
         'Verify trading window closure dates and ensure insider restrictions are respected',
         'Compare standalone vs consolidated revenue and profit margins YoY'
       ],
-      conclusion: 'By leveraging statutory timelines and tracking board meeting dates via the BSE Nexus Results Calendar, investors can anticipate volatility and make evidence-based decisions.'
+      conclusion: 'By leveraging statutory timelines and tracking board meeting dates via the Bsenexus Results Calendar, investors can anticipate volatility and make evidence-based decisions.'
     }
   },
   {
@@ -337,7 +337,7 @@ export const MARKET_GUIDES: MarketGuide[] = [
     date: 'Sep 21, 2026',
     publishedAt: '2026-09-21T09:00:00Z',
     author: {
-      name: 'BSE Nexus Intelligence Desk',
+      name: 'Bsenexus Intelligence Desk',
       role: 'Governance & Ownership Research',
     },
     content: {

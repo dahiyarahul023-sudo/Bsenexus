@@ -548,7 +548,7 @@ export async function sendWatchlistNewsDigestToTelegram(
     );
   });
 
-  lines.push(`\n━━━━━━━━━━━━━━━━━━━━`, `⚡ Powered by BSE Nexus • ET, LiveMint, Moneycontrol & BS`);
+  lines.push(`\n━━━━━━━━━━━━━━━━━━━━`, `⚡ Powered by Bsenexus • ET, LiveMint, Moneycontrol & BS`);
 
   const fullText = lines.join('\n');
   const res = await sendToTelegram(fullText, customChatId);

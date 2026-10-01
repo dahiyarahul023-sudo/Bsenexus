@@ -112,12 +112,12 @@ export function buildReceiptMailto(r: PaymentReceipt, toEmail: string): string {
     ? `1x ${r.planLabel}${r.validityDays ? ` (${r.validityDays} days)` : ''}`
     : '1x Pro Monthly (30 days)';
   const lines = [
-    'BSE Nexus — Invoice',
+    'Bsenexus — Invoice',
     '--------------------------------',
     `Invoice No.: ${r.orderId}`,
     `Issued Date: ${formatReceiptDate(r.paidAt)}`,
     `Valid Until: ${formatReceiptDate(new Date(r.validUntil).toISOString())}`,
-    'From: BSE Nexus (bsenexus.in)',
+    'From: Bsenexus (bsenexus.in)',
     `To: ${toEmail.trim()}`,
     '--------------------------------',
     `Item: ${planLine}`,
@@ -128,7 +128,7 @@ export function buildReceiptMailto(r: PaymentReceipt, toEmail: string): string {
     'Thank you for going Pro!',
     'bsenexus.in',
   ];
-  const subject = `BSE Nexus invoice — ${r.orderId}`;
+  const subject = `Bsenexus invoice — ${r.orderId}`;
   return `mailto:${encodeURIComponent(toEmail.trim())}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join('\n'))}`;
 }
 

@@ -153,7 +153,7 @@ export function TermsModal({ isOpen, onClose, initialTab = 'terms' }: TermsModal
                     &ldquo;Investments in securities market are subject to market risks. Read all the related documents carefully before investing.&rdquo;
                   </p>
                   <p>
-                    <strong>BSE Nexus is NOT a SEBI-registered Research Analyst, Investment Adviser, Portfolio Manager, or Broker</strong> under the Securities and Exchange Board of India (Research Analysts) Regulations, 2014 or SEBI (Investment Advisers) Regulations, 2013.
+                    <strong>Bsenexus is NOT a SEBI-registered Research Analyst, Investment Adviser, Portfolio Manager, or Broker</strong> under the Securities and Exchange Board of India (Research Analysts) Regulations, 2014 or SEBI (Investment Advisers) Regulations, 2013.
                   </p>
                   <p>
                     Nothing contained on this application, including algorithmic alerts, YoY financial breakdowns, corporate action classifications, or market pulse feeds, shall be construed as stock recommendations, buy/sell tips, trading calls, portfolio guidance, or financial advisory.
@@ -167,7 +167,7 @@ export function TermsModal({ isOpen, onClose, initialTab = 'terms' }: TermsModal
                   <span>Educational &amp; Analytical Technology Only</span>
                 </h4>
                 <p>
-                  BSE Nexus is an automated information dissemination tool and data aggregation terminal. It parses public corporate filings published by companies on the official regulatory feeds of the Bombay Stock Exchange (BSE India) pursuant to SEBI (Listing Obligations and Disclosure Requirements) Regulations, 2015 (&ldquo;SEBI LODR&rdquo;).
+                  Bsenexus is an automated information dissemination tool and data aggregation terminal. It parses public corporate filings published by companies on the official regulatory feeds of the Bombay Stock Exchange (BSE India) pursuant to SEBI (Listing Obligations and Disclosure Requirements) Regulations, 2015 (&ldquo;SEBI LODR&rdquo;).
                 </p>
                 <p>
                   All metrics, including Revenue YoY, Net Profit YoY, EBITDA, and EPS, are extracted algorithmically. Users must conduct their own independent due diligence and consult a qualified, SEBI-registered financial adviser before executing any investment decisions.
@@ -202,14 +202,14 @@ export function TermsModal({ isOpen, onClose, initialTab = 'terms' }: TermsModal
               <div className="space-y-3">
                 <h5 className="font-bold text-slate-900 dark:text-white text-xs">1. Acceptance of Terms</h5>
                 <p>
-                  By accessing, browsing, or utilizing the BSE Nexus web terminal, mobile interface, or automated alert channels, you agree to be bound by these Terms of Service and all applicable laws and regulations of India. If you do not agree, you must discontinue use immediately.
+                  By accessing, browsing, or utilizing the Bsenexus web terminal, mobile interface, or automated alert channels, you agree to be bound by these Terms of Service and all applicable laws and regulations of India. If you do not agree, you must discontinue use immediately.
                 </p>
               </div>
 
               <div className="space-y-3">
                 <h5 className="font-bold text-slate-900 dark:text-white text-xs">2. Permitted Use &amp; License</h5>
                 <p>
-                  BSE Nexus grants you a revocable, non-exclusive, non-transferable, limited license to access and view publicly available corporate disclosures for personal, educational, and internal analytical research purposes only.
+                  Bsenexus grants you a revocable, non-exclusive, non-transferable, limited license to access and view publicly available corporate disclosures for personal, educational, and internal analytical research purposes only.
                 </p>
                 <p>
                   You agree NOT to:
@@ -232,7 +232,7 @@ export function TermsModal({ isOpen, onClose, initialTab = 'terms' }: TermsModal
               <div className="space-y-3">
                 <h5 className="font-bold text-slate-900 dark:text-white text-xs">4. Limitation of Liability</h5>
                 <p>
-                  To the maximum extent permitted by Indian law, BSE Nexus, its developers, operators, and affiliates shall NOT be liable for any direct, indirect, incidental, punitive, or consequential damages resulting from:
+                  To the maximum extent permitted by Indian law, Bsenexus, its developers, operators, and affiliates shall NOT be liable for any direct, indirect, incidental, punitive, or consequential damages resulting from:
                 </p>
                 <ul className="list-disc list-inside space-y-1 text-slate-500 dark:text-slate-400 pl-1">
                   <li>Any financial or trading losses incurred by the user.</li>
@@ -339,7 +339,7 @@ export function TermsModal({ isOpen, onClose, initialTab = 'terms' }: TermsModal
               </div>
 
               <p>
-                BSE Nexus uses modern browser <strong>Local Storage</strong> and strictly essential session cookies to function smoothly. We do NOT use third-party advertising cookies or cross-site tracking scripts.
+                Bsenexus uses modern browser <strong>Local Storage</strong> and strictly essential session cookies to function smoothly. We do NOT use third-party advertising cookies or cross-site tracking scripts.
               </p>
 
               {/* Cookie Inventory Table */}
@@ -422,7 +422,7 @@ export function TermsModal({ isOpen, onClose, initialTab = 'terms' }: TermsModal
                   <span>1-Week Free Pro Access (No Credit Card Required)</span>
                 </div>
                 <p className="text-[11px] text-emerald-950 dark:text-emerald-200">
-                  BSE Nexus currently offers <strong>1-Week (7-Day) Free Pro Access</strong> upon signing in with your genuine Google account. We do NOT require credit card details upfront, ensuring zero risk of unexpected automatic renewals.
+                  Bsenexus currently offers <strong>1-Week (7-Day) Free Pro Access</strong> upon signing in with your genuine Google account. We do NOT require credit card details upfront, ensuring zero risk of unexpected automatic renewals.
                 </p>
               </div>
 
@@ -539,7 +539,7 @@ export function TermsModal({ isOpen, onClose, initialTab = 'terms' }: TermsModal
                   <div className="pt-1.5 space-y-1 font-mono text-[11px]">
                     <div><strong>Officer Name:</strong> Rahul Dahiya</div>
                     <div><strong>Designation:</strong> Chief Grievance &amp; Data Protection Officer</div>
-                    <div><strong>Entity:</strong> BSE Nexus Analytics &amp; Technologies</div>
+                    <div><strong>Entity:</strong> Bsenexus Analytics &amp; Technologies</div>
                     <div><strong>Email:</strong> <a href="mailto:admin@bsenexus.in" className="underline font-bold">admin@bsenexus.in</a></div>
                     <div><strong>Support Desk:</strong> <a href="mailto:admin@bsenexus.in" className="underline">admin@bsenexus.in</a></div>
                     <div><strong>Turnaround Time:</strong> Acknowledgment within 24 hours; grievance resolution within 15 days.</div>
@@ -554,7 +554,7 @@ export function TermsModal({ isOpen, onClose, initialTab = 'terms' }: TermsModal
                   <strong>&ldquo;BSE&rdquo;</strong>, <strong>&ldquo;SENSEX&rdquo;</strong>, and associated trade dresses are registered trademarks of BSE Limited. <strong>&ldquo;NIFTY&rdquo;</strong> is a registered trademark of NSE Indices Limited.
                 </p>
                 <p>
-                  BSE Nexus is an independent analytical application. It is <strong>NOT affiliated with, officially sponsored by, endorsed by, or an official product of BSE Limited, NSE Limited, or SEBI</strong>. Corporate logos displayed are the property of their respective issuers and are utilized strictly for identification and educational reference under nominative fair use doctrine.
+                  Bsenexus is an independent analytical application. It is <strong>NOT affiliated with, officially sponsored by, endorsed by, or an official product of BSE Limited, NSE Limited, or SEBI</strong>. Corporate logos displayed are the property of their respective issuers and are utilized strictly for identification and educational reference under nominative fair use doctrine.
                 </p>
               </div>
 
@@ -573,7 +573,7 @@ export function TermsModal({ isOpen, onClose, initialTab = 'terms' }: TermsModal
         {/* Modal Footer */}
         <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/60 flex flex-wrap items-center justify-between gap-3 shrink-0">
           <div className="text-[11px] text-slate-400">
-            Last Reviewed: September 2026 • BSE Nexus Compliance
+            Last Reviewed: September 2026 • Bsenexus Compliance
           </div>
           
           <div className="flex items-center gap-2">

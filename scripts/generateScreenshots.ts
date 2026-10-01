@@ -43,7 +43,7 @@ function getDesktopSvg(): string {
     <circle cx="40" cy="26" r="3" fill="#FFFFFF" />
     <path d="M 33 38 L 40 31 L 47 38" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" fill="none" />
     
-    <text x="66" y="38" fill="#F8FAFC" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="700" letter-spacing="-0.5">BSE Nexus</text>
+    <text x="66" y="38" fill="#F8FAFC" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="700" letter-spacing="-0.5">Bsenexus</text>
     <rect x="156" y="22" width="68" height="20" rx="4" fill="#1E293B" />
     <text x="165" y="36" fill="#38BDF8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="600">TERMINAL</text>
 
@@ -206,7 +206,7 @@ function getMobileSvg(): string {
     <circle cx="44" cy="83" r="3.5" fill="#FFFFFF" />
     <path d="M 36 98 L 44 89 L 52 98" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" fill="none" />
 
-    <text x="76" y="96" fill="#F8FAFC" font-family="-apple-system, sans-serif" font-size="22" font-weight="800">BSE Nexus</text>
+    <text x="76" y="96" fill="#F8FAFC" font-family="-apple-system, sans-serif" font-size="22" font-weight="800">Bsenexus</text>
     <rect x="200" y="77" width="70" height="24" rx="5" fill="#1E293B" />
     <text x="212" y="93" fill="#38BDF8" font-family="sans-serif" font-size="12" font-weight="700">LIVE</text>
 

@@ -270,10 +270,10 @@ export const CompaniesPage: React.FC<CompaniesPageProps> = ({ onEnterTerminal })
   const [selectedSector, setSelectedSector] = useState<string>('ALL');
 
   useEffect(() => {
-    document.title = 'BSE Listed Companies — Company Profiles, Results & Filings | BSE Nexus';
+    document.title = 'BSE Listed Companies — Company Profiles, Results & Filings | Bsenexus';
     const metaDesc = document.querySelector('meta[name="description"]');
     if (metaDesc) {
-      metaDesc.setAttribute('content', 'Explore all 26 premier BSE listed companies on BSE Nexus. Access live corporate announcements, quarterly earnings results, SEBI LODR disclosures, and AI intelligence.');
+      metaDesc.setAttribute('content', 'Explore all 26 premier BSE listed companies on Bsenexus. Access live corporate announcements, quarterly earnings results, SEBI LODR disclosures, and AI intelligence.');
     }
     let canonical = document.querySelector('link[rel="canonical"]');
     if (!canonical) {
@@ -525,7 +525,7 @@ export const CompaniesPage: React.FC<CompaniesPageProps> = ({ onEnterTerminal })
         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <div className="w-5 h-5 rounded bg-emerald-600 text-white font-bold flex items-center justify-center text-[10px]">N</div>
-            <span className="font-bold text-slate-800 dark:text-slate-200">BSE Nexus</span>
+            <span className="font-bold text-slate-800 dark:text-slate-200">Bsenexus</span>
             <span>&copy; {new Date().getFullYear()} — India's Premier Corporate Disclosures Intelligence Platform</span>
           </div>
 

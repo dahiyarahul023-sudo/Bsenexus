@@ -9,16 +9,16 @@ export interface FAQItem {
 
 export const COMMON_QUESTIONS: FAQItem[] = [
   {
-    question: 'What is BSE Nexus and what services does it provide?',
-    answer: 'BSE Nexus structures official BSE India corporate announcements into a searchable feed — filings, quarterly results, board meeting notices, and company pages. It adds AI-generated filing summaries, a results calendar, watchlists, and Telegram alerts on top of the official disclosures.'
+    question: 'What is Bsenexus and what services does it provide?',
+    answer: 'Bsenexus structures official BSE India corporate announcements into a searchable feed — filings, quarterly results, board meeting notices, and company pages. It adds AI-generated filing summaries, a results calendar, watchlists, and Telegram alerts on top of the official disclosures.'
   },
   {
     question: 'How do I check upcoming BSE quarterly results and board meetings?',
     answer: 'Open the Results Calendar (/results-calendar) or the Live BSE Docket on the homepage. Meeting dates, quarterly periods, dividend agendas, and board meeting notices are synced from official BSE India disclosures.'
   },
   {
-    question: 'How does BSE Nexus process SEBI LODR Regulation 30 corporate announcements?',
-    answer: 'Listed companies disclose material events — dividends, acquisitions, order wins, financial results — under SEBI LODR Regulations 30 and 33. BSE Nexus parses the official PDF filings from bseindia.com and extracts key figures like revenue, PAT, and EBITDA into readable summaries.'
+    question: 'How does Bsenexus process SEBI LODR Regulation 30 corporate announcements?',
+    answer: 'Listed companies disclose material events — dividends, acquisitions, order wins, financial results — under SEBI LODR Regulations 30 and 33. Bsenexus parses the official PDF filings from bseindia.com and extracts key figures like revenue, PAT, and EBITDA into readable summaries.'
   },
   {
     question: 'Where can I find research guides on Indian stock market filings?',
@@ -29,8 +29,8 @@ export const COMMON_QUESTIONS: FAQItem[] = [
     answer: 'Yes. Search any listed BSE scrip or open a dedicated company page (such as /company/RELIANCE or /company/TCS) for its filings history, upcoming board meetings, price data, and peer comparisons.'
   },
   {
-    question: 'Is BSE Nexus affiliated with the Bombay Stock Exchange or Nexus Select Trust?',
-    answer: 'No. BSE Nexus is not affiliated with BSE India Ltd, SEBI, or Nexus Select Trust (REIT Scrip: 543913). All disclosures shown here originate from official BSE India filings — always verify critical filings on bseindia.com.'
+    question: 'Is Bsenexus affiliated with the Bombay Stock Exchange or Nexus Select Trust?',
+    answer: 'No. Bsenexus is not affiliated with BSE India Ltd, SEBI, or Nexus Select Trust (REIT Scrip: 543913). All disclosures shown here originate from official BSE India filings — always verify critical filings on bseindia.com.'
   }
 ];
 

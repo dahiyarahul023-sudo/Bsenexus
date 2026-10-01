@@ -423,7 +423,7 @@ paymentsRouter.post('/create-order', requireAuth, async (req, res) => {
           return_url: `${base}/?cf_order_id=${orderId}`,
           notify_url: `${base}/api/payments/webhook`,
         },
-        order_note: `${plan.label} — BSE Nexus`,
+        order_note: `${plan.label} — Bsenexus`,
       }),
     });
 

@@ -35,10 +35,10 @@ export const TrustPage: React.FC<TrustPageProps> = ({ type, onEnterTerminal }) =
             <div className="space-y-3">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
                 <Building2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span>About BSE Nexus</span>
+                <span>About Bsenexus</span>
               </div>
               <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
-                About BSE Nexus
+                About Bsenexus
               </h1>
               <p className="text-sm text-slate-400">
                 Corporate announcements structured from official BSE India filings.
@@ -53,7 +53,7 @@ export const TrustPage: React.FC<TrustPageProps> = ({ type, onEnterTerminal }) =
                 <span>Who We Are & What We Do</span>
               </h2>
               <p className="text-slate-200 text-base sm:text-lg leading-relaxed font-medium">
-                BSE Nexus structures official BSE India corporate announcements into a searchable feed. Built and operated by Rahul Dahiya — contact <a href="mailto:admin@bsenexus.in" className="text-emerald-400 underline hover:text-emerald-300 font-bold">admin@bsenexus.in</a>.
+                Bsenexus structures official BSE India corporate announcements into a searchable feed. Built and operated by Rahul Dahiya — contact <a href="mailto:admin@bsenexus.in" className="text-emerald-400 underline hover:text-emerald-300 font-bold">admin@bsenexus.in</a>.
               </p>
             </div>
 
@@ -65,7 +65,7 @@ export const TrustPage: React.FC<TrustPageProps> = ({ type, onEnterTerminal }) =
                   Every trading day, thousands of public listed companies file critical disclosures with the Bombay Stock Exchange (BSE India)—including quarterly financial results, SEBI LODR Regulation 30 corporate actions, board meeting intimations, dividend announcements, and auditor disclosures.
                 </p>
                 <p>
-                  BSE Nexus was built to make these regulatory filings easy to discover and structured for equity researchers, investors, analysts, and market participants across India.
+                  Bsenexus was built to make these regulatory filings easy to discover and structured for equity researchers, investors, analysts, and market participants across India.
                 </p>
               </div>
 
@@ -137,7 +137,7 @@ export const TrustPage: React.FC<TrustPageProps> = ({ type, onEnterTerminal }) =
                 <span>Contact Information</span>
               </div>
               <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
-                Contact Rahul Dahiya / BSE Nexus
+                Contact Rahul Dahiya / Bsenexus
               </h1>
               <p className="text-sm text-slate-400">
                 We are open to user inquiries, developer feedback, data correction requests, and institutional collaboration.
@@ -185,7 +185,7 @@ export const TrustPage: React.FC<TrustPageProps> = ({ type, onEnterTerminal }) =
             <div className="p-6 rounded-2xl bg-[#121624] border border-slate-800 space-y-3">
               <h3 className="text-sm font-bold text-white">Platform Governance & Operator</h3>
               <p className="text-xs text-slate-400 leading-relaxed">
-                BSE Nexus is independently operated by <strong className="text-slate-200">Rahul Dahiya</strong>. For regulatory queries, privacy questions, or data removal requests, please write with relevant subject headers to <code className="text-emerald-400 bg-[#0B0F19] px-1.5 py-0.5 rounded font-mono">admin@bsenexus.in</code>.
+                Bsenexus is independently operated by <strong className="text-slate-200">Rahul Dahiya</strong>. For regulatory queries, privacy questions, or data removal requests, please write with relevant subject headers to <code className="text-emerald-400 bg-[#0B0F19] px-1.5 py-0.5 rounded font-mono">admin@bsenexus.in</code>.
               </p>
             </div>
           </div>
@@ -209,7 +209,7 @@ export const TrustPage: React.FC<TrustPageProps> = ({ type, onEnterTerminal }) =
 
             <div className="space-y-6 text-slate-300 text-sm leading-relaxed">
               <div className="p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/20 text-emerald-300 text-xs">
-                <strong>Our Core Privacy Commitment:</strong> BSE Nexus does not sell, rent, monetize, or trade your personal data. We collect only what is strictly necessary to provide real-time equity market tools and Telegram alert dispatches.
+                <strong>Our Core Privacy Commitment:</strong> Bsenexus does not sell, rent, monetize, or trade your personal data. We collect only what is strictly necessary to provide real-time equity market tools and Telegram alert dispatches.
               </div>
 
               <div className="space-y-3">
@@ -225,14 +225,14 @@ export const TrustPage: React.FC<TrustPageProps> = ({ type, onEnterTerminal }) =
               <div className="space-y-3">
                 <h2 className="text-base font-bold text-white">2. How Information Is Used</h2>
                 <p className="text-slate-400 text-xs sm:text-sm">
-                  We use the information collected exclusively to operate, maintain, and enhance the BSE Nexus terminal, dispatch user-requested alerts, monitor system performance, and prevent fraudulent abuse.
+                  We use the information collected exclusively to operate, maintain, and enhance the Bsenexus terminal, dispatch user-requested alerts, monitor system performance, and prevent fraudulent abuse.
                 </p>
               </div>
 
               <div className="space-y-3">
                 <h2 className="text-base font-bold text-white">3. Cookies & Local Storage</h2>
                 <p className="text-slate-400 text-xs sm:text-sm">
-                  BSE Nexus uses functional cookies and browser LocalStorage to remember your active tabs, sound alert toggles, filter preferences, and session tokens. We do not use third-party behavioral advertising cookies.
+                  Bsenexus uses functional cookies and browser LocalStorage to remember your active tabs, sound alert toggles, filter preferences, and session tokens. We do not use third-party behavioral advertising cookies.
                 </p>
               </div>
 
@@ -265,7 +265,7 @@ export const TrustPage: React.FC<TrustPageProps> = ({ type, onEnterTerminal }) =
                 Terms of Service
               </h1>
               <p className="text-sm text-slate-400">
-                Last updated: September 2026 • Please read carefully before using BSE Nexus
+                Last updated: September 2026 • Please read carefully before using Bsenexus
               </p>
             </div>
 
@@ -273,35 +273,35 @@ export const TrustPage: React.FC<TrustPageProps> = ({ type, onEnterTerminal }) =
               <div className="space-y-3">
                 <h2 className="text-base font-bold text-white">1. Acceptance of Terms</h2>
                 <p className="text-slate-400 text-xs sm:text-sm">
-                  By accessing or using BSE Nexus (bsenexus.in), you agree to be bound by these Terms of Service. If you do not agree with these terms, please discontinue use of the platform.
+                  By accessing or using Bsenexus (bsenexus.in), you agree to be bound by these Terms of Service. If you do not agree with these terms, please discontinue use of the platform.
                 </p>
               </div>
 
               <div className="space-y-3">
                 <h2 className="text-base font-bold text-white">2. Nature of the Service</h2>
                 <p className="text-slate-400 text-xs sm:text-sm">
-                  BSE Nexus is an automated information indexing terminal designed to aggregate public disclosures made by listed companies on the Bombay Stock Exchange (BSE India). BSE Nexus is not an exchange, broker, dealer, or financial advisory firm.
+                  Bsenexus is an automated information indexing terminal designed to aggregate public disclosures made by listed companies on the Bombay Stock Exchange (BSE India). Bsenexus is not an exchange, broker, dealer, or financial advisory firm.
                 </p>
               </div>
 
               <div className="space-y-3">
                 <h2 className="text-base font-bold text-white">3. Acceptable Use Policy</h2>
                 <p className="text-slate-400 text-xs sm:text-sm">
-                  You agree to use BSE Nexus solely for lawful purposes. You shall not attempt to reverse engineer, scrape at abusive frequencies, disrupt server infrastructure, or circumvent rate limits.
+                  You agree to use Bsenexus solely for lawful purposes. You shall not attempt to reverse engineer, scrape at abusive frequencies, disrupt server infrastructure, or circumvent rate limits.
                 </p>
               </div>
 
               <div className="space-y-3">
                 <h2 className="text-base font-bold text-white">4. Intellectual Property & Disclosures Ownership</h2>
                 <p className="text-slate-400 text-xs sm:text-sm">
-                  All underlying corporate announcement PDFs, filings, and regulatory submissions remain the property of their respective issuing companies and the Bombay Stock Exchange. BSE Nexus software code, UI designs, and synthesis logic are protected proprietary property.
+                  All underlying corporate announcement PDFs, filings, and regulatory submissions remain the property of their respective issuing companies and the Bombay Stock Exchange. Bsenexus software code, UI designs, and synthesis logic are protected proprietary property.
                 </p>
               </div>
 
               <div className="space-y-3">
                 <h2 className="text-base font-bold text-white">5. Limitation of Liability</h2>
                 <p className="text-slate-400 text-xs sm:text-sm">
-                  BSE Nexus, its operator Rahul Dahiya, and affiliates shall not be held liable for any direct, indirect, incidental, or consequential damages resulting from reliance on data, delays in exchange feeds, AI extraction discrepancies, or downtime.
+                  Bsenexus, its operator Rahul Dahiya, and affiliates shall not be held liable for any direct, indirect, incidental, or consequential damages resulting from reliance on data, delays in exchange feeds, AI extraction discrepancies, or downtime.
                 </p>
               </div>
 
@@ -338,7 +338,7 @@ export const TrustPage: React.FC<TrustPageProps> = ({ type, onEnterTerminal }) =
                 <span>Official Independence & Non-Affiliation Statement</span>
               </div>
               <p className="text-slate-100 text-base sm:text-lg font-semibold leading-relaxed">
-                BSE Nexus is not affiliated with BSE India Ltd, SEBI, or any exchange; informational use only; not investment advice; verify filings on <a href="https://www.bseindia.com" target="_blank" rel="noopener noreferrer" className="text-emerald-400 underline hover:text-emerald-300">bseindia.com</a>.
+                Bsenexus is not affiliated with BSE India Ltd, SEBI, or any exchange; informational use only; not investment advice; verify filings on <a href="https://www.bseindia.com" target="_blank" rel="noopener noreferrer" className="text-emerald-400 underline hover:text-emerald-300">bseindia.com</a>.
               </p>
             </div>
 
@@ -346,14 +346,14 @@ export const TrustPage: React.FC<TrustPageProps> = ({ type, onEnterTerminal }) =
               <div className="space-y-3">
                 <h2 className="text-base font-bold text-white">1. Informational & Research Purpose Only</h2>
                 <p className="text-slate-400 text-xs sm:text-sm">
-                  All data, corporate announcements, financial metric summaries, earnings dates, and AI analysis presented on BSE Nexus are provided strictly for informational and educational purposes. Nothing on this website constitutes a recommendation, endorsement, solicitation, or offer to buy or sell securities, derivatives, or financial instruments.
+                  All data, corporate announcements, financial metric summaries, earnings dates, and AI analysis presented on Bsenexus are provided strictly for informational and educational purposes. Nothing on this website constitutes a recommendation, endorsement, solicitation, or offer to buy or sell securities, derivatives, or financial instruments.
                 </p>
               </div>
 
               <div className="space-y-3">
                 <h2 className="text-base font-bold text-white">2. Not SEBI-Registered Investment Advice</h2>
                 <p className="text-slate-400 text-xs sm:text-sm">
-                  BSE Nexus and Rahul Dahiya are not registered as investment advisors, research analysts, or portfolio managers under SEBI (Investment Advisers) Regulations, 2013 or SEBI (Research Analysts) Regulations, 2014. Users must consult a SEBI-registered financial advisor before making any investment or trading decisions.
+                  Bsenexus and Rahul Dahiya are not registered as investment advisors, research analysts, or portfolio managers under SEBI (Investment Advisers) Regulations, 2013 or SEBI (Research Analysts) Regulations, 2014. Users must consult a SEBI-registered financial advisor before making any investment or trading decisions.
                 </p>
               </div>
 
@@ -367,7 +367,7 @@ export const TrustPage: React.FC<TrustPageProps> = ({ type, onEnterTerminal }) =
               <div className="space-y-3">
                 <h2 className="text-base font-bold text-white">4. Distinct Entity Notice</h2>
                 <p className="text-slate-400 text-xs sm:text-sm">
-                  BSE Nexus is a distinct entity with no connection to <strong>Nexus Select Trust</strong> (BSE Scrip Code: 543913), BSE Limited, or the National Stock Exchange of India (NSE).
+                  Bsenexus is a distinct entity with no connection to <strong>Nexus Select Trust</strong> (BSE Scrip Code: 543913), BSE Limited, or the National Stock Exchange of India (NSE).
                 </p>
               </div>
             </div>
@@ -473,7 +473,7 @@ export const TrustPage: React.FC<TrustPageProps> = ({ type, onEnterTerminal }) =
             </div>
           </div>
           <div className="border-t border-slate-800/80 pt-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-400">
-            <div>© {new Date().getFullYear()} BSE Nexus. Not affiliated with BSE Limited or NSE. Built and operated by Rahul Dahiya.</div>
+            <div>© {new Date().getFullYear()} Bsenexus. Not affiliated with BSE Limited or NSE. Built and operated by Rahul Dahiya.</div>
             <SocialIconsRow size={18} />
           </div>
         </div>

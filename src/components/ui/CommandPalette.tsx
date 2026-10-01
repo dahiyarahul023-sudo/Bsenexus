@@ -563,7 +563,7 @@ export function CommandPalette({
             </span>
           </div>
           <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-            BSE Nexus Smart Search
+            Bsenexus Smart Search
           </span>
         </div>
       </motion.div>

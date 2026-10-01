@@ -8,10 +8,10 @@ interface NotFoundPageProps {
 
 export const NotFoundPage: React.FC<NotFoundPageProps> = ({ onEnterTerminal }) => {
   useEffect(() => {
-    document.title = 'Page Not Found (404) | BSE Nexus';
+    document.title = 'Page Not Found (404) | Bsenexus';
     const metaDesc = document.querySelector('meta[name="description"]');
     if (metaDesc) {
-      metaDesc.setAttribute('content', 'The page you are looking for does not exist on BSE Nexus. Return to live corporate announcements or browse market guides.');
+      metaDesc.setAttribute('content', 'The page you are looking for does not exist on Bsenexus. Return to live corporate announcements or browse market guides.');
     }
     let canonical = document.querySelector('link[rel="canonical"]');
     if (!canonical) {
@@ -117,7 +117,7 @@ export const NotFoundPage: React.FC<NotFoundPageProps> = ({ onEnterTerminal }) =
             <SocialIconsRow size={20} />
           </div>
           <p className="text-[11px] text-slate-400">
-            © {new Date().getFullYear()} BSE Nexus. Independent BSE Disclosures Aggregator. Operator: Rahul Dahiya.
+            © {new Date().getFullYear()} Bsenexus. Independent BSE Disclosures Aggregator. Operator: Rahul Dahiya.
           </p>
         </div>
       </footer>

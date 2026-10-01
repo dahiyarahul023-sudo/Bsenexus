@@ -58,7 +58,7 @@ function stem(t: string): string {
 /**
  * Shared normalization for questions AND keywords: lowercase, drop
  * punctuation, drop stopwords, stem. Keywords go through the same pipeline
- * so "what is bse nexus" matches the tokens [bse, nexus].
+ * so "what is bsenexus" matches the tokens [bse, nexus].
  */
 function normTokens(text: string): string[] {
   return text
@@ -220,7 +220,7 @@ export const FAQ_BANK: FaqBankEntry[] = [
     id: 'no-password',
     keywords: ['password', 'forgot password', 'reset password'],
     phrases: ['i forgot my password', 'how to reset password'],
-    answer: 'BSE Nexus uses Google sign-in, so there is no BSE Nexus password to reset. Recover access via your Google account.',
+    answer: 'Bsenexus uses Google sign-in, so there is no Bsenexus password to reset. Recover access via your Google account.',
   },
   {
     id: 'delete-account',
@@ -234,7 +234,7 @@ export const FAQ_BANK: FaqBankEntry[] = [
     keywords: ['watchlist', 'watchlists'],
     phrases: ['what is a watchlist', 'what are watchlists', 'watchlist meaning'],
     answer:
-      'A watchlist is your personal list of stocks. BSE Nexus builds a live filings feed for each stock on it, so you never miss an announcement for companies you follow.',
+      'A watchlist is your personal list of stocks. Bsenexus builds a live filings feed for each stock on it, so you never miss an announcement for companies you follow.',
   },
   {
     id: 'watchlist-create',
@@ -298,10 +298,10 @@ export const FAQ_BANK: FaqBankEntry[] = [
   // ---------------------------------------------------------------- filings & data
   {
     id: 'what-is',
-    keywords: ['what is bse nexus', 'about', 'app kya hai'],
-    phrases: ['what is bse nexus', 'tell me about bse nexus', 'what does bse nexus do'],
+    keywords: ['what is bsenexus', 'about', 'app kya hai'],
+    phrases: ['what is bsenexus', 'tell me about bsenexus', 'what does bsenexus do'],
     answer:
-      'BSE Nexus structures official BSE India corporate announcements into a searchable feed — filings, quarterly results, and board meetings — with AI filing summaries, a results calendar, watchlists, and Telegram alerts on top.',
+      'Bsenexus structures official BSE India corporate announcements into a searchable feed — filings, quarterly results, and board meetings — with AI filing summaries, a results calendar, watchlists, and Telegram alerts on top.',
   },
   {
     id: 'data-source',
@@ -313,7 +313,7 @@ export const FAQ_BANK: FaqBankEntry[] = [
     id: 'coverage',
     keywords: ['how many companies', 'coverage', 'stocks covered', 'scrips'],
     phrases: ['how many companies covered', 'which stocks are covered', 'coverage of stocks'],
-    answer: 'BSE Nexus covers 5,000+ BSE-listed scrips — effectively the full BSE equity universe.',
+    answer: 'Bsenexus covers 5,000+ BSE-listed scrips — effectively the full BSE equity universe.',
   },
   {
     id: 'update-frequency',
@@ -333,7 +333,7 @@ export const FAQ_BANK: FaqBankEntry[] = [
     keywords: ['lodr', 'regulation 30', 'regulation 33', 'sebi'],
     phrases: ['what is lodr', 'what is regulation 30', 'sebi disclosure rules'],
     answer:
-      'Under SEBI LODR Regulations 30 and 33, listed companies must disclose material events — results, dividends, acquisitions. BSE Nexus parses these official PDF filings into readable summaries.',
+      'Under SEBI LODR Regulations 30 and 33, listed companies must disclose material events — results, dividends, acquisitions. Bsenexus parses these official PDF filings into readable summaries.',
   },
   {
     id: 'company-page',
@@ -406,9 +406,9 @@ export const FAQ_BANK: FaqBankEntry[] = [
     id: 'affiliated',
     keywords: ['affiliated', 'official', 'real bse', 'genuine', 'fraud', 'scam', 'legit'],
     strong: ['affiliated', 'fraud', 'scam'],
-    phrases: ['is bse nexus official', 'are you affiliated with bse', 'is this genuine'],
+    phrases: ['is bsenexus official', 'are you affiliated with bse', 'is this genuine'],
     answer:
-      'BSE Nexus is not affiliated with BSE India Ltd, SEBI, or Nexus Select Trust. All disclosures shown originate from official BSE India filings.',
+      'Bsenexus is not affiliated with BSE India Ltd, SEBI, or Nexus Select Trust. All disclosures shown originate from official BSE India filings.',
   },
   {
     id: 'pro-expire',

@@ -588,7 +588,7 @@ export function LandingPage({
       <CreativeHero onEnterTerminal={onEnterTerminal} />
       <FeatureTabs onEnterTerminal={onEnterTerminal} />
 
-      {/* 3.5 WHAT'S NEW IN BSE NEXUS 2.0 SECTION */}
+      {/* 3.5 WHAT'S NEW IN BSENEXUS 2.0 SECTION */}
       <section id="whats-new" className="py-16 sm:py-24 bg-gradient-to-b from-slate-50 to-white dark:from-[#0B0F17] dark:to-[#0F172A] border-b border-slate-200/80 dark:border-slate-800/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
@@ -598,7 +598,7 @@ export function LandingPage({
               <span>MAJOR PLATFORM UPDATE • VERSION 2.0</span>
             </div>
             <h2 className="text-2xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
-              Everything newly built & enhanced in BSE Nexus
+              Everything newly built & enhanced in Bsenexus
             </h2>
             <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400">
               Explore the latest suite of institutional tools designed for active Indian equity investors, forensic analysts, and prop desks.
@@ -855,7 +855,7 @@ export function LandingPage({
                 360° Company Intelligence & Material Actions Hub
               </h2>
               <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
-                Click across the companies and explore all 5 dossier tabs below. See how BSE Nexus transforms dense disclosures into actionable alpha.
+                Click across the companies and explore all 5 dossier tabs below. See how Bsenexus transforms dense disclosures into actionable alpha.
               </p>
             </Reveal>
 
@@ -1906,7 +1906,7 @@ export function LandingPage({
                     </div>
                     <div>
                       <div className="text-sm font-bold text-white flex items-center gap-1.5">
-                        <span>BSE Nexus Intelligence Bot</span>
+                        <span>Bsenexus Intelligence Bot</span>
                         <span className="w-2 h-2 rounded-full bg-emerald-400" />
                       </div>
                       <div className="text-[11px] text-slate-400 font-mono">@BseNexusBot • bot</div>
@@ -2181,7 +2181,7 @@ export function LandingPage({
         </div>
       </section>
 
-      {/* 9.5. ABOUT BSE NEXUS SECTION */}
+      {/* 9.5. ABOUT BSENEXUS SECTION */}
       <section id="about" aria-labelledby="about-heading" className="py-16 sm:py-24 bg-white dark:bg-[#0B0F17] border-b border-slate-200/80 dark:border-slate-800/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-4xl mx-auto space-y-6 mb-12">
@@ -2191,13 +2191,13 @@ export function LandingPage({
                 <span>Institutional Equity Analytics &amp; AEO Knowledge Base</span>
               </div>
               <h2 id="about-heading" className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
-                About BSE Nexus: Corporate Filings &amp; Market Intelligence
+                About Bsenexus: Corporate Filings &amp; Market Intelligence
               </h2>
             </div>
 
             <div className="prose prose-slate dark:prose-invert max-w-none text-sm sm:text-base text-slate-700 dark:text-slate-300 leading-relaxed space-y-4">
               <p>
-                <strong>BSE Nexus</strong> structures corporate announcements, regulatory disclosures, and earnings releases sourced directly from the official portal of the <a href="https://www.bseindia.com" target="_blank" rel="noopener noreferrer" className="text-emerald-600 dark:text-emerald-400 font-semibold underline hover:text-emerald-500">Bombay Stock Exchange (BSE India)</a>. Built for retail investors, equity research analysts, and market participants who track Indian listed companies.
+                <strong>Bsenexus</strong> structures corporate announcements, regulatory disclosures, and earnings releases sourced directly from the official portal of the <a href="https://www.bseindia.com" target="_blank" rel="noopener noreferrer" className="text-emerald-600 dark:text-emerald-400 font-semibold underline hover:text-emerald-500">Bombay Stock Exchange (BSE India)</a>. Built for retail investors, equity research analysts, and market participants who track Indian listed companies.
               </p>
 
               <p>
@@ -2205,7 +2205,7 @@ export function LandingPage({
               </p>
 
               <p>
-                Beyond the disclosure feed, BSE Nexus maintains an updated <a href="/results-calendar" className="text-emerald-600 dark:text-emerald-400 font-semibold underline hover:text-emerald-500">Quarterly Results Calendar</a> tracking scheduled board meetings, audited and unaudited earnings declarations, and historical corporate actions across 5,000+ BSE-listed companies. Investors can navigate directly to dedicated company pages—such as <a href="/company/RELIANCE" className="text-emerald-600 dark:text-emerald-400 font-semibold underline hover:text-emerald-500">Reliance Industries</a>, <a href="/company/TCS" className="text-emerald-600 dark:text-emerald-400 font-semibold underline hover:text-emerald-500">Tata Consultancy Services (TCS)</a>, and HDFC Bank—to review comprehensive regulatory histories, price metrics, and peer group benchmarks.
+                Beyond the disclosure feed, Bsenexus maintains an updated <a href="/results-calendar" className="text-emerald-600 dark:text-emerald-400 font-semibold underline hover:text-emerald-500">Quarterly Results Calendar</a> tracking scheduled board meetings, audited and unaudited earnings declarations, and historical corporate actions across 5,000+ BSE-listed companies. Investors can navigate directly to dedicated company pages—such as <a href="/company/RELIANCE" className="text-emerald-600 dark:text-emerald-400 font-semibold underline hover:text-emerald-500">Reliance Industries</a>, <a href="/company/TCS" className="text-emerald-600 dark:text-emerald-400 font-semibold underline hover:text-emerald-500">Tata Consultancy Services (TCS)</a>, and HDFC Bank—to review comprehensive regulatory histories, price metrics, and peer group benchmarks.
               </p>
 
               <p>
@@ -2223,7 +2223,7 @@ export function LandingPage({
                 Continuous Regulatory Ingestion
               </h3>
               <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                BSE Nexus continuously tracks live regulatory feeds under SEBI LODR Regulation 30 &amp; 33. Announcements from 5,000+ BSE-listed companies are ingested, parsed, and categorized within minutes of filing.
+                Bsenexus continuously tracks live regulatory feeds under SEBI LODR Regulation 30 &amp; 33. Announcements from 5,000+ BSE-listed companies are ingested, parsed, and categorized within minutes of filing.
               </p>
               <div className="pt-2">
                 <a href="/guides/sebi-lodr-reg-30-disclosures" className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline">
@@ -2276,7 +2276,7 @@ export function LandingPage({
                 Entity Notice
               </p>
               <p className="text-xs text-slate-600 dark:text-slate-300">
-                BSE Nexus is not affiliated with Nexus Select Trust (REIT Scrip: 543913), BSE India Ltd, or SEBI, and is not a SEBI-registered investment adviser.
+                Bsenexus is not affiliated with Nexus Select Trust (REIT Scrip: 543913), BSE India Ltd, or SEBI, and is not a SEBI-registered investment adviser.
               </p>
             </div>
             <div className="flex items-center gap-3 shrink-0">
@@ -2355,7 +2355,7 @@ export function LandingPage({
         </div>
       </section>
 
-      {/* Follow BSE Nexus Social Community Block */}
+      {/* Follow Bsenexus Social Community Block */}
       <FollowBseNexusBlock />
       </main>
 
@@ -2413,7 +2413,7 @@ export function LandingPage({
             <div className="md:col-span-2 space-y-2.5">
               <p className="font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider">Resources</p>
               <ul className="space-y-2">
-                <li><a href="/about" className="hover:text-emerald-500 transition-colors text-slate-700 dark:text-slate-300 block">About BSE Nexus</a></li>
+                <li><a href="/about" className="hover:text-emerald-500 transition-colors text-slate-700 dark:text-slate-300 block">About Bsenexus</a></li>
                 <li><a href="/companies" className="hover:text-emerald-500 transition-colors text-emerald-600 dark:text-emerald-400 font-semibold block">BSE Listed Companies</a></li>
                 <li><a href="/pricing" className="hover:text-emerald-500 transition-colors text-slate-700 dark:text-slate-300 block">Pricing &amp; Plans</a></li>
                 <li><a href="/guides" className="hover:text-emerald-500 transition-colors text-slate-700 dark:text-slate-300 block">Market Research Guides</a></li>
@@ -2435,13 +2435,13 @@ export function LandingPage({
                 <li><a href="/terms" className="hover:text-emerald-500 transition-colors text-slate-700 dark:text-slate-300 block">Terms of Service</a></li>
               </ul>
               <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed pt-1">
-                BSE Nexus is not affiliated with BSE India Ltd, SEBI, or any exchange; informational use only; not investment advice; verify filings on bseindia.com.
+                Bsenexus is not affiliated with BSE India Ltd, SEBI, or any exchange; informational use only; not investment advice; verify filings on bseindia.com.
               </p>
             </div>
           </div>
 
           <div className="border-t border-slate-200 dark:border-slate-800 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-slate-700 dark:text-slate-300 font-medium">
-            <div>© {new Date().getFullYear()} BSE Nexus. Not affiliated with BSE Limited or NSE. Built and operated by Rahul Dahiya (admin@bsenexus.in).</div>
+            <div>© {new Date().getFullYear()} Bsenexus. Not affiliated with BSE Limited or NSE. Built and operated by Rahul Dahiya (admin@bsenexus.in).</div>
             <div className="flex flex-wrap items-center gap-3">
               <a href="/about" className="hover:text-emerald-500 transition-colors">About</a>
               <span>•</span>

@@ -1,5 +1,5 @@
 /**
- * PDF Helper for BSE Nexus
+ * PDF Helper for Bsenexus
  * Resolves BSE PDF attachments safely with automatic fallback for moved files (AttachLive vs AttachHis)
  * and proxies through /api/pdf-open to bypass CORS/hotlinking blocks on mobile/desktop browsers.
  */

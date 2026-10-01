@@ -849,7 +849,7 @@ apiRouter.post("/test-telegram", requireAdmin, telegramRateLimiter, async (req, 
   }
 
   const result = await sendToTelegram(
-    "👋 <b>Root Admin Test Message</b>\n\nYour global Telegram channel integration is working perfectly! BSE Nexus Engine is ready.",
+    "👋 <b>Root Admin Test Message</b>\n\nYour global Telegram channel integration is working perfectly! Bsenexus Engine is ready.",
     targetChatId
   );
   if (result.success) {
@@ -887,7 +887,7 @@ apiRouter.post("/users/test-telegram", requireProOrAdmin, telegramRateLimiter, a
     const isAiSummaryOn = userProf?.notificationPreferences?.telegramAiSummaryEnabled !== false;
     const isAlertsOn = userProf?.notificationPreferences?.telegramAlertsEnabled !== false;
 
-    const testMsg = `👋 <b>BSE Nexus Personal Alert Test</b>\n\nHello <b>${escapeHTML(userName)}</b>!\n\nYour personal Telegram instant alert connection is <b>ACTIVE & VERIFIED</b>.\n\n⚙️ <b>Current Configuration:</b>\n• Alert Status: ${isAlertsOn ? '🔔 <b>Active (ON)</b>' : '🔕 <b>Muted/Paused (OFF)</b>'}\n• Gemini AI Summary: ${isAiSummaryOn ? '✨ <b>Enabled (ON)</b>' : '⚡ <b>Disabled (Raw Filings Only)</b>'}\n\nYou will receive real-time corporate filings for your Watchlist stocks directly to this chat.\n\n🕒 <i>${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</i>`;
+    const testMsg = `👋 <b>Bsenexus Personal Alert Test</b>\n\nHello <b>${escapeHTML(userName)}</b>!\n\nYour personal Telegram instant alert connection is <b>ACTIVE & VERIFIED</b>.\n\n⚙️ <b>Current Configuration:</b>\n• Alert Status: ${isAlertsOn ? '🔔 <b>Active (ON)</b>' : '🔕 <b>Muted/Paused (OFF)</b>'}\n• Gemini AI Summary: ${isAiSummaryOn ? '✨ <b>Enabled (ON)</b>' : '⚡ <b>Disabled (Raw Filings Only)</b>'}\n\nYou will receive real-time corporate filings for your Watchlist stocks directly to this chat.\n\n🕒 <i>${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</i>`;
 
     const result = await sendToTelegram(testMsg, cleanChatId);
     if (result.success) {
@@ -1293,7 +1293,7 @@ apiRouter.post("/send-holiday-telegram", requireProOrAdmin, async (req, res) => 
     }
     
     const formattedDate = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
-    messageText += `\n🕒 <i>Broadcasted via BSE Nexus • ${formattedDate}</i>`;
+    messageText += `\n🕒 <i>Broadcasted via Bsenexus • ${formattedDate}</i>`;
 
     const telegramRes = await sendToTelegram(messageText);
     if (!telegramRes.success) {
@@ -1858,7 +1858,7 @@ apiRouter.patch("/watchlists/symbols/:symbol/priority-sync", requireProOrAdmin, 
   }
 });
 
-// Interactive AI Help Assistant for BSE Nexus Guide
+// Interactive AI Help Assistant for Bsenexus Guide
 apiRouter.post("/help/ask-ai", requireProOrAdmin, aiRateLimiter, async (req, res) => {
   try {
     const { question, history } = req.body;

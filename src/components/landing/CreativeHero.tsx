@@ -100,7 +100,7 @@ function PhoneMockup() {
           <div className="flex items-center gap-2.5">
             <BseNexusLogo className="w-[34px] h-[34px]" />
             <div>
-              <div className="text-[13px] font-extrabold text-slate-900">BSE Nexus</div>
+              <div className="text-[13px] font-extrabold text-slate-900">Bsenexus</div>
               <div className="text-[9px] text-emerald-600 font-bold">● Live</div>
             </div>
           </div>
@@ -159,7 +159,7 @@ function PhoneMockup() {
 /**
  * CreativeHero — approved v3 creative hero.
  * Sky gradient + drifting clouds, serif-italic headline, lime CTAs,
- * iPhone mockup with the real BSE Nexus mark + premium company logo tiles,
+ * iPhone mockup with the real Bsenexus mark + premium company logo tiles,
  * floating watchlist / Telegram cards with mouse parallax. On mobile the
  * side cards stack under the phone instead of hiding.
  */
@@ -290,11 +290,11 @@ export function CreativeHero({ onEnterTerminal }: CreativeHeroProps) {
       <section className="bg-white dark:bg-[#12131C] transition-colors">
         <div className="max-w-[1180px] mx-auto px-6 py-[72px]">
           <div className="flex justify-between text-[11px] font-semibold tracking-[2px] text-slate-400 uppercase mb-[34px]">
-            <span>/ About BSE Nexus /</span><span>© 2026</span>
+            <span>/ About Bsenexus /</span><span>© 2026</span>
           </div>
           <p className="text-[clamp(22px,3.8vw,38px)] leading-[1.38] max-w-[1020px]">
             <span className="font-serif font-semibold text-slate-900 dark:text-white tracking-[-0.5px]">
-              BSE Nexus{' '}
+              Bsenexus{' '}
               <span className="inline-flex items-center justify-center w-[0.95em] h-[0.95em] rounded-lg bg-[#d4f565] text-[#1a2e05] text-[0.62em] not-italic">↗</span>{' '}
               is an AI-powered market-intelligence platform
             </span>{' '}

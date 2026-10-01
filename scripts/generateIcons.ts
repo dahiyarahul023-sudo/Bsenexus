@@ -81,7 +81,7 @@ function getFullBrandTileSvg() {
     <circle cx="360" cy="244" r="26" />
   </g>
 
-  <text x="256" y="390" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="44" font-weight="800" fill="#F8FAFC" text-anchor="middle" letter-spacing="8">BSE NEXUS</text>
+  <text x="256" y="390" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="44" font-weight="800" fill="#F8FAFC" text-anchor="middle" letter-spacing="8">BSENEXUS</text>
 </svg>`;
 }
 
@@ -124,7 +124,7 @@ function getSocialOgSvg() {
     <circle cx="360" cy="244" r="26" />
   </g>
 
-  <text x="600" y="440" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="58" font-weight="900" fill="#F8FAFC" text-anchor="middle" letter-spacing="12">BSE NEXUS</text>
+  <text x="600" y="440" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="58" font-weight="900" fill="#F8FAFC" text-anchor="middle" letter-spacing="12">BSENEXUS</text>
   <text x="600" y="490" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="500" fill="#94A3B8" text-anchor="middle" letter-spacing="4">FINANCIAL DISCLOSURES &amp; INTELLIGENCE TERMINAL</text>
 </svg>`;
 }
