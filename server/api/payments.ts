@@ -11,16 +11,16 @@
  *   (7 / 30 / 180 / 365 days).
  */
 import express from 'express';
-import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
-import { requireAuth } from '../security/auth.js';
-import { getUserProfile, invalidateUserProfileCache } from '../database/usersDao.js';
+import { requireAuth, requireAdmin } from '../security/auth.js';
+import { getUserProfile, getAllUserProfiles, invalidateUserProfileCache } from '../database/usersDao.js';
 import { sanitizeUserId } from '../database/watchlistDao.js';
 import {
   recordPendingOrder,
   getPendingOrdersForUser,
   getGrantedOrdersForUser,
   markOrderFailed,
+  expireStalePendingOrders,
 } from '../database/paymentOrdersDao.js';
 import {
   grantPaymentAtomically,
@@ -34,6 +34,11 @@ import {
   isFirestoreQuotaExceeded,
   isAdminPermissionDenied,
 } from '../database/localStore.js';
+import {
+  verifyCashfreeWebhookSignature,
+  isValidPaymentOrderId,
+  PAYMENT_ORDER_ID_RE,
+} from '../services/paymentSecurityLogic.js';
 
 /** Extract the verified uid from the authenticated request (local copy — avoids a routes.ts import cycle). */
 function getReqUserId(req: express.Request): string {
@@ -58,6 +63,34 @@ const paymentRecoveryLimiter = rateLimit({
   legacyHeaders: false,
   validate: { xForwardedForHeader: false, forwardedHeader: false, default: true },
   message: { success: false, error: 'Too many recovery attempts. Please wait a minute and try again.' },
+});
+
+// ---------------------------------------------------------------------------
+// Checkout-start limiter (1 Oct 2026). /create-order fans out to the
+// Cashfree Orders API AND writes a durable ledger order per call — an
+// unthrottled loop here would burn gateway quota and fill the ledger with
+// junk pending rows. 5 checkouts per minute per IP is generous for a
+// genuine buyer (a human needs one).
+// ---------------------------------------------------------------------------
+const createOrderLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { xForwardedForHeader: false, forwardedHeader: false, default: true },
+  message: { success: false, error: 'Too many payment attempts. Please wait a minute before trying again.' },
+});
+
+// Post-payment polling limiter for /verify and /status. The frontend polls
+// these after checkout; 30/min per IP allows eager polling while blocking
+// scripts that hammer the gateway-backed verify path.
+const paymentStatusLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { xForwardedForHeader: false, forwardedHeader: false, default: true },
+  message: { success: false, error: 'Too many status checks. Please slow down.' },
 });
 
 // Plan catalogue — moved to server/config/plans.ts (single source of truth
@@ -342,7 +375,7 @@ async function describeSuccessfulPayment(orderId: string): Promise<string> {
 // POST /api/payments/create-order — authenticated user starts a purchase.
 // Body: { planId }. Returns a Cashfree payment_session_id for the JS checkout.
 // ---------------------------------------------------------------------------
-paymentsRouter.post('/create-order', requireAuth, async (req, res) => {
+paymentsRouter.post('/create-order', requireAuth, createOrderLimiter, async (req, res) => {
   try {
     const cfg = getCashfreeConfig();
     if (!isConfigured()) {
@@ -480,7 +513,7 @@ paymentsRouter.post('/create-order', requireAuth, async (req, res) => {
 // GET /api/payments/verify?order_id=... — after Cashfree redirects back.
 // Re-checks the order with Cashfree (source of truth) and grants Pro if PAID.
 // ---------------------------------------------------------------------------
-paymentsRouter.get('/verify', requireAuth, async (req, res) => {
+paymentsRouter.get('/verify', requireAuth, paymentStatusLimiter, async (req, res) => {
   try {
     const uid = getReqUserId(req);
     const orderId = String(req.query.order_id || '').trim();
@@ -550,7 +583,7 @@ paymentsRouter.get('/verify', requireAuth, async (req, res) => {
 // for the separate free trial. If the payment store cannot be read, this
 // endpoint fails closed with 503 instead of falsely reporting Free.
 // ---------------------------------------------------------------------------
-paymentsRouter.get('/status', requireAuth, async (req, res) => {
+paymentsRouter.get('/status', requireAuth, paymentStatusLimiter, async (req, res) => {
   try {
     const uid = getReqUserId(req);
     const isAdmin = Boolean((req as any).user?.isAdmin || (req as any).user?.isOwner);
@@ -760,7 +793,7 @@ paymentsRouter.post('/recover', requireAuth, paymentRecoveryLimiter, async (req,
 //   - amount + currency match the plan encoded in the order id.
 // Works even for orders that predate the ledger.
 // ---------------------------------------------------------------------------
-const ORDER_ID_RE = /^BN_[WMHY]_[A-Za-z0-9_-]{1,45}_\d{10,}$/;
+const ORDER_ID_RE = PAYMENT_ORDER_ID_RE;
 
 paymentsRouter.post('/claim', requireAuth, paymentRecoveryLimiter, async (req, res) => {
   try {
@@ -837,7 +870,7 @@ paymentsRouter.post('/claim', requireAuth, paymentRecoveryLimiter, async (req, r
 // Only `granted` ledger orders are returned — a mere payment attempt can
 // never appear here. Each entry belongs to the caller (uid from JWT).
 // ---------------------------------------------------------------------------
-paymentsRouter.get('/history', requireAuth, async (req, res) => {
+paymentsRouter.get('/history', requireAuth, paymentStatusLimiter, async (req, res) => {
   try {
     const uid = getReqUserId(req);
     if (!uid) {
@@ -872,6 +905,85 @@ paymentsRouter.get('/history', requireAuth, async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// POST /api/payments/admin/reconcile-all — ROOT-OPS ONLY (1 Oct 2026).
+//
+// One-shot repair + cleanup for the whole payment dataset:
+//   1. Expires abandoned checkouts (stale `pending` ledger orders) so they
+//      stop being re-checked with the gateway on every login.
+//   2. Runs reconcilePaymentEntitlement() for every user, which merges all
+//      three durable sources (payment_entitlements, granted ledger orders,
+//      legacy users/<uid> payment fields) and repairs whatever is missing.
+//
+// This is the fix for the "purana data" class of bugs: legacy users whose
+// paid evidence exists in only one place are brought up to date in one
+// pass, instead of waiting for each of them to log in.
+//
+// Expiry math can never shorten paid validity — reconciliation only ever
+// widens to the furthest durable expiry. Safe to run repeatedly.
+// ---------------------------------------------------------------------------
+const adminReconcileLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { xForwardedForHeader: false, forwardedHeader: false, default: true },
+  message: { success: false, error: 'Reconcile is already running or was run very recently. Wait a minute.' },
+});
+
+paymentsRouter.post('/admin/reconcile-all', requireAuth, requireAdmin, adminReconcileLimiter, async (req, res) => {
+  try {
+    if (isFirestoreQuotaExceeded() || isAdminPermissionDenied()) {
+      return paymentUnavailable(
+        res,
+        'Payment store is temporarily unavailable. Reconcile was not started; no data was changed.',
+      );
+    }
+
+    const expiredOrderIds = await expireStalePendingOrders();
+
+    const profiles = await getAllUserProfiles();
+    let scanned = 0;
+    let repaired = 0;
+    const errors: string[] = [];
+
+    for (const profile of profiles) {
+      const uid = sanitizeUserId(String((profile as any)?.uid || ''));
+      if (!uid || uid === 'guest') continue;
+      scanned += 1;
+      try {
+        const r = await reconcilePaymentEntitlement(uid);
+        if (r.repaired) repaired += 1;
+      } catch (oneErr: any) {
+        if (isPaymentStoreUnavailable(oneErr)) throw oneErr; // fail closed mid-run
+        errors.push(`${uid}: ${oneErr?.message || oneErr}`.slice(0, 200));
+      }
+    }
+
+    console.log(
+      `[Payments] admin reconcile-all: scanned=${scanned} repaired=${repaired} ` +
+      `expiredStaleOrders=${expiredOrderIds.length} errors=${errors.length}`,
+    );
+    return res.json({
+      success: true,
+      usersScanned: scanned,
+      entitlementsRepaired: repaired,
+      staleOrdersExpired: expiredOrderIds.length,
+      expiredOrderIds,
+      errors,
+    });
+  } catch (err: any) {
+    console.error('[Payments] admin reconcile-all error:', err?.message || err);
+    if (isPaymentStoreUnavailable(err)) {
+      return paymentUnavailable(
+        res,
+        'Payment store became unavailable mid-reconcile. Partial repairs are durable; re-run to finish.',
+      );
+    }
+    return res.status(503).json({ success: false, error: 'Reconcile failed. Please try again.' });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // POST /api/payments/webhook — Cashfree server-to-server notification.
 // NOTE: this route MUST receive the raw body (see server.ts) because the
 // signature is computed over timestamp + raw JSON bytes.
@@ -887,17 +999,19 @@ paymentsRouter.post('/webhook', async (req, res) => {
     const signature = String(req.headers['x-webhook-signature'] || '');
     const timestamp = String(req.headers['x-webhook-timestamp'] || '');
 
-    if (!signature || !timestamp) {
-      console.warn('[Payments] webhook missing signature headers');
-      return res.status(200).json({ ok: false, reason: 'no-signature' });
-    }
-
-    const expectedBase64 = crypto.createHmac('sha256', cfg.secret).update(timestamp + rawBody).digest('base64');
-    const expectedHex = crypto.createHmac('sha256', cfg.secret).update(timestamp + rawBody).digest('hex');
-    const valid = signature === expectedBase64 || signature === expectedHex;
-    if (!valid) {
-      console.warn('[Payments] webhook signature mismatch');
-      return res.status(200).json({ ok: false, reason: 'bad-signature' });
+    // Timing-safe HMAC comparison + freshness check (1 Oct 2026).
+    // The previous plain equality comparison leaked timing information,
+    // and an unchecked timestamp allowed captured payloads to be
+    // replayed within Cashfree's 24h retry window.
+    const verdict = verifyCashfreeWebhookSignature({
+      secret: cfg.secret,
+      timestamp,
+      rawBody,
+      signature,
+    });
+    if (verdict.ok === false) {
+      console.warn('[Payments] webhook rejected:', verdict.reason);
+      return res.status(200).json({ ok: false, reason: verdict.reason });
     }
 
     let payload: any = null;
@@ -912,6 +1026,12 @@ paymentsRouter.post('/webhook', async (req, res) => {
     const paymentStatus: string = payload?.data?.payment?.payment_status || '';
     if (!orderId) {
       return res.status(200).json({ ok: false, reason: 'no-order' });
+    }
+    // Reject malformed order ids BEFORE any gateway call — a signed but
+    // junk payload must never fan out to the Cashfree Orders API.
+    if (!isValidPaymentOrderId(orderId)) {
+      console.warn('[Payments] webhook rejected: malformed order id');
+      return res.status(200).json({ ok: false, reason: 'bad-order-id' });
     }
 
     // Only act on successful payments, and always re-confirm with Cashfree.
@@ -959,5 +1079,35 @@ paymentsRouter.post('/webhook', async (req, res) => {
     return res.status(503).json({ ok: false, reason: 'error-retry' });
   }
 });
+
+// ---------------------------------------------------------------------------
+// Payment ledger housekeeping scheduler (1 Oct 2026).
+//
+// Every 6 hours, auto-expire abandoned checkouts (stale `pending` ledger
+// orders) so login recovery never wastes gateway calls on checkouts that
+// can never complete. Payment-safe by design: a genuinely PAID order is
+// still granted by webhook / verify / recover / claim even after its
+// ledger row is marked failed — the sweep only stops proactive re-checks.
+//
+// Lives at module scope so server.ts (which bundles for production) stays
+// untouched. Skipped under node:test; timers are unref'd so importing this
+// module from a script never keeps a process alive.
+// ---------------------------------------------------------------------------
+const isTestEnv =
+  process.env.NODE_ENV === 'test' ||
+  Boolean(process.env.NODE_TEST_CONTEXT) ||
+  process.argv.some((a) => a.includes('test'));
+
+if (!isTestEnv) {
+  const sweepStaleOrders = () => {
+    expireStalePendingOrders().catch((e: any) =>
+      console.warn('[Payments] stale-order sweep error:', e?.message || e),
+    );
+  };
+  const bootTimer = setTimeout(sweepStaleOrders, 30 * 1000);
+  bootTimer.unref?.();
+  const sweepTimer = setInterval(sweepStaleOrders, 6 * 60 * 60 * 1000);
+  sweepTimer.unref?.();
+}
 
 export default paymentsRouter;

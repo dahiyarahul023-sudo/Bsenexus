@@ -20,6 +20,10 @@ import {
   PaymentOrderOwnershipError,
   runPaymentStore,
 } from './paymentStore.js';
+import {
+  isStalePendingOrder,
+  STALE_PENDING_ORDER_MAX_AGE_MS,
+} from '../services/paymentSecurityLogic.js';
 
 export type PaymentOrderStatus = 'pending' | 'granting' | 'granted' | 'failed';
 
@@ -253,4 +257,52 @@ export async function markOrderFailed(orderId: string, lastError: string): Promi
     lastError: lastError.slice(0, 300),
   };
   await runPaymentStore('mark payment order failed', orderRef(orderId).set(patch, { merge: true }), 10_000);
+}
+
+/**
+ * Housekeeping sweep (1 Oct 2026): auto-expire abandoned checkouts.
+ *
+ * Every checkout writes a durable `pending` ledger order BEFORE Cashfree
+ * opens. Users who close the tab mid-checkout leave those rows pending
+ * forever, and login recovery would re-check them with the gateway on
+ * every sign-in for the life of the account. Cashfree orders themselves
+ * expire within hours, so a pending row older than
+ * STALE_PENDING_ORDER_MAX_AGE_MS (48h) can never complete — mark it
+ * `failed` and stop polling it.
+ *
+ * No payment can be lost by this sweep: webhook / return-verify / claim /
+ * recover all re-confirm PAID state with Cashfree before granting, and
+ * grantPaymentAtomically() grants a `failed` ledger order exactly like a
+ * `pending` one. The sweep only stops *proactive* gateway re-checks.
+ *
+ * Returns the expired order ids (for ops logging / admin reporting).
+ */
+export async function expireStalePendingOrders(
+  nowMs: number = Date.now(),
+  maxAgeMs: number = STALE_PENDING_ORDER_MAX_AGE_MS,
+): Promise<string[]> {
+  const snap = await runPaymentStore(
+    'scan stale pending payment orders',
+    adminDb.collection(COLLECTION).where('status', '==', 'pending').get(),
+    15_000,
+  );
+
+  const staleIds: string[] = [];
+  snap.forEach((doc: any) => {
+    const order = normalizeOrder(doc.id, doc.data());
+    if (order && isStalePendingOrder(order, nowMs, maxAgeMs)) {
+      staleIds.push(order.orderId);
+    }
+  });
+
+  for (const orderId of staleIds) {
+    await markOrderFailed(orderId, 'stale: abandoned checkout auto-expired').catch((e: any) =>
+      console.warn('[Payments] stale sweep failed for order:', orderId, e?.message || e),
+    );
+  }
+
+  if (staleIds.length > 0) {
+    console.log(`[Payments] stale-order sweep expired ${staleIds.length} abandoned checkout(s)`);
+  }
+  return staleIds;
 }
