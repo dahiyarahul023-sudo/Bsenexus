@@ -1583,8 +1583,25 @@ export async function fetchDeepHistoricalResultsForStock(
 // awaiting the full fetch on purpose (explicit user action).
 const AUTO_DEEP_FETCH_WAIT_MS = 8000;
 const AUTO_DEEP_FETCH_COOLDOWN_MS = 10 * 60 * 1000;
+// Hard cap on the cooldown Map size to prevent unbounded memory growth on a
+// long-lived Cloud Run instance where thousands of unique scrip codes may
+// pass through. Once exceeded, the oldest entries are pruned — a re-fetch
+// of a pruned scrip simply costs one extra BSE walk, which is acceptable.
+const AUTO_DEEP_FETCH_COOLDOWN_MAX_ENTRIES = 2000;
 const autoDeepFetchInFlight = new Map<string, Promise<unknown>>();
 const autoDeepFetchLastAttempt = new Map<string, number>();
+
+function pruneCooldownMapIfNeeded() {
+  if (autoDeepFetchLastAttempt.size <= AUTO_DEEP_FETCH_COOLDOWN_MAX_ENTRIES) return;
+  // Sort by timestamp ascending and drop the oldest 25% — amortized O(1) per
+  // insert because we only prune once per 500 new entries.
+  const sorted = Array.from(autoDeepFetchLastAttempt.entries())
+    .sort((a, b) => a[1] - b[1]);
+  const dropCount = Math.floor(sorted.length * 0.25);
+  for (let i = 0; i < dropCount; i++) {
+    autoDeepFetchLastAttempt.delete(sorted[i][0]);
+  }
+}
 
 export async function autoFetchDeepHistoricalResults(
   scripCode: string,
@@ -1594,12 +1611,31 @@ export async function autoFetchDeepHistoricalResults(
   const key = String(scripCode || '').trim();
   if (!key) return false;
   let task = autoDeepFetchInFlight.get(key);
+  let startedNew = false;
   if (!task) {
     const lastAttempt = autoDeepFetchLastAttempt.get(key) || 0;
-    if (Date.now() - lastAttempt < AUTO_DEEP_FETCH_COOLDOWN_MS) return false;
+    if (Date.now() - lastAttempt < AUTO_DEEP_FETCH_COOLDOWN_MS) {
+      // Cooldown active — silent skip (high-frequency path, no log spam).
+      return false;
+    }
+    pruneCooldownMapIfNeeded();
     autoDeepFetchLastAttempt.set(key, Date.now());
+    startedNew = true;
     task = fetchDeepHistoricalResultsForStock(key, symbol, years)
-      .catch(() => undefined)
+      .then((res: any) => {
+        const saved = res?.newlySaved || 0;
+        const total = res?.totalHistoryCount || 0;
+        // INFO-level so it shows up in admin Logs tab — useful for diagnosing
+        // which stocks are triggering background BSE walks and how much they
+        // are saving. 'BSE' module keeps it grouped with other BSE logs.
+        addLog('INFO', 'BSE', `Background deep-fetch for ${symbol || key} (${key}) complete: +${saved} filings, ${total} total results.`);
+        return res;
+      })
+      .catch((err: any) => {
+        // WARNING so admin sees BSE failures without it being a CRITICAL alert.
+        addLog('WARNING', 'BSE', `Background deep-fetch for ${symbol || key} (${key}) failed: ${err?.message || String(err)}`);
+        return undefined;
+      })
       .finally(() => {
         autoDeepFetchInFlight.delete(key);
       });
@@ -1608,10 +1644,22 @@ export async function autoFetchDeepHistoricalResults(
   // true = the pull landed inside the wait, so a re-read shows fresh data;
   // false = still running in the background (or skipped by cooldown), and
   // callers must NOT pay a second slow read on top of the wait.
-  return Promise.race([
+  const landed = await Promise.race([
     task.then(() => true),
     new Promise<boolean>((resolve) => setTimeout(() => resolve(false), AUTO_DEEP_FETCH_WAIT_MS))
   ]);
+  // One-time log per fresh attempt — distinguish "landed in-wait" vs
+  // "still running in background" so the admin dashboard can see slow BSE
+  // patterns vs fast ones. Only logs when this call started the task, not
+  // when piggybacking on an in-flight one (otherwise we'd double-log).
+  if (startedNew) {
+    addLog(
+      'INFO',
+      'BSE',
+      `autoFetch for ${symbol || key} (${key}): ${landed ? 'landed within 8s' : 'still running in background (will save async)'}`
+    );
+  }
+  return landed;
 }
 
 export async function fetchDeepHistoricalResultsForWatchlist(
