@@ -1770,7 +1770,16 @@ apiRouter.get("/stock-results-history", async (req, res) => {
     if (!symbol && !scripCode && !companyName) {
       return res.status(400).json({ error: "Missing symbol or scripCode" });
     }
-    const history = await getStockResultsHistory(symbol, scripCode, companyName);
+    let history = await getStockResultsHistory(symbol, scripCode, companyName);
+    // Empty history for a real stock almost always means its filings sit
+    // outside the recent cache window — pull one year from BSE once, then
+    // re-read, so the tab never opens blank for a listed company.
+    if (history.length === 0 && scripCode) {
+      try {
+        await fetchDeepHistoricalResultsForStock(scripCode, symbol, 1);
+        history = await getStockResultsHistory(symbol, scripCode, companyName);
+      } catch (e) {}
+    }
     res.json({ success: true, symbol, scripCode, history });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });

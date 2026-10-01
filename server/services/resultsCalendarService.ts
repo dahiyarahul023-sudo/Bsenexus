@@ -5,6 +5,7 @@ import { getScripCodeForSymbolOrName, isSymbolMatch, parseBseDate, resolveStockD
 import { addLog } from '../database/logDao.js';
 import { 
   getRecentAnnouncements, 
+  getAnnouncementsForScrip,
   saveAnnouncement, 
   saveAnnouncementsBatch,
   flushLocalDiskSave, 
@@ -138,7 +139,7 @@ export async function fetchNSEEventCalendarForSymbol(symbol: string): Promise<NS
   if (!symbol) return [];
   const cleanSym = symbol.trim().toUpperCase();
   const url = `https://www.nseindia.com/api/event-calendar?symbol=${encodeURIComponent(cleanSym)}`;
-  return await externalFeedsCircuitBreaker.execute(
+  const attempt = () => externalFeedsCircuitBreaker.execute(
     async (signal) => {
       const res = await fetch(url, { headers: NSE_HEADERS, signal: signal || AbortSignal.timeout(8000) });
       if (!res.ok) return [];
@@ -151,6 +152,13 @@ export async function fetchNSEEventCalendarForSymbol(symbol: string): Promise<NS
     (_err) => [],
     8000
   );
+  // NSE intermittently answers empty/blocked for this endpoint, and it is
+  // the only date source for quarters whose filings sit outside the recent
+  // cache — one quiet retry before giving up.
+  const first = await attempt();
+  if (first.length > 0) return first;
+  await new Promise(r => setTimeout(r, 700));
+  return attempt();
 }
 
 export async function fetchGeneralNSEEventCalendar(): Promise<NSECalendarEvent[]> {
@@ -1090,9 +1098,22 @@ export async function getStockResultsHistory(
   const quarterOutcomesMap = new Map<string, StockHistoricalResultItem>();
   const todayStartTs = getIstMidnightTs(new Date());
 
-  // 1. Fetch announcements for this stock from Dao
+  // 1. Fetch announcements for this stock from Dao. The recent-announcements
+  // cache only holds the newest ~10k filings, so union in the durable
+  // per-scrip read — otherwise older quarters vanish after every restart
+  // even though their filings are still stored.
   const recentAnnouncements = await getRecentAnnouncements(10000);
-  const stockAnns = recentAnnouncements.filter((ann: any) => {
+  let announcementPool: any[] = recentAnnouncements;
+  if (targetScrip) {
+    try {
+      const durable = await getAnnouncementsForScrip(targetScrip);
+      if (durable.length > 0) {
+        const seen = new Set(announcementPool.map((a: any) => a.id || a.newsId));
+        announcementPool = [...announcementPool, ...durable.filter((a: any) => !seen.has(a.id || a.newsId))];
+      }
+    } catch (e) {}
+  }
+  const stockAnns = announcementPool.filter((ann: any) => {
     const annScrip = String(ann.scrip_cd || ann.SCRIP_CD || ann.scripCode || '').trim();
     const annSym = (ann.symbol || '').toUpperCase().trim();
     const annComp = (ann.companyName || ann.SLONGNAME || '').toUpperCase();

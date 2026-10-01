@@ -1,7 +1,7 @@
 import YahooFinance from 'yahoo-finance2';
 import { getStockResultsHistory, getResultsCalendarData, fetchDeepHistoricalResultsForStock } from './resultsCalendarService.js';
 import { classifyMaterialEvent, MaterialEvent } from './timelineClassifier.js';
-import { getRecentAnnouncements } from '../database/announcementDao.js';
+import { getRecentAnnouncements, getAnnouncementsForScrip } from '../database/announcementDao.js';
 import { generateDirectSummary } from './gemini.js';
 import { parseBseDate } from '../utils/helpers.js';
 
@@ -196,11 +196,21 @@ export async function getCompanyIntelligence(scripCode: string, symbol: string):
       }
     }
   }
-  const quarterlyResults = Array.from(resultMap.values()).sort((a, b) => (b.submissionTimestamp || 0) - (a.submissionTimestamp || 0));
+  let quarterlyResults = Array.from(resultMap.values()).sort((a, b) => (b.submissionTimestamp || 0) - (a.submissionTimestamp || 0));
 
   // 4. Extract Material Corporate Events Timeline & All Recent Filings
   const recentAnnouncements = await getRecentAnnouncements(10000);
-  const rawStockAnnouncements = recentAnnouncements.filter((ann: any) => {
+  let announcementPool: any[] = recentAnnouncements;
+  if (targetScrip) {
+    try {
+      const durable = await getAnnouncementsForScrip(targetScrip);
+      if (durable.length > 0) {
+        const seen = new Set(announcementPool.map((a: any) => a.id || a.newsId));
+        announcementPool = [...announcementPool, ...durable.filter((a: any) => !seen.has(a.id || a.newsId))];
+      }
+    } catch (e) {}
+  }
+  const rawStockAnnouncements = announcementPool.filter((ann: any) => {
     const annScrip = String(ann.scrip_cd || ann.SCRIP_CD || ann.scripCode || '').trim();
     const annSym = (ann.symbol || '').toUpperCase().trim();
     const annComp = (ann.companyName || ann.SLONGNAME || '').toUpperCase();
@@ -250,8 +260,12 @@ export async function getCompanyIntelligence(scripCode: string, symbol: string):
     }
   }
 
-  // If this stock has 0 local filings, automatically trigger a fast 1-year archive sync from BSE API
-  if (filingMap.size === 0 && targetScrip) {
+  // If this stock has no usable results history (no filings at all, or
+  // filings but not one declared quarter), automatically pull a 1-year
+  // archive from BSE so the Financial Results tab never opens blank for a
+  // listed company, then refresh BOTH the filings list and the results.
+  const hasDeclaredResult = quarterlyResults.some((r: any) => r.status === 'Declared');
+  if (targetScrip && (filingMap.size === 0 || !hasDeclaredResult)) {
     try {
       await fetchDeepHistoricalResultsForStock(targetScrip, targetSym, 1);
       const syncedHistory = await getStockResultsHistory(targetScrip, targetSym);
@@ -269,6 +283,16 @@ export async function getCompanyIntelligence(scripCode: string, symbol: string):
             symbol: targetSym
           });
         }
+        const key = (h.quarterKey || h.periodOrMeeting || h.meetingDate || '').trim();
+        if (key) {
+          const existing = resultMap.get(key);
+          if (!existing || (!existing.pdfLink && h.pdfLink) || (!existing.isOutcome && h.isOutcome)) {
+            resultMap.set(key, existing ? { ...existing, ...h } : h);
+          }
+        }
+      }
+      if ((syncedHistory || []).length > 0) {
+        quarterlyResults = Array.from(resultMap.values()).sort((a, b) => (b.submissionTimestamp || 0) - (a.submissionTimestamp || 0));
       }
     } catch (syncErr: any) {
       console.warn(`[CompanyIntel] Auto-sync notice for ${targetScrip}:`, syncErr?.message);

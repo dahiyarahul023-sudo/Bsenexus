@@ -786,6 +786,46 @@ export function getTotalAnnouncementsCount(): number {
   return announcementsMemoryCache.length;
 }
 
+// Durable per-stock read for results history. The memory cache intentionally
+// holds only the newest ~10,000 filings (boot hydration loads a 7-day fetched
+// window, then slices), so deep per-stock history — including filings saved by
+// an earlier deep sync — falls out of memory after restarts even though it
+// still exists in Firestore. Query Firestore directly by scrip (single-field
+// equality, no composite index) and union with whatever memory already holds.
+// During quota-out / local fallback this degrades to the memory-only view.
+export async function getAnnouncementsForScrip(scripCode: string, limitNum: number = 400): Promise<any[]> {
+  const target = String(scripCode || '').trim();
+  if (!target) return [];
+
+  const byId = new Map<string, any>();
+  for (const ann of announcementsMemoryCache) {
+    const annScrip = String(ann.scrip_cd || ann.SCRIP_CD || ann.scripCode || '').trim();
+    if (annScrip === target) {
+      byId.set(ann.id || ann.newsId, ann);
+    }
+  }
+
+  if (adminDb && !isFirestoreQuotaExceeded() && !isAdminPermissionDenied()) {
+    try {
+      const snap = await adminDb.collection('announcements')
+        .where('scrip_cd', '==', target)
+        .limit(limitNum)
+        .get();
+      for (const d of snap.docs) {
+        const data: any = d.data() || {};
+        let bseTs = parseBseDate(data.bseTime);
+        if (!bseTs) bseTs = data.bseTimestamp || data.fetched_at || 0;
+        const item = { id: d.id, ...data, bseTimestamp: bseTs };
+        byId.set(d.id, { ...(byId.get(d.id) || {}), ...item });
+      }
+    } catch (e) {
+      // Quota/permission/network — memory-only view is the honest fallback.
+    }
+  }
+
+  return Array.from(byId.values());
+}
+
 export async function boostAnnouncementsPriorityForWindow(
   scripCode: string,
   symbol: string,
