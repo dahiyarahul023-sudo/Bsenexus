@@ -39,6 +39,7 @@ function TabFallback() {
   );
 }
 import { useScrollRestoration } from './hooks/useScrollRestoration';
+import { TabErrorBoundary } from './components/ui/TabErrorBoundary';
 import { ScrollRestoredPill } from './components/ui/ScrollRestoredPill';
 import { saveScrollPosition } from './utils/scrollState';
 import { parseShareablePath } from './utils/shareUrls';
@@ -717,6 +718,7 @@ function AppContent() {
   if (currentRoute === 'guides') {
     return (
       <>
+        <TabErrorBoundary label="guides">
         <Suspense fallback={<TabFallback />}>
           <GuidesPage
             onEnterTerminal={(tab) => {
@@ -726,6 +728,7 @@ function AppContent() {
             }}
           />
         </Suspense>
+        </TabErrorBoundary>
         {isAuthModalOpen && <AuthModal />}
         {isProModalOpen && <ProUpgradeModal />}
       </>
@@ -735,6 +738,7 @@ function AppContent() {
   if (currentRoute === 'companies') {
     return (
       <>
+        <TabErrorBoundary label="companies">
         <Suspense fallback={<TabFallback />}>
           <CompaniesPage
             onEnterTerminal={(tab) => {
@@ -744,6 +748,7 @@ function AppContent() {
             }}
           />
         </Suspense>
+        </TabErrorBoundary>
         {isAuthModalOpen && <AuthModal />}
         {isProModalOpen && <ProUpgradeModal />}
       </>
@@ -759,6 +764,7 @@ function AppContent() {
   ) {
     return (
       <>
+        <TabErrorBoundary label="trust-page">
         <Suspense fallback={<TabFallback />}>
           <TrustPage
             type={currentRoute}
@@ -769,6 +775,7 @@ function AppContent() {
             }}
           />
         </Suspense>
+        </TabErrorBoundary>
         {isAuthModalOpen && <AuthModal />}
         {isProModalOpen && <ProUpgradeModal />}
       </>
@@ -778,6 +785,7 @@ function AppContent() {
   if (currentRoute === '404') {
     return (
       <>
+        <TabErrorBoundary label="not-found">
         <Suspense fallback={<TabFallback />}>
           <NotFoundPage
             onEnterTerminal={(tab) => {
@@ -787,6 +795,7 @@ function AppContent() {
             }}
           />
         </Suspense>
+        </TabErrorBoundary>
         {isAuthModalOpen && <AuthModal />}
         {isProModalOpen && <ProUpgradeModal />}
       </>
@@ -909,66 +918,81 @@ function AppContent() {
         )}
         {visitedTabs.has('watchlists') && (
           <div className={activeTab === 'watchlists' ? '' : 'hidden'}>
+            <TabErrorBoundary label="watchlists">
             <Suspense fallback={<TabFallback />}>
               <WatchlistManager />
             </Suspense>
+            </TabErrorBoundary>
           </div>
         )}
         {visitedTabs.has('results-calendar') && (
           <div className={activeTab === 'results-calendar' ? '' : 'hidden'}>
+            <TabErrorBoundary label="results-calendar">
             <Suspense fallback={<TabFallback />}>
               <ResultsCalendar />
             </Suspense>
+            </TabErrorBoundary>
           </div>
         )}
         {visitedTabs.has('news') && (
           <div className={activeTab === 'news' ? '' : 'hidden'}>
+            <TabErrorBoundary label="news">
             <Suspense fallback={<TabFallback />}>
-              <NewsPortal 
-                watchlists={watchlists} 
-                user={user} 
+              <NewsPortal
+                watchlists={watchlists}
+                user={user}
                 onOpenWatchlists={() => handleTabChange('watchlists')}
                 onOpenSettings={() => handleTabChange('settings')}
               />
             </Suspense>
+            </TabErrorBoundary>
           </div>
         )}
         {isAdmin && visitedTabs.has('seo-suite') && (
           <div className={activeTab === 'seo-suite' ? '' : 'hidden'}>
+            <TabErrorBoundary label="seo-suite">
             <Suspense fallback={<TabFallback />}>
               <SeoStudio />
             </Suspense>
+            </TabErrorBoundary>
           </div>
         )}
         {isAdmin && visitedTabs.has('storage') && (
           <div className={activeTab === 'storage' ? '' : 'hidden'}>
+            <TabErrorBoundary label="storage">
             <Suspense fallback={<TabFallback />}>
               <StorageManager />
             </Suspense>
+            </TabErrorBoundary>
           </div>
         )}
         {isAdmin && visitedTabs.has('diagnostics') && (
           <div className={activeTab === 'diagnostics' ? '' : 'hidden'}>
+            <TabErrorBoundary label="diagnostics">
             <Suspense fallback={<TabFallback />}>
               <AdminDiagnostics />
             </Suspense>
+            </TabErrorBoundary>
           </div>
         )}
         {isAdmin && visitedTabs.has('logs') && (
           <div className={activeTab === 'logs' ? '' : 'hidden'}>
+            <TabErrorBoundary label="logs">
             <Suspense fallback={<TabFallback />}>
               <LogsTab logs={logs} onRefreshLogs={fetchLogs} />
             </Suspense>
+            </TabErrorBoundary>
           </div>
         )}
         {visitedTabs.has('settings') && (
           <div className={activeTab === 'settings' ? '' : 'hidden'}>
+            <TabErrorBoundary label="settings" onBack={() => handleTabChange('home')}>
             <Suspense fallback={<TabFallback />}>
-              <SettingsTab 
-                settings={settings} 
-                setSettings={setSettings} 
-                fetchSettings={fetchSettings} 
-                theme={theme} 
+              <SettingsTab
+                settings={settings}
+                setSettings={setSettings}
+                fetchSettings={fetchSettings}
+                theme={theme}
                 setTheme={setTheme}
                 designTheme={designTheme}
                 setDesignTheme={setDesignTheme}
@@ -976,6 +1000,7 @@ function AppContent() {
                 onNavigate={(tab: string) => handleTabChange(tab)}
               />
             </Suspense>
+            </TabErrorBoundary>
           </div>
         )}
       </Layout>

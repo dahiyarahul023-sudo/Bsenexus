@@ -155,7 +155,7 @@ export async function runAutoStorageCleanup(force: boolean = false): Promise<{
   for (const item of announcements) {
     const age = now - (item.bseTimestamp || item.fetched_at || now);
     const isResults = item.category === 'RESULTS' || item.category === 'CONFERENCE_CALL';
-    const isWatchlist = item.isWatchlist || (item.scrip_cd && lowerSymbols.has(item.scrip_cd.toLowerCase()));
+    const isWatchlist = item.isWatchlist || (item.scrip_cd != null && lowerSymbols.has(String(item.scrip_cd).toLowerCase()));
 
     // Rule 1: All Watchlists & Results kept for up to 2 full years
     if (isResults || isWatchlist) {
@@ -265,7 +265,7 @@ export async function pruneAnnouncementsByPercentage(
 
   for (const item of announcements) {
     const isResults = item.category === 'RESULTS' || item.category === 'CONFERENCE_CALL';
-    const isWatchlist = item.isWatchlist || (item.scrip_cd && lowerSymbols.has(item.scrip_cd.toLowerCase()));
+    const isWatchlist = item.isWatchlist || (item.scrip_cd != null && lowerSymbols.has(String(item.scrip_cd).toLowerCase()));
 
     if (isResults || isWatchlist) {
       protectedItems.push(item);
