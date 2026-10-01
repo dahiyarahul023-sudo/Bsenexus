@@ -1136,10 +1136,18 @@ export async function getStockResultsHistory(
     // and the day's remaining filings stay one tap away as follow-ups.
     // (Filings are time-sorted ascending above.) Board-meeting archive
     // placeholders (bm_* ids, date-only) are meeting notices, not filings of
-    // the day, so they can never take the declaration slot.
+    // the day, so they can never take the declaration slot. A bucket with NO
+    // result filing (e.g. only a pre-meeting newspaper publication or board
+    // meeting intimation) claims no card at all — the calendar sources below
+    // provide that quarter's date-only card, and the real results-day bucket
+    // keeps the declaration. (Regression seen 1 Oct 2026: a 06-Jul newspaper
+    // publication stole the FY27-Q1 declaration from the 09-Jul outcome.)
     const isMeetingPlaceholder = (f: any) => String(f.newsId || '').startsWith('bm_');
-    const resultPool = filings.filter(f => !isMeetingPlaceholder(f) && (f.category === 'RESULTS' || isPureResultOutcomeFiling(f.subject, f.details)));
-    const outcomeFiling = resultPool[0] || filings.find(f => !isMeetingPlaceholder(f));
+    // Pre-meeting notices only announce the meeting — never the declaration,
+    // even if a classifier tagged one RESULTS by its result keywords.
+    const isPreMeetingNotice = (f: any) => /newspaper\s*(publication|advertisement)|intimation|notice of board|prior intimation|trading window/i.test(`${f.subject || ''} ${f.details || ''}`);
+    const resultPool = filings.filter(f => !isMeetingPlaceholder(f) && !isPreMeetingNotice(f) && (f.category === 'RESULTS' || isPureResultOutcomeFiling(f.subject, f.details)));
+    const outcomeFiling = resultPool[0];
     if (outcomeFiling) {
       const { quarterKey, periodLabel } = parseQuarterPeriod(`${outcomeFiling.subject} ${outcomeFiling.details}`, outcomeFiling.ts);
 
@@ -1381,20 +1389,39 @@ export async function fetchDeepHistoricalResultsForStock(
     console.warn(`BSE BoardMeeting sync for ${targetScrip} notice:`, e.message);
   }
 
+  // Fetch strategy (rewritten 1 Oct 2026, after Rohit's Sync-2Y test filled
+  // only the two newest quarters): page EACH 366-day window from page 1 until
+  // an empty page, window by window, newest first. This is correct under both
+  // pagination behaviors BSE may use — if BSE filters by date before
+  // paginating, each window is an independent archive slice; if it pages the
+  // newest-first list first and filters by date afterwards, restarting at
+  // page 1 inside each older window still surfaces that window's filings.
+  // (Earlier designs failed: one queried the same last-180-days window on
+  // every page; the next slid the window WITH the global page number, which
+  // under paginate-first behavior returns empty deep pages and strands
+  // filings older than ~6 months.)
+  const windowDays = 366;
+  const windowCount = Math.max(1, Math.ceil(validYears));
+  const pagesPerWindow = Math.max(6, Math.ceil(maxPages / windowCount));
+  const totalPages = windowCount * pagesPerWindow;
+  const exhaustedWindows = new Set<number>();
+
   // Process in batches of 4 pages concurrently for rapid sync
   const batchSize = 4;
-  for (let startPage = 1; startPage <= maxPages && !reachedCutoff; startPage += batchSize) {
-    const pageNumbers = Array.from({ length: Math.min(batchSize, maxPages - startPage + 1) }, (_, i) => startPage + i);
+  for (let startPage = 1; startPage <= totalPages && !reachedCutoff; startPage += batchSize) {
+    const pageNumbers = Array.from({ length: Math.min(batchSize, totalPages - startPage + 1) }, (_, i) => startPage + i);
 
     const batchResults = await Promise.all(
       pageNumbers.map(async (page) => {
-        // Slide the 180-day window backwards page by page. Previously every
-        // page queried the same last-180-days window, so result filings older
-        // than ~6 months could never be reached no matter the years asked.
-        const toDate = getBseISTDate(180 * (page - 1));
-        const prevDate = getBseISTDate(180 * page);
+        // Global page p maps to window floor((p-1)/pagesPerWindow); the BSE
+        // pageno restarts at 1 inside each window (see strategy note above).
+        const windowIdx = Math.floor((page - 1) / pagesPerWindow);
+        const pageInWindow = ((page - 1) % pagesPerWindow) + 1;
+        const toDate = getBseISTDate(windowDays * windowIdx);
+        const prevDate = getBseISTDate(windowDays * (windowIdx + 1));
+        if (exhaustedWindows.has(windowIdx)) return [];
         try {
-          const url = `https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w?pageno=${page}&strCat=Result&strPrevDate=${prevDate}&strScrip=${targetScrip}&strSearch=P&strToDate=${toDate}&strType=C`;
+          const url = `https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w?pageno=${pageInWindow}&strCat=Result&strPrevDate=${prevDate}&strScrip=${targetScrip}&strSearch=P&strToDate=${toDate}&strType=C`;
           const res = await fetch(url, {
             headers: COMMON_HEADERS,
             signal: AbortSignal.timeout(9000)
@@ -1404,13 +1431,17 @@ export async function fetchDeepHistoricalResultsForStock(
           if (!txt || txt.includes("No Record") || txt.trim() === "{}" || txt.trim() === "[]") return [];
 
           const data = JSON.parse(txt);
-          if (data && data.Table && Array.isArray(data.Table)) return data.Table;
-          if (Array.isArray(data)) return data;
+          // Provenance: these rows came from BSE's own Result category, so tag
+          // them — the save loop stores category 'RESULTS' for them (BSE's
+          // classification is the candidacy for the declaration rule; our
+          // keyword classifier alone drops titles like "Standalone Results…").
+          if (data && data.Table && Array.isArray(data.Table)) return data.Table.map((r: any) => ({ ...r, __bseCat: 'Result' }));
+          if (Array.isArray(data)) return data.map((r: any) => ({ ...r, __bseCat: 'Result' }));
           return [];
         } catch {
           // Fallback to general AnnSubCategoryGetData for this page
           try {
-            const fbUrl = `https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w?pageno=${page}&strCat=-1&strPrevDate=${prevDate}&strScrip=${targetScrip}&strSearch=P&strToDate=${toDate}&strType=C`;
+            const fbUrl = `https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w?pageno=${pageInWindow}&strCat=-1&strPrevDate=${prevDate}&strScrip=${targetScrip}&strSearch=P&strToDate=${toDate}&strType=C`;
             const fbRes = await fetch(fbUrl, {
               headers: COMMON_HEADERS,
               signal: AbortSignal.timeout(9000)
@@ -1427,9 +1458,14 @@ export async function fetchDeepHistoricalResultsForStock(
       })
     );
 
-    for (const items of batchResults) {
+    for (let bi = 0; bi < batchResults.length; bi++) {
+      const items = batchResults[bi];
       if (!items || items.length === 0) {
-        reachedCutoff = true;
+        // An empty page exhausts only its own window. Older windows are still
+        // tried (under paginate-first behavior this window's later pages are
+        // empty anyway; under filter-first behavior the next window is a
+        // separate archive slice that may well hold filings).
+        exhaustedWindows.add(Math.floor((pageNumbers[bi] - 1) / pagesPerWindow));
         continue;
       }
 
@@ -1463,7 +1499,7 @@ export async function fetchDeepHistoricalResultsForStock(
           scrip_cd,
           bseTime: rawTime,
           priority: priority.level,
-          category: priority.category,
+          category: (item as any).__bseCat === 'Result' ? 'RESULTS' : priority.category,
           isWatchlist: true
         });
       }
