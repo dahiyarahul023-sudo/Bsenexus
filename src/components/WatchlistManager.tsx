@@ -2831,7 +2831,7 @@ Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to create unlimi
                         
                         {/* 1-Click Instant Add Suggestions Dropdown */}
                         {showSuggestions && newSymbol.length >= 2 && !newSymbol.includes(',') && (
-                          <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-[#1A1926] border border-slate-200 dark:border-[#2D283E] rounded-xl shadow-2xl z-50 max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-[#2D283E]/50">
+                          <div className="absolute top-full left-0 right-0 mt-1 surface-dropdown bg-white dark:bg-[#1A1926] border border-slate-200 dark:border-[#2D283E] rounded-xl shadow-2xl z-50 max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-[#2D283E]/50">
                             <div className="px-3 py-1.5 bg-slate-50 dark:bg-[#201E2E] flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 font-semibold sticky top-0 backdrop-blur-xs z-10">
                               <span className="flex items-center gap-1 text-slate-800 dark:text-slate-200 font-bold">
                                 <Zap size={12} className="text-amber-500" />
@@ -3205,7 +3205,7 @@ Upgrade to Pro (one-time plans from ₹${getLowestPlanPrice()}) to create unlimi
                       
                       {/* Suggestions Dropdown in ALL panel */}
                       {showSuggestions && newSymbol.length >= 2 && !newSymbol.includes(',') && (
-                        <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-[#1A1926] border border-slate-200 dark:border-[#2D283E] rounded-xl shadow-2xl z-50 max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-[#2D283E]/50">
+                        <div className="absolute top-full left-0 right-0 mt-1 surface-dropdown bg-white dark:bg-[#1A1926] border border-slate-200 dark:border-[#2D283E] rounded-xl shadow-2xl z-50 max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-[#2D283E]/50">
                           <div className="px-3 py-1.5 bg-slate-50 dark:bg-[#201E2E] flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 font-semibold sticky top-0 backdrop-blur-xs z-10">
                             <span className="flex items-center gap-1 text-slate-800 dark:text-slate-200 font-bold">
                               <Zap size={12} className="text-amber-500" />

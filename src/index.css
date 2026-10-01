@@ -496,6 +496,14 @@ body {
   background-color: rgba(255, 255, 255, 0.82);
 }
 
+/* Floating suggestion dropdowns must stay readable in Soft Glass:
+   near-solid frost so page content never bleeds through (watchlist add-stock). */
+[data-design-theme="softglass"] .surface-dropdown {
+  background-color: rgba(255, 255, 255, 0.97);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+}
+
 /* Warm up the cool slate/gray washes so they sit naturally on the canvas */
 [data-design-theme="softglass"] .bg-slate-50 {
   background-color: rgba(244, 246, 241, 0.85);

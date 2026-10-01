@@ -306,7 +306,11 @@ export function determinePriority(subject: string, details: string): { level: st
     text.includes('APPROVAL OF FINANCIAL RESULTS');
 
   // 3. Genuine Financial Results & Board Meeting Outcome for Results Detection (Regulation 33)
-  if (isExplicitResultsOutcome && !text.includes('INTIMATION OF BOARD') && !text.includes('PRIOR INTIMATION') && !text.includes('TO CONSIDER AND APPROVE')) {
+  // Pre-meeting notices (board-meeting intimation, newspaper publication of the
+  // notice, trading-window closure) only ANNOUNCE a future meeting — even when
+  // their text carries result keywords ("…to consider financial results"), they
+  // are never the results declaration, so they must never land in RESULTS.
+  if (!isPreMeetingNotice && isExplicitResultsOutcome && !text.includes('INTIMATION OF BOARD') && !text.includes('PRIOR INTIMATION') && !text.includes('TO CONSIDER AND APPROVE')) {
     return { level: 'HIGH', icon: '🔴', category: 'RESULTS' };
   }
 
