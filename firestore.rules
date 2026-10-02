@@ -29,11 +29,30 @@ service cloud.firestore {
     }
 
     // Role tampering / privilege escalation guard
+    // SECURITY (1 Oct 2026 audit SEC-003): Expanded to block ALL Pro/payment-related
+    // fields. Previously only blocked role/isAdmin/admin/isPro — a client could write
+    // tier='pro' or proExpiresAt=<future> directly to their own users doc and gain
+    // unlimited free Pro (bypassing Cashfree payment entirely). Now blocks:
+    // - role, isAdmin, admin, isPro (admin/role escalation)
+    // - tier, proExpiresAt, proPlanId (Pro status forgery)
+    // - lastPaymentAt, lastOrderId, grantedOrderIds (payment history forgery)
+    // - maxWatchlistStocks (limit bypass)
+    // - freeSummaryUsed, trialUsed (entitlement bypass)
+    // Only the Admin SDK (which bypasses these rules) can write these fields.
     function isNotElevatingRole() {
       return (!('role' in request.resource.data) || request.resource.data.role != 'admin') &&
              (!('isAdmin' in request.resource.data) || request.resource.data.isAdmin != true) &&
              (!('admin' in request.resource.data) || request.resource.data.admin != true) &&
-             (!('isPro' in request.resource.data) || request.resource.data.isPro != true);
+             (!('isPro' in request.resource.data) || request.resource.data.isPro != true) &&
+             !('tier' in request.resource.data) &&
+             !('proExpiresAt' in request.resource.data) &&
+             !('proPlanId' in request.resource.data) &&
+             !('lastPaymentAt' in request.resource.data) &&
+             !('lastOrderId' in request.resource.data) &&
+             !('grantedOrderIds' in request.resource.data) &&
+             !('maxWatchlistStocks' in request.resource.data) &&
+             !('freeSummaryUsed' in request.resource.data) &&
+             !('trialUsed' in request.resource.data);
     }
 
     // BSE Announcements: Public read for regulatory disclosure, writes restricted to Admin/Server
@@ -70,10 +89,13 @@ service cloud.firestore {
     // User Profiles & Subcollections: Strict UID-scoped ownership enforcement.
     // Anonymous guests & users can manage their own profile and subcollections,
     // but cannot elevate privileges or read/write other users' data.
+    // SECURITY (1 Oct 2026 audit SEC-003): update rule now uses isNotElevatingRole()
+    // which blocks ALL Pro/payment-related fields (tier, proExpiresAt, proPlanId,
+    // lastPaymentAt, lastOrderId, maxWatchlistStocks, freeSummaryUsed, trialUsed).
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
       allow create: if isOwner(userId) && isNotElevatingRole();
-      allow update: if (isOwner(userId) && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isAdmin', 'admin', 'isPro']))) || isAdmin();
+      allow update: if (isOwner(userId) && isNotElevatingRole()) || isAdmin();
       allow delete: if isAdmin();
     }
     match /users/{userId}/{document=**} {

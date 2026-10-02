@@ -143,6 +143,43 @@ export async function checkAndConsumeServerAiQuota(
   };
 }
 
+/**
+ * Refund one AI quota unit for a user. Called when AI generation fails AFTER
+ * the quota was atomically consumed (e.g. Gemini timeout, model error).
+ * Without this, a failed generation would still count against the daily limit,
+ * effectively giving the user fewer than 100 actual summaries per day.
+ *
+ * LOGIC-002 (1 Oct 2026 audit): Routes now use checkAndConsumeServerAiQuota
+ * atomically BEFORE generation, then call refundServerAiQuota if generation
+ * throws. This closes the race where N concurrent requests all pass the check
+ * (used<100) and all consume, bypassing the limit.
+ *
+ * For admin/guest/free users this is a no-op (admin=unlimited, guest=0, free
+ * uses the separate freeSummaryUsed flag with its own release path).
+ */
+export async function refundServerAiQuota(
+  uid: string,
+  isAdminUser: boolean
+): Promise<void> {
+  // Admin/owner: unlimited, no refund needed
+  if (isAdminUser || uid === 'admin') return;
+  // Guest: no quota to refund
+  if (!uid || uid === 'guest' || uid.startsWith('guest_') || uid.startsWith('trader_')) return;
+
+  try {
+    const todayKey = getTodayKeyIST();
+    const usageKey = `${uid}_${todayKey}`;
+    const usageMap = readLocalJson<Record<string, number>>(AI_USAGE_FILE, {});
+    const used = usageMap[usageKey] || 0;
+    if (used > 0) {
+      usageMap[usageKey] = used - 1;
+      writeLocalJson(AI_USAGE_FILE, usageMap);
+    }
+  } catch {
+    // Best-effort refund — don't throw on failure (could mask the original error)
+  }
+}
+
 export async function getServerAiQuotaStatus(
   uid: string,
   isAdminUser: boolean

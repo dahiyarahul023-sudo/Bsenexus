@@ -114,11 +114,12 @@ export async function sendReplyToTelegram(text: string, replyToMessageId: number
   const botToken = settings.botToken || process.env.TELEGRAM_BOT_TOKEN;
   const targetChatId = customChatId || settings.chatId || process.env.TELEGRAM_CHAT_ID;
   if (!botToken || !targetChatId) return { success: false };
-  
+
   if (telegramCircuitBreaker.getState() === 'OPEN') {
     return { success: false, error: 'Telegram circuit is OPEN' };
   }
 
+  const start = Date.now();
   return await telegramCircuitBreaker.execute<TelegramSendResult>(
     async (signal) => {
       const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
@@ -126,22 +127,36 @@ export async function sendReplyToTelegram(text: string, replyToMessageId: number
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: signal || AbortSignal.timeout(8000),
-        body: JSON.stringify({ 
-          chat_id: targetChatId, 
+        body: JSON.stringify({
+          chat_id: targetChatId,
           reply_to_message_id: replyToMessageId,
-          text, 
+          text,
           parse_mode: "HTML",
           disable_web_page_preview: true
         })
       });
       const responseData = await response.json();
       if (!response.ok) {
-        throw new Error(responseData?.description || `HTTP ${response.status}`);
+        const errorMsg = responseData?.description || `HTTP ${response.status}`;
+        // LOGIC-012 fix (1 Oct 2026 audit): Mirror sendToTelegram pattern —
+        // user-specific 400/403 errors (e.g. "message to reply not found",
+        // "chat not found", "bot blocked") must NOT trip the global circuit
+        // breaker. Previously any 400/403 threw, which after 3 occurrences
+        // opened the breaker for 20s and blocked ALL Telegram sends.
+        if (response.status === 400 || response.status === 403) {
+          return { success: false, error: errorMsg };
+        }
+        telegramHealth = { status: 'down', latency: -1 };
+        throw new Error(errorMsg);
       }
+      const latency = Date.now() - start;
+      telegramHealth = { status: latency > 1500 ? 'degraded' : 'stable', latency };
       return { success: true, messageId: responseData?.result?.message_id };
     },
-    (err) => {
-      return { success: false, error: err.message };
+    async (err) => {
+      await addLog('ERROR', 'TELEGRAM', `Reply send failure: ${err.message}`);
+      telegramHealth = { status: 'down', latency: -1 };
+      return { success: false, error: err.message || "Network error" };
     },
     8000
   );

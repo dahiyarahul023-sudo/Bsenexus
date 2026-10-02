@@ -67,7 +67,7 @@ import {
   releaseFreeSummaryDemo
 } from "../database/usersDao.js";
 import { getAllAlertRules, saveAlertRule, toggleAlertRule, deleteAlertRule } from "../database/alertRulesDao.js";
-import { checkServerAiQuota, consumeServerAiQuota, getServerAiQuotaStatus, resetServerAiQuota } from "../services/aiQuotaService.js";
+import { checkServerAiQuota, consumeServerAiQuota, checkAndConsumeServerAiQuota, refundServerAiQuota, getServerAiQuotaStatus, resetServerAiQuota } from "../services/aiQuotaService.js";
 import { classifyMaterialEvent } from "../services/timelineClassifier.js";
 import { searchCompany } from "./search.js";
 import { fetchLiveMarketIndices, getMarketSessionStatus } from "../services/marketIndicesService.js";
@@ -495,12 +495,15 @@ apiRouter.post("/billing/reset-quota", requireAdmin, async (req, res) => {
 });
 
 apiRouter.post("/announcements/:id/generate-summary", aiRateLimiter, async (req, res) => {
-  // Hoisted for the catch block: release the free-demo claim on ANY throw.
+  // Hoisted for the catch block: release the free-demo claim + refund quota on ANY throw.
   let uid = '';
+  let isAdminUser = false;
   let isFreeDemo = false;
+  let quotaConsumed = false;
+  let consumed: { remaining: number; dailyLimit: number; isPro: boolean } = { remaining: 0, dailyLimit: 0, isPro: false };
   try {
     uid = getReqUserId(req);
-    const isAdminUser = (req as any).user?.isAdmin === true;
+    isAdminUser = (req as any).user?.isAdmin === true;
 
     // Reject unauthenticated guests immediately to safeguard Gemini API
     if (!uid || uid === 'guest' || uid.startsWith('guest_') || uid.startsWith('trader_')) {
@@ -552,8 +555,12 @@ apiRouter.post("/announcements/:id/generate-summary", aiRateLimiter, async (req,
       }
       isFreeDemo = true; // this single request owns the demo; released if generation fails
     } else {
-      // 1. Check server-side AI summary quota before generation (Pro / trial only)
-      const quotaCheck = await checkServerAiQuota(uid, isAdminUser);
+      // LOGIC-002 fix (1 Oct 2026 audit): Atomically check+consume BEFORE generation.
+      // Previously used check-then-generate-then-consume which had a race: N concurrent
+      // requests all passed the check (used<100), all generated, all consumed → user
+      // got N summaries on a quota that should only allow (100-used) more.
+      // Now consume atomically up-front; if generation fails, refund below.
+      const quotaCheck = await checkAndConsumeServerAiQuota(uid, isAdminUser);
       if (!quotaCheck.allowed) {
         return res.status(429).json({
           success: false,
@@ -563,36 +570,42 @@ apiRouter.post("/announcements/:id/generate-summary", aiRateLimiter, async (req,
           dailyLimit: quotaCheck.dailyLimit
         });
       }
+      consumed = { remaining: quotaCheck.remaining, dailyLimit: quotaCheck.dailyLimit, isPro: quotaCheck.isPro };
+      quotaConsumed = true; // track for refund on generation failure
     }
 
     // AI summary language: user's Settings choice (default English).
     // Each language is generated directly and cached in its own field.
     const reqLang = (req.body && (req.body as any).lang) || req.query.lang;
     const summaryLang = reqLang === 'hinglish' ? 'hinglish' : 'english';
-    const summary = await generateDirectSummary(
-      item.companyName || item.SLONGNAME || "",
-      item.subject || item.NEWSSUB || "",
-      item.details || item.HEADLINE || "",
-      item.category || "OTHER",
-      item.pdfLink || item.attachmentUrl || "",
-      newsId,
-      summaryLang
-    );
-    if (!summary) {
-      // Generation failed — release the free demo claim so the user can retry it
+    let summary: string | null = null;
+    try {
+      summary = await generateDirectSummary(
+        item.companyName || item.SLONGNAME || "",
+        item.subject || item.NEWSSUB || "",
+        item.details || item.HEADLINE || "",
+        item.category || "OTHER",
+        item.pdfLink || item.attachmentUrl || "",
+        newsId,
+        summaryLang
+      );
+    } catch (genErr: any) {
+      // Generation threw — refund the atomically-consumed quota + release free demo
+      if (quotaConsumed) { try { await refundServerAiQuota(uid, isAdminUser); } catch {} }
       if (isFreeDemo) { try { await releaseFreeSummaryDemo(uid); } catch {} }
-      return res.status(500).json({ 
-        success: false, 
-        error: "AI Summary generation failed or rate limited. Check Engine Activity Logs tab for details." 
+      throw genErr;
+    }
+    if (!summary) {
+      // Generation failed (returned null) — refund quota + release free demo
+      if (quotaConsumed) { try { await refundServerAiQuota(uid, isAdminUser); } catch {} }
+      if (isFreeDemo) { try { await releaseFreeSummaryDemo(uid); } catch {} }
+      return res.status(500).json({
+        success: false,
+        error: "AI Summary generation failed or rate limited. Check Engine Activity Logs tab for details."
       });
     }
 
-    // 2. Consume quota ONLY after successful generation (Pro/trial).
-    // Free demo was already claimed atomically above — nothing more to burn.
-    if (isProLike) {
-      consumed = await consumeServerAiQuota(uid, isAdminUser);
-    }
-
+    // Quota was already consumed atomically above; nothing more to burn.
     res.json({
       success: true,
       aiSummary: summary,
@@ -603,8 +616,9 @@ apiRouter.post("/announcements/:id/generate-summary", aiRateLimiter, async (req,
       isPro: consumed.isPro
     });
   } catch (e: any) {
-    // Generation threw — release the free demo claim so the user can retry it
+    // Generation threw — release the free demo claim + refund quota so the user can retry it
     if (isFreeDemo) { try { await releaseFreeSummaryDemo(uid); } catch {} }
+    if (quotaConsumed) { try { await refundServerAiQuota(uid, isAdminUser); } catch {} }
     res.status(500).json({ error: e.message });
   }
 });
@@ -1428,16 +1442,18 @@ apiRouter.get("/news/stock/:symbol", async (req, res) => {
 });
 
 apiRouter.post("/news/summarize", aiRateLimiter, async (req, res) => {
-  // Hoisted for the catch block: release the free-demo claim on ANY throw.
+  // Hoisted for the catch block: release the free-demo claim + refund quota on ANY throw.
   let uid = '';
+  let isAdminUser = false;
   let isFreeDemo = false;
+  let quotaConsumed = false;
   try {
     const { title, snippet, source, symbol, companyName, link } = req.body;
     if (!title) {
       return res.status(400).json({ success: false, error: "News title required" });
     }
     uid = getReqUserId(req);
-    const isAdminUser = (req as any).user?.isAdmin === true;
+    isAdminUser = (req as any).user?.isAdmin === true;
 
     // Reject unauthenticated guests immediately to safeguard Gemini API
     if (!uid || uid === 'guest' || uid.startsWith('guest_') || uid.startsWith('trader_')) {
@@ -1466,8 +1482,11 @@ apiRouter.post("/news/summarize", aiRateLimiter, async (req, res) => {
       }
       isFreeDemo = true; // released below if generation fails
     } else {
-      // 1. Check AI quota without consuming (Pro / trial only)
-      const quotaCheck = await checkServerAiQuota(uid, isAdminUser);
+      // LOGIC-002 fix (1 Oct 2026 audit): Atomically check+consume BEFORE generation.
+      // Previously used check-then-generate-then-consume which had a race where
+      // N concurrent requests all passed the check, all generated, all consumed.
+      // Now consume atomically up-front; refund if generation fails.
+      const quotaCheck = await checkAndConsumeServerAiQuota(uid, isAdminUser);
       if (!quotaCheck.allowed) {
         return res.status(429).json({
           success: false,
@@ -1477,23 +1496,28 @@ apiRouter.post("/news/summarize", aiRateLimiter, async (req, res) => {
           dailyLimit: quotaCheck.dailyLimit
         });
       }
+      consumed = { remaining: quotaCheck.remaining, dailyLimit: quotaCheck.dailyLimit, isPro: quotaCheck.isPro };
+      quotaConsumed = true;
     }
 
     const companyTarget = companyName || (symbol ? `${symbol}` : (source || "Market News"));
     const details = `${snippet || title}\n\nPublisher: ${source || 'Financial Media'}\nArticle URL: ${link || ''}`;
-    const summary = await generateDirectSummary(companyTarget, title, details, 'NEWS');
-    
+    let summary: string | null = null;
+    try {
+      summary = await generateDirectSummary(companyTarget, title, details, 'NEWS');
+    } catch (genErr: any) {
+      if (quotaConsumed) { try { await refundServerAiQuota(uid, isAdminUser); } catch {} }
+      if (isFreeDemo) { try { await releaseFreeSummaryDemo(uid); } catch {} }
+      throw genErr;
+    }
+
     if (!summary) {
+      if (quotaConsumed) { try { await refundServerAiQuota(uid, isAdminUser); } catch {} }
       if (isFreeDemo) { try { await releaseFreeSummaryDemo(uid); } catch {} }
       return res.status(500).json({ success: false, error: "Gemini AI was unable to summarize this news story." });
     }
 
-    // 2. Consume quota ONLY after successful generation (Pro/trial).
-    // Free demo was already claimed atomically above.
-    if (isProLike) {
-      consumed = await consumeServerAiQuota(uid, isAdminUser);
-    }
-
+    // Quota was already consumed atomically above; nothing more to burn.
     res.json({
       success: true,
       aiSummary: summary,
@@ -1502,8 +1526,9 @@ apiRouter.post("/news/summarize", aiRateLimiter, async (req, res) => {
       isPro: consumed.isPro
     });
   } catch (err: any) {
-    // Generation threw — release the free demo claim so the user can retry it
+    // Generation threw — release the free demo claim + refund quota so the user can retry it
     if (isFreeDemo) { try { await releaseFreeSummaryDemo(uid); } catch {} }
+    if (quotaConsumed) { try { await refundServerAiQuota(uid, isAdminUser); } catch {} }
     // Payment-store outage must never silently treat a paid user as Free.
     if (isPaymentStoreUnavailable(err)) {
       return res.status(503).json({
@@ -1793,12 +1818,26 @@ apiRouter.get("/stock-results-history", async (req, res) => {
 });
 
 // Deep Historical Sync for a single stock (1 to 5 years)
+// PERF (1 Oct 2026 audit PERF-001): Previously awaited the FULL deep fetch
+// synchronously, which could block the event loop for 60-80s on slow BSE
+// (same pattern as the 1 Oct outage). Now uses autoFetchDeepHistoricalResults
+// which is bounded at 8s wait + 10-min cooldown + in-flight dedupe. The fetch
+// continues in the background if it doesn't land within 8s; the client gets
+// an immediate response and can re-query for the filled history.
 apiRouter.post("/stocks/:scripCode/fetch-deep-history", async (req, res) => {
   try {
     const scripCode = req.params.scripCode;
     const { symbol, years } = req.body;
-    const result = await fetchDeepHistoricalResultsForStock(scripCode, symbol, parseInt(years, 10) || 1);
-    res.json(result);
+    const yearsNum = Math.max(1, Math.min(5, parseInt(years, 10) || 1));
+    const landed = await autoFetchDeepHistoricalResults(scripCode, symbol, yearsNum);
+    res.json({
+      success: true,
+      landed,
+      message: landed
+        ? `Deep fetch complete (${yearsNum} year${yearsNum > 1 ? 's' : ''}).`
+        : 'Deep fetch initiated in background. Refresh in a few seconds to see updated history.',
+      years: yearsNum
+    });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -1970,12 +2009,18 @@ apiRouter.get("/company-intel/:identifier", async (req, res) => {
 });
 
 apiRouter.all("/company-intel/:identifier/ai-overview", requireProOrAdmin, aiRateLimiter, async (req, res) => {
+  let uid = '';
+  let isAdminUser = false;
+  let quotaConsumed = false;
   try {
-    const uid = getReqUserId(req);
-    const isAdminUser = (req as any).user?.isAdmin === true;
+    uid = getReqUserId(req);
+    isAdminUser = (req as any).user?.isAdmin === true;
 
-    // 1. Check AI quota without consuming
-    const quotaCheck = await checkServerAiQuota(uid, isAdminUser);
+    // LOGIC-002 fix (1 Oct 2026 audit): Atomically check+consume BEFORE generation.
+    // Previously used check-then-generate-then-consume which had a race where
+    // N concurrent requests all passed the check, all generated, all consumed.
+    // Now consume atomically up-front; refund if generation fails.
+    const quotaCheck = await checkAndConsumeServerAiQuota(uid, isAdminUser);
     if (!quotaCheck.allowed) {
       return res.status(429).json({
         success: false,
@@ -1985,6 +2030,8 @@ apiRouter.all("/company-intel/:identifier/ai-overview", requireProOrAdmin, aiRat
         dailyLimit: quotaCheck.dailyLimit
       });
     }
+    quotaConsumed = true;
+    const consumed = { remaining: quotaCheck.remaining, dailyLimit: quotaCheck.dailyLimit, isPro: quotaCheck.isPro };
 
     const identifier = req.params.identifier;
     const scripCode = (req.query.scripCode as string) || (req.body?.scripCode as string) || (/^\d+$/.test(identifier) ? identifier : '');
@@ -1997,14 +2044,19 @@ apiRouter.all("/company-intel/:identifier/ai-overview", requireProOrAdmin, aiRat
       if ((prof as any)?.notificationPreferences?.aiSummaryLang === 'hinglish') overviewLang = 'hinglish';
     } catch { /* default stays english */ }
 
-    const aiOverview = await generateCompanyAiOverview(scripCode, symbol, overviewLang);
+    let aiOverview: string | null = null;
+    try {
+      aiOverview = await generateCompanyAiOverview(scripCode, symbol, overviewLang);
+    } catch (genErr: any) {
+      if (quotaConsumed) { try { await refundServerAiQuota(uid, isAdminUser); } catch {} }
+      throw genErr;
+    }
     if (!aiOverview) {
+      if (quotaConsumed) { try { await refundServerAiQuota(uid, isAdminUser); } catch {} }
       return res.status(500).json({ success: false, error: "Gemini AI was unable to generate company overview." });
     }
 
-    // 2. Consume quota ONLY after successful generation
-    const consumed = await consumeServerAiQuota(uid, isAdminUser);
-
+    // Quota was already consumed atomically above; nothing more to burn.
     res.json({
       success: true,
       aiOverview,
@@ -2013,6 +2065,7 @@ apiRouter.all("/company-intel/:identifier/ai-overview", requireProOrAdmin, aiRat
       isPro: consumed.isPro
     });
   } catch (err: any) {
+    if (quotaConsumed) { try { await refundServerAiQuota(uid, isAdminUser); } catch {} }
     res.status(500).json({ success: false, error: err.message });
   }
 });

@@ -6059,13 +6059,23 @@ async function scheduleAnnouncementPoller() {
 }
 scheduleAnnouncementPoller();
 
+// PERF-006 (1 Oct 2026 audit): Track all setInterval handles for graceful shutdown.
+// Cloud Run sends SIGTERM ~10s before killing the instance. Without clearing
+// these intervals, in-flight work (Telegram dispatches, BSE polls) is cut mid-
+// operation, and any state that should have been persisted is lost.
+const trackedIntervals: NodeJS.Timeout[] = [];
+function trackInterval(handle: NodeJS.Timeout): NodeJS.Timeout {
+  trackedIntervals.push(handle);
+  return handle;
+}
+
 // Independent Storage Capacity & Pruning (Every 15 minutes, completely decoupled from critical poller path)
 setTimeout(() => {
   pruneAndCheckStorageCapacity().catch(e => console.error("Initial storage check err:", e.message));
 }, 10000);
-setInterval(() => {
+trackInterval(setInterval(() => {
   pruneAndCheckStorageCapacity().catch(e => console.error("Periodic storage check err:", e.message));
-}, 15 * 60 * 1000);
+}, 15 * 60 * 1000));
 
 // Results Calendar Sync, Watchlists Init & Historical Sync.
 // STAGGERED on boot: firing all BSE-heavy jobs at once (cold start burst) trips
@@ -6086,21 +6096,21 @@ setTimeout(() => {
   // has warmed up and the boot backfill has settled.
   syncWatchlistHistoricalData().catch(e => console.error("Initial watchlist historical sync err:", e.message));
 }, 170 * 1000);
-setInterval(() => {
+trackInterval(setInterval(() => {
   fetchAndSyncResultsCalendar(true).catch(e => console.error("Periodic results calendar sync err:", e.message));
   syncWatchlistHistoricalData().catch(e => console.error("Periodic watchlist historical sync err:", e.message));
-}, 24 * 60 * 60 * 1000);
+}, 24 * 60 * 60 * 1000));
 
 // 24/7 Background Multi-Source RSS News Worker (Runs every 3 minutes to auto-dispatch watchlist stock news to Telegram)
 setTimeout(() => {
   processAutomatedNewsAlerts().catch(e => console.warn("[StockNewsWorker] Initial pass notice:", e.message));
 }, 8000);
-setInterval(() => {
+trackInterval(setInterval(() => {
   processAutomatedNewsAlerts().catch(e => console.warn("[StockNewsWorker] Interval pass error:", e.message));
-}, 3 * 60 * 1000);
+}, 3 * 60 * 1000));
 
 // Auto-Recovery Check: Every 10 minutes, verify if Pacific Midnight passed / quota flag cleared / permission lock expired, and resume Firestore network
-setInterval(async () => {
+trackInterval(setInterval(async () => {
   try {
     const mode = getManualStorageMode();
     if (mode !== 'FORCE_LOCAL') {
@@ -6113,7 +6123,7 @@ setInterval(async () => {
   } catch (err: any) {
     console.warn("Storage auto-recovery interval error:", err?.message || err);
   }
-}, 10 * 60 * 1000);
+}, 10 * 60 * 1000));
 
 // Tab-specific SEO metadata mapping matching sitemap.xml and search engine requirements
 interface TabSeoMeta {
@@ -6534,13 +6544,52 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", async () => {
+  const httpServer = app.listen(PORT, "0.0.0.0", async () => {
     console.log(`Server running on port ${PORT}`);
     // Restore the admin's durable storage mode and auto-recover from quota
     // fallback without waiting for a manual switch or Pacific midnight.
     startStorageRecoveryProbe();
     try { await addLog('INFO', 'SYSTEM', 'Bsenexus Server Started'); } catch(e) { console.error('DB connect err:', e); }
   });
+
+  // PERF-006 (1 Oct 2026 audit): Graceful shutdown handler.
+  // Cloud Run sends SIGTERM ~10s before killing the instance. Without this:
+  // - In-flight HTTP requests are aborted mid-response
+  // - Background intervals (BSE poller, news worker, storage recovery) keep
+  //   firing during the 10s window, racing against shutdown
+  // - Firestore connection is not closed cleanly
+  // - Telegram dispatches are cut mid-send, leaving markAnnouncementSent flags
+  //   in inconsistent state
+  // With this: stop accepting new requests, clear intervals, drain for 8s.
+  let isShuttingDown = false;
+  async function gracefulShutdown(signal: string) {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+    console.log(`[Shutdown] ${signal} received, draining...`);
+    try { await addLog('INFO', 'SYSTEM', `Server shutdown initiated (${signal})`); } catch {}
+
+    // 1. Stop accepting new HTTP requests
+    httpServer.close((err: any) => {
+      if (err) console.error('[Shutdown] HTTP server close error:', err.message);
+      else console.log('[Shutdown] HTTP server closed (no new connections)');
+    });
+
+    // 2. Clear all tracked intervals so background workers stop firing
+    for (const handle of trackedIntervals) {
+      try { clearInterval(handle); } catch {}
+    }
+    console.log(`[Shutdown] Cleared ${trackedIntervals.length} background intervals`);
+
+    // 3. Give in-flight requests up to 8s to complete, then force-exit
+    // (Cloud Run's SIGTERM grace is ~10s; leave 2s buffer for cleanup)
+    setTimeout(() => {
+      console.log('[Shutdown] Forcing exit');
+      process.exit(0);
+    }, 8000).unref();
+  }
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 }
 
 if (process.env.NODE_ENV !== 'test' && !process.env.TEST_RUNNER && !process.argv.some(a => a.includes('test'))) {
