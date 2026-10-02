@@ -7,7 +7,7 @@ import { getActiveWatchlistSymbols, getActiveWatchlistSymbolMap } from '../datab
 import { getAllUserProfiles } from '../database/usersDao.js';
 import { isAnnouncementProcessed, isAnnouncementSent, markAnnouncementSent, saveAnnouncement, pruneAndCheckStorageCapacity, initAnnouncementCache } from '../database/announcementDao.js';
 import { escapeHTML, determinePriority, isSymbolMatch, parseBseDate, isMarketHoursIST } from '../utils/helpers.js';
-import { addNotification, initNotificationsFromFirestore } from '../database/notificationDao.js';
+import { addNotification, initNotificationsFromCloud } from '../database/notificationDao.js';
 import { evaluateAlertRulesForUser } from '../database/alertRulesDao.js';
 import { classifyMaterialEvent } from './timelineClassifier.js';
 import { doesAnnouncementMatchUserPrefs, isTelegramEligible } from '../utils/alertDecision.js';
@@ -118,8 +118,8 @@ export async function processAnnouncements() {
   try {
     if (!isCacheInitialized) {
       await initAnnouncementCache();
-      // Restore in-app notifications from Firestore in the background (never blocks polling)
-      initNotificationsFromFirestore().catch(() => {});
+      // Restore in-app notifications from Supabase in the background (never blocks polling)
+      initNotificationsFromCloud().catch(() => {});
       isCacheInitialized = true;
     }
 

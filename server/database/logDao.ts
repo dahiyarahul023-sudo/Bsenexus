@@ -1,5 +1,5 @@
-import { adminDb } from './firebase.js';
-import { readLocalJson, writeLocalJson, isFirestoreQuotaExceeded, setFirestoreQuotaExceeded, isQuotaError, isPermissionDeniedError, setAdminPermissionDenied, isAdminPermissionDenied } from './localStore.js';
+import { getSupabase, isSupabaseConfigured } from './supabase.js';
+import { readLocalJson, writeLocalJson } from './localStore.js';
 
 const LOGS_FILE = 'logs.json';
 const logsCache: any[] = readLocalJson<any[]>(LOGS_FILE, []);
@@ -85,26 +85,24 @@ export async function clearLogs() {
 }
 
 export async function getLogs(limitNum: number = 200) {
-  if (logsCache.length > 0 || isFirestoreQuotaExceeded() || isAdminPermissionDenied()) {
+  if (logsCache.length > 0 || !isSupabaseConfigured()) {
     return logsCache.slice(0, limitNum);
   }
 
   try {
-    const snap = await adminDb.collection('logs').orderBy('timestamp', 'desc').limit(limitNum).get();
-    const loaded = snap.docs.map(doc => doc.data());
+    const { data, error } = await getSupabase()
+      .from('logs')
+      .select('data')
+      .order('created_at', { ascending: false })
+      .limit(limitNum);
+    if (error) throw error;
+    const loaded = (data || []).map((row: any) => row.data);
     logsCache.length = 0;
     logsCache.push(...loaded);
     writeLocalJson(LOGS_FILE, logsCache);
     return loaded;
   } catch (e: any) {
-    if (isQuotaError(e)) {
-      setFirestoreQuotaExceeded(true);
-      console.warn("Firestore quota limit reached in getLogs. Returning local logs.");
-    } else if (isPermissionDeniedError(e)) {
-      setAdminPermissionDenied(true);
-    } else {
-      console.warn("Notice in getLogs:", e?.message || e);
-    }
+    console.warn("Notice in getLogs:", e?.message || e);
     return logsCache.slice(0, limitNum);
   }
 }

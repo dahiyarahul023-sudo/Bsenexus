@@ -15,8 +15,7 @@ import {
 import { sendToTelegram } from './telegram.js';
 import { getSettings } from '../database/settingsDao.js';
 import { determinePriority } from '../utils/helpers.js';
-import { isFirestoreQuotaExceeded, setFirestoreQuotaExceeded, isQuotaError, isPermissionDeniedError, setAdminPermissionDenied, isAdminPermissionDenied } from '../database/localStore.js';
-import { adminDb } from '../database/firebase.js';
+import { getSupabase, isSupabaseConfigured } from '../database/supabase.js';
 import { getBseISTDate } from './bse.js';
 import { externalFeedsCircuitBreaker } from '../utils/circuitBreaker.js';
 
@@ -500,29 +499,29 @@ export async function fetchAndSyncResultsCalendar(
       console.error('Failed to write results calendar disk cache:', fsErr.message);
     }
 
-    // Optionally sync with Firestore
+    // Optionally sync with Supabase
     try {
-      if (!isFirestoreQuotaExceeded() && !isAdminPermissionDenied()) {
-        const batch = adminDb.batch();
-        let count = 0;
+      if (isSupabaseConfigured()) {
+        const rows: Record<string, any>[] = [];
         for (const item of cachedCalendar) {
-          if (count >= 400) break;
-          const docRef = adminDb.collection('results_calendar').doc(item.id);
-          batch.set(docRef, item, { merge: true });
-          count++;
+          if (rows.length >= 400) break;
+          if (!item || !item.id) continue;
+          rows.push({
+            id: item.id,
+            scrip_code: String(item.scripCode || ''),
+            symbol: String(item.symbol || ''),
+            data: item,
+          });
         }
-        if (count > 0) {
-          await batch.commit();
+        if (rows.length > 0) {
+          const { error } = await getSupabase()
+            .from('results_calendar')
+            .upsert(rows, { onConflict: 'id' });
+          if (error) throw error;
         }
       }
-    } catch (fireErr: any) {
-      if (isQuotaError(fireErr)) {
-        setFirestoreQuotaExceeded(true);
-      } else if (isPermissionDeniedError(fireErr)) {
-        setAdminPermissionDenied(true);
-      } else {
-        console.warn('Firestore results calendar sync notice:', fireErr.message);
-      }
+    } catch (syncErr: any) {
+      console.warn('Supabase results calendar sync notice:', syncErr?.message || syncErr);
     }
 
     // Auto-notify Telegram for newly discovered upcoming board meetings

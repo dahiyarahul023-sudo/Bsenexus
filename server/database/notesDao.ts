@@ -1,25 +1,23 @@
 import crypto from 'node:crypto';
-import { adminDb } from './firebase.js';
+import { getSupabase, isSupabaseConfigured } from './supabase.js';
 import { withRetry } from '../utils/retry.js';
 import {
-  isFirestoreQuotaExceeded, setFirestoreQuotaExceeded,
-  isQuotaError, isPermissionDeniedError, setAdminPermissionDenied, isAdminPermissionDenied,
   isOfflineOrNetworkError,
   readLocalJson, writeLocalJson,
 } from './localStore.js';
 
 /**
- * Saved Notes DAO — Firestore-FIRST storage.
+ * Saved Notes DAO — Supabase-FIRST storage.
  *
  * Durability contract (the rule the user was promised):
- *  - Writes (create/update/delete) go to Firestore FIRST. The note is only
- *    reported as saved after the Firestore write succeeds.
- *  - If Firestore is unavailable (quota exceeded, offline, permission denied),
- *    the write FAILS LOUDLY ({ ok:false, storageUnavailable:true }) and is
- *    NEVER silently persisted to the ephemeral local JSON. The client keeps
- *    the draft and shows "couldn't save — retry". A republish must never be
- *    able to wipe a note the user believes is saved.
- *  - Reads fall back to the local cache when Firestore is unreachable —
+ *  - Writes (create/update/delete) go to Supabase FIRST. The note is only
+ *    reported as saved after the Supabase write succeeds.
+ *  - If Supabase is unavailable (offline, network error), the write FAILS
+ *    LOUDLY ({ ok:false, storageUnavailable:true }) and is NEVER silently
+ *    persisted to the ephemeral local JSON. The client keeps the draft and
+ *    shows "couldn't save — retry". A republish must never be able to wipe
+ *    a note the user believes is saved.
+ *  - Reads fall back to the local cache when the cloud is unreachable —
  *    a stale read is safe, a fake write is not.
  */
 
@@ -56,7 +54,7 @@ export interface NoteInput {
   link?: NoteLink | null;
 }
 
-const NOTES_COLLECTION = 'user_notes';
+const NOTES_TABLE = 'user_notes';
 const NOTES_FILE = 'user_notes.json';
 
 export const NOTE_LIMITS = {
@@ -150,12 +148,15 @@ function removeFromCache(id: string): void {
 }
 
 function cloudDown(): boolean {
-  return isFirestoreQuotaExceeded() || isAdminPermissionDenied();
+  return !isSupabaseConfigured();
 }
 
-function markCloudError(err: any): void {
-  if (isQuotaError(err)) setFirestoreQuotaExceeded(true);
-  else if (isPermissionDeniedError(err)) setAdminPermissionDenied(true);
+function toRow(note: UserNote): Record<string, any> {
+  return { id: note.id, user_id: note.userId, note };
+}
+
+function fromRow(row: any): UserNote {
+  return row.note as UserNote;
 }
 
 export type DaoResult<T> = { ok: true; value: T; fromCache?: boolean } | { ok: false; storageUnavailable: true };
@@ -171,21 +172,20 @@ export type NoteWriteResult<T> =
 export async function listNotes(userId: string): Promise<DaoResult<UserNote[]>> {
   if (!cloudDown()) {
     try {
-      const snap = await withRetry(async () =>
-        await adminDb.collection(NOTES_COLLECTION).where('userId', '==', userId).get()
-      , { maxRetries: 1 });
-      const notes: UserNote[] = [];
-      snap.forEach(d => {
-        const n = d.data() as UserNote;
-        if (n && n.id) notes.push(n);
-      });
+      const notes = await withRetry(async () => {
+        const { data, error } = await getSupabase()
+          .from(NOTES_TABLE)
+          .select('note')
+          .eq('user_id', userId);
+        if (error) throw error;
+        return (data || []).map(fromRow).filter(n => n && n.id);
+      }, { maxRetries: 1 });
       notes.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
       // Refresh the read cache with the cloud truth.
       const others = readCache().filter(n => n.userId !== userId);
       writeCache([...others, ...notes]);
       return { ok: true, value: notes };
     } catch (err: any) {
-      markCloudError(err);
       if (!isOfflineOrNetworkError(err)) console.warn('[notesDao] list fallback to cache:', err?.message || err);
     }
   }
@@ -194,7 +194,7 @@ export async function listNotes(userId: string): Promise<DaoResult<UserNote[]>> 
   return { ok: true, value: cached, fromCache: true };
 }
 
-/** Create a note — Firestore FIRST. Loud failure, never a silent local write. */
+/** Create a note — Supabase FIRST. Loud failure, never a silent local write. */
 export async function createNote(userId: string, input: NoteInput): Promise<NoteWriteResult<UserNote>> {
   const v = validateNoteInput(input);
   if (v.ok === false) return { ok: false, validationError: v.error };
@@ -215,17 +215,22 @@ export async function createNote(userId: string, input: NoteInput): Promise<Note
 
   try {
     // Enforce the per-user cap against cloud truth, not the cache.
-    const countSnap = await withRetry(async () =>
-      await adminDb.collection(NOTES_COLLECTION).where('userId', '==', userId).count().get()
-    , { maxRetries: 1 });
-    if ((countSnap.data().count || 0) >= NOTE_LIMITS.maxNotesPerUser) {
+    const count = await withRetry(async () => {
+      const { count, error } = await getSupabase()
+        .from(NOTES_TABLE)
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId);
+      if (error) throw error;
+      return count || 0;
+    }, { maxRetries: 1 });
+    if (count >= NOTE_LIMITS.maxNotesPerUser) {
       return { ok: false, tooMany: true };
     }
     await withRetry(async () => {
-      await adminDb.collection(NOTES_COLLECTION).doc(note.id).set(note);
+      const { error } = await getSupabase().from(NOTES_TABLE).upsert(toRow(note), { onConflict: 'id' });
+      if (error) throw error;
     }, { maxRetries: 1 });
   } catch (err: any) {
-    markCloudError(err);
     return { ok: false, storageUnavailable: true };
   }
 
@@ -233,14 +238,20 @@ export async function createNote(userId: string, input: NoteInput): Promise<Note
   return { ok: true, value: note };
 }
 
-/** Update a note — ownership-checked, Firestore FIRST. */
+/** Update a note — ownership-checked, Supabase FIRST. */
 export async function updateNote(userId: string, id: string, input: Partial<NoteInput>): Promise<NoteWriteResult<UserNote>> {
   if (cloudDown()) return { ok: false, storageUnavailable: true };
   try {
-    const ref = adminDb.collection(NOTES_COLLECTION).doc(id);
-    const snap = await withRetry(async () => await ref.get(), { maxRetries: 1 });
-    if (!snap.exists) return { ok: false, notFound: true };
-    const existing = snap.data() as UserNote;
+    const existing = await withRetry(async () => {
+      const { data, error } = await getSupabase()
+        .from(NOTES_TABLE)
+        .select('note')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw error;
+      return data ? fromRow(data) : null;
+    }, { maxRetries: 1 });
+    if (!existing) return { ok: false, notFound: true };
     if (existing.userId !== userId) return { ok: false, notFound: true }; // no cross-user oracle
 
     const merged: NoteInput = {
@@ -253,29 +264,39 @@ export async function updateNote(userId: string, id: string, input: Partial<Note
     if (v.ok === false) return { ok: false, validationError: v.error };
 
     const updated: UserNote = { ...existing, text: v.note.text, icon: v.note.icon, tags: v.note.tags, link: v.note.link, updatedAt: Date.now() };
-    await withRetry(async () => { await ref.set(updated, { merge: true }); }, { maxRetries: 1 });
+    await withRetry(async () => {
+      const { error } = await getSupabase().from(NOTES_TABLE).update(toRow(updated)).eq('id', id);
+      if (error) throw error;
+    }, { maxRetries: 1 });
     upsertCache(updated);
     return { ok: true, value: updated };
   } catch (err: any) {
-    markCloudError(err);
     return { ok: false, storageUnavailable: true };
   }
 }
 
-/** Delete a note — ownership-checked, Firestore FIRST. */
+/** Delete a note — ownership-checked, Supabase FIRST. */
 export async function deleteNote(userId: string, id: string): Promise<{ ok: true } | { ok: false; notFound: true } | { ok: false; storageUnavailable: true }> {
   if (cloudDown()) return { ok: false, storageUnavailable: true };
   try {
-    const ref = adminDb.collection(NOTES_COLLECTION).doc(id);
-    const snap = await withRetry(async () => await ref.get(), { maxRetries: 1 });
-    if (!snap.exists) return { ok: false, notFound: true };
-    const existing = snap.data() as UserNote;
+    const existing = await withRetry(async () => {
+      const { data, error } = await getSupabase()
+        .from(NOTES_TABLE)
+        .select('note')
+        .eq('id', id)
+        .maybeSingle();
+      if (error) throw error;
+      return data ? fromRow(data) : null;
+    }, { maxRetries: 1 });
+    if (!existing) return { ok: false, notFound: true };
     if (existing.userId !== userId) return { ok: false, notFound: true };
-    await withRetry(async () => { await ref.delete(); }, { maxRetries: 1 });
+    await withRetry(async () => {
+      const { error } = await getSupabase().from(NOTES_TABLE).delete().eq('id', id);
+      if (error) throw error;
+    }, { maxRetries: 1 });
     removeFromCache(id);
     return { ok: true };
   } catch (err: any) {
-    markCloudError(err);
     return { ok: false, storageUnavailable: true };
   }
 }

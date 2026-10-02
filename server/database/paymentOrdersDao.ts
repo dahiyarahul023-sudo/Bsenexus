@@ -8,14 +8,15 @@
  * unavailable at the time) and was wiped by the next republish. Treat that
  * as a hypothesis, not a proven root cause.
  *
- * Payment-isolation rule (30 Sep 2026): this ledger is Firestore-only.
- * Local JSON is never authoritative for payments because Cloud Run local
- * files are revision-local and can be empty after a republish. If Firestore
- * cannot confirm a payment write, the operation fails closed with
- * PaymentStoreUnavailableError; Cashfree remains the payment gateway of
- * record and the webhook/recovery flow can safely retry later.
+ * Payment-isolation rule (30 Sep 2026, kept for Supabase): this ledger is
+ * durable-store-only. Local JSON is never authoritative for payments
+ * because Cloud Run local files are revision-local and can be empty after
+ * a republish. If Supabase cannot confirm a payment write, the operation
+ * fails closed with PaymentStoreUnavailableError; Cashfree remains the
+ * payment gateway of record and the webhook/recovery flow can safely
+ * retry later.
  */
-import { adminDb } from './firebase.js';
+import { getSupabase } from './supabase.js';
 import {
   PaymentOrderOwnershipError,
   runPaymentStore,
@@ -40,37 +41,77 @@ export interface PaymentOrder {
   lastError?: string;
 }
 
-const COLLECTION = 'payment_orders';
+const ORDERS_TABLE = 'payment_orders';
 
-function orderRef(orderId: string) {
-  return adminDb.collection(COLLECTION).doc(orderId);
+// --- Row mapping: camelCase app shape <-> snake_case Postgres columns ---
+function toRow(o: PaymentOrder): Record<string, any> {
+  return {
+    order_id: o.orderId,
+    uid: o.uid,
+    email: o.email || '',
+    plan_id: o.planId || '',
+    amount_paise: o.amountPaise || 0,
+    currency: o.currency || 'INR',
+    status: o.status,
+    created_at: o.createdAt,
+    updated_at: o.updatedAt,
+    granted_at: o.grantedAt ?? null,
+    paid_at: o.paidAt ?? null,
+    pro_expires_at: o.proExpiresAt ?? null,
+    grant_source: o.grantSource ?? null,
+    last_error: o.lastError ?? null,
+  };
 }
 
-function normalizeOrder(orderId: string, raw: any): PaymentOrder | null {
-  if (!raw) return null;
+function fromRow(orderId: string, r: any): PaymentOrder | null {
+  if (!r) return null;
   return {
-    orderId: String(raw.orderId || orderId),
-    uid: String(raw.uid || ''),
-    email: String(raw.email || ''),
-    planId: String(raw.planId || ''),
-    amountPaise: Number(raw.amountPaise || 0),
-    currency: String(raw.currency || 'INR'),
-    status: (raw.status || 'pending') as PaymentOrderStatus,
-    createdAt: Number(raw.createdAt || 0),
-    updatedAt: Number(raw.updatedAt || raw.createdAt || 0),
-    grantedAt: raw.grantedAt ? Number(raw.grantedAt) : undefined,
-    paidAt: raw.paidAt ? Number(raw.paidAt) : undefined,
-    proExpiresAt: raw.proExpiresAt ? Number(raw.proExpiresAt) : undefined,
-    grantSource: raw.grantSource,
-    lastError: raw.lastError ? String(raw.lastError).slice(0, 300) : undefined,
+    orderId: String(r.order_id || orderId),
+    uid: String(r.uid || ''),
+    email: String(r.email || ''),
+    planId: String(r.plan_id || ''),
+    amountPaise: Number(r.amount_paise || 0),
+    currency: String(r.currency || 'INR'),
+    status: (r.status || 'pending') as PaymentOrderStatus,
+    createdAt: Number(r.created_at || 0),
+    updatedAt: Number(r.updated_at || r.created_at || 0),
+    grantedAt: r.granted_at != null ? Number(r.granted_at) : undefined,
+    paidAt: r.paid_at != null ? Number(r.paid_at) : undefined,
+    proExpiresAt: r.pro_expires_at != null ? Number(r.pro_expires_at) : undefined,
+    grantSource: r.grant_source || undefined,
+    lastError: r.last_error ? String(r.last_error).slice(0, 300) : undefined,
   };
 }
 
 /**
- * Record a new order as pending in Firestore BEFORE Cashfree checkout.
+ * Call a Postgres function through the payment store. A Postgres
+ * OWNERSHIP exception becomes PaymentOrderOwnershipError (a caller bug,
+ * not a store outage) so runPaymentStore passes it through untouched.
+ */
+async function callPaymentRpc<T>(operation: string, fn: string, args: Record<string, any>, timeoutMs = 12_000): Promise<T> {
+  return runPaymentStore(
+    operation,
+    (async () => {
+      const { data, error } = await getSupabase().rpc(fn, args);
+      if (error) {
+        if (String(error.message || '').includes('OWNERSHIP:')) {
+          throw new PaymentOrderOwnershipError(String(args.p_order_id || ''));
+        }
+        throw error;
+      }
+      return data as T;
+    })(),
+    timeoutMs,
+  );
+}
+
+/**
+ * Record a new order as pending in Supabase BEFORE Cashfree checkout.
  * If this write cannot be durably confirmed, checkout must not start;
  * otherwise a paid order could exist at Cashfree with no reconciliation
- * trail owned by this server.
+ * trail owned by this server. Atomic via record_pending_order_atomic:
+ * a duplicate create for the same order id is an idempotent no-op and a
+ * resolved order is never resurrected or downgraded.
  */
 export async function recordPendingOrder(input: {
   orderId: string;
@@ -80,63 +121,52 @@ export async function recordPendingOrder(input: {
   amountPaise: number;
   currency: string;
 }): Promise<void> {
-  const now = Date.now();
-  const order: PaymentOrder = {
-    ...input,
-    status: 'pending',
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  await runPaymentStore(
-    'record pending payment order',
-    adminDb.runTransaction(async (tx: any) => {
-      const ref = orderRef(order.orderId);
-      const snap = await tx.get(ref);
-      if (!snap.exists) {
-        tx.set(ref, order);
-        return;
-      }
-
-      const existing = normalizeOrder(order.orderId, snap.data());
-      if (!existing) {
-        tx.set(ref, order);
-        return;
-      }
-      // Never resurrect or downgrade a resolved order. A duplicate create
-      // attempt for the same durable order id is an idempotent no-op.
-      if (existing.status === 'granted' || existing.status === 'granting') return;
-      tx.set(
-        ref,
-        {
-          ...order,
-          createdAt: existing.createdAt || order.createdAt,
-        },
-        { merge: true },
-      );
-    }),
-    12_000,
-  );
+  await callPaymentRpc('record pending payment order', 'record_pending_order_atomic', {
+    p_order_id: input.orderId,
+    p_uid: input.uid,
+    p_email: input.email,
+    p_plan_id: input.planId,
+    p_amount_paise: input.amountPaise,
+    p_currency: input.currency,
+  });
 }
 
-/** Fetch one durable order by id. Absence means Firestore has no such order. */
+/** Fetch one durable order by id. Absence means the store has no such order. */
 export async function getPaymentOrder(orderId: string): Promise<PaymentOrder | null> {
   if (!orderId) return null;
-  const snap = await runPaymentStore('read payment order', orderRef(orderId).get(), 10_000);
-  return snap.exists ? normalizeOrder(orderId, snap.data()) : null;
+  return runPaymentStore(
+    'read payment order',
+    (async () => {
+      const { data, error } = await getSupabase()
+        .from(ORDERS_TABLE)
+        .select('*')
+        .eq('order_id', orderId)
+        .maybeSingle();
+      if (error) throw error;
+      return fromRow(orderId, data);
+    })(),
+    10_000,
+  );
 }
 
 async function getOrdersForUser(uid: string): Promise<PaymentOrder[]> {
-  const snap = await runPaymentStore(
+  const rows = await runPaymentStore(
     'list payment orders for user',
-    adminDb.collection(COLLECTION).where('uid', '==', uid).get(),
+    (async () => {
+      const { data, error } = await getSupabase()
+        .from(ORDERS_TABLE)
+        .select('*')
+        .eq('uid', uid);
+      if (error) throw error;
+      return data || [];
+    })(),
     12_000,
   );
   const orders: PaymentOrder[] = [];
-  snap.forEach((doc: any) => {
-    const order = normalizeOrder(doc.id, doc.data());
+  for (const row of rows) {
+    const order = fromRow(row.order_id, row);
     if (order && order.uid === uid) orders.push(order);
-  });
+  }
   return orders;
 }
 
@@ -167,52 +197,23 @@ export async function getGrantedOrdersForUser(uid: string): Promise<PaymentOrder
 /**
  * Claim a durable order for a non-atomic caller. The production grant
  * path uses grantPaymentAtomically(), which claims and grants inside one
- * Firestore transaction. This helper remains Firestore-only and therefore
- * cannot "succeed" through ephemeral local storage.
+ * Postgres function. This helper remains durable-store-only and therefore
+ * cannot "succeed" through ephemeral local storage. The claim serializes
+ * on the order row lock inside claim_order_for_grant.
  */
 export async function tryClaimOrderForGrant(
   orderId: string,
   uid: string,
 ): Promise<{ ok: boolean; reason?: 'already-granted' }> {
-  return runPaymentStore(
+  const result = await callPaymentRpc<{ ok: boolean; reason?: 'already-granted' }>(
     'claim payment order for grant',
-    adminDb.runTransaction(async (tx: any) => {
-      const ref = orderRef(orderId);
-      const snap = await tx.get(ref);
-      const existing = snap.exists ? normalizeOrder(orderId, snap.data()) : null;
-
-      if (existing?.uid && existing.uid !== uid) {
-        throw new PaymentOrderOwnershipError(orderId);
-      }
-      if (existing?.status === 'granted') {
-        return { ok: false as const, reason: 'already-granted' as const };
-      }
-
-      const now = Date.now();
-      if (existing) {
-        tx.set(ref, { status: 'granting', uid, updatedAt: now }, { merge: true });
-      } else {
-        // Order predates the durable ledger: create its reconciliation doc
-        // in `granting` so concurrent grants serialize in Firestore.
-        tx.set(ref, {
-          orderId,
-          uid,
-          email: '',
-          planId: '',
-          amountPaise: 0,
-          currency: 'INR',
-          status: 'granting',
-          createdAt: now,
-          updatedAt: now,
-        } satisfies PaymentOrder);
-      }
-      return { ok: true as const };
-    }),
-    12_000,
+    'claim_order_for_grant',
+    { p_order_id: orderId, p_uid: uid },
   );
+  return { ok: !!result?.ok, reason: result?.reason };
 }
 
-/** Mark an order granted in Firestore only. */
+/** Mark an order granted in the durable store only. */
 export async function markOrderGranted(
   orderId: string,
   info: {
@@ -226,20 +227,27 @@ export async function markOrderGranted(
   },
 ): Promise<void> {
   const now = Date.now();
-  const patch: Partial<PaymentOrder> = {
+  const patch: Record<string, any> = {
     status: 'granted',
-    updatedAt: now,
-    grantedAt: now,
-    proExpiresAt: info.proExpiresAt,
-    grantSource: info.grantSource,
+    updated_at: now,
+    granted_at: now,
+    pro_expires_at: info.proExpiresAt,
+    grant_source: info.grantSource,
     uid: info.uid,
   };
   if (info.email !== undefined) patch.email = info.email;
-  if (info.planId !== undefined) patch.planId = info.planId;
-  if (info.amountPaise !== undefined) patch.amountPaise = info.amountPaise;
-  if (info.paidAt !== undefined) patch.paidAt = info.paidAt;
+  if (info.planId !== undefined) patch.plan_id = info.planId;
+  if (info.amountPaise !== undefined) patch.amount_paise = info.amountPaise;
+  if (info.paidAt !== undefined) patch.paid_at = info.paidAt;
 
-  await runPaymentStore('mark payment order granted', orderRef(orderId).set(patch, { merge: true }), 10_000);
+  await runPaymentStore(
+    'mark payment order granted',
+    (async () => {
+      const { error } = await getSupabase().from(ORDERS_TABLE).update(patch).eq('order_id', orderId);
+      if (error) throw error;
+    })(),
+    10_000,
+  );
 }
 
 /**
@@ -247,10 +255,17 @@ export async function markOrderGranted(
  * user-dropped). Login recovery will stop re-checking it with Cashfree.
  */
 export async function markOrderFailed(orderId: string, lastError: string): Promise<void> {
-  const patch: Partial<PaymentOrder> = {
+  const patch: Record<string, any> = {
     status: 'failed',
-    updatedAt: Date.now(),
-    lastError: lastError.slice(0, 300),
+    updated_at: Date.now(),
+    last_error: lastError.slice(0, 300),
   };
-  await runPaymentStore('mark payment order failed', orderRef(orderId).set(patch, { merge: true }), 10_000);
+  await runPaymentStore(
+    'mark payment order failed',
+    (async () => {
+      const { error } = await getSupabase().from(ORDERS_TABLE).update(patch).eq('order_id', orderId);
+      if (error) throw error;
+    })(),
+    10_000,
+  );
 }

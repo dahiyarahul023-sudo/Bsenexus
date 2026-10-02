@@ -4,8 +4,8 @@ import { sendToTelegram } from './telegram.js';
 import { addLog } from '../database/logDao.js';
 import { getSettings } from '../database/settingsDao.js';
 import { getAllUserProfiles } from '../database/usersDao.js';
-import { readLocalJson, writeLocalJson, isFirestoreQuotaExceeded, isAdminPermissionDenied } from '../database/localStore.js';
-import { adminDb } from '../database/firebase.js';
+import { readLocalJson, writeLocalJson } from '../database/localStore.js';
+import { getSupabase, isSupabaseConfigured } from '../database/supabase.js';
 import { externalFeedsCircuitBreaker } from '../utils/circuitBreaker.js';
 
 export interface StockNewsItem {
@@ -112,14 +112,14 @@ export async function markNewsAlertSentToTarget(targetId: string, newsId: string
   sentNewsAlertsMemory.set(key, now);
   saveSentNewsMemoryToDisk();
 
-  // Async log to Firestore if available
-  if (!isFirestoreQuotaExceeded() && !isAdminPermissionDenied()) {
+  // Async log to Supabase if available
+  if (isSupabaseConfigured()) {
     try {
-      await adminDb.collection('sent_news_alerts').doc(key.replace(/[^a-zA-Z0-9_\-]/g, '_')).set({
-        targetId,
-        newsId,
-        sentAt: now
-      });
+      const { error } = await getSupabase().from('sent_news_alerts').upsert({
+        id: key.replace(/[^a-zA-Z0-9_\-]/g, '_'),
+        data: { targetId, newsId, sentAt: now },
+      }, { onConflict: 'id' });
+      if (error) throw error;
     } catch (e) {
       // Non-blocking
     }

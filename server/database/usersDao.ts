@@ -1,9 +1,60 @@
-import { adminDb } from './firebase.js';
-import { readLocalJson, writeLocalJson, isFirestoreQuotaExceeded, setFirestoreQuotaExceeded, isQuotaError, isOfflineOrNetworkError, isPermissionDeniedError, setAdminPermissionDenied, isAdminPermissionDenied } from './localStore.js';
+import { getSupabase, isSupabaseConfigured } from './supabase.js';
+import { readLocalJson, writeLocalJson, isOfflineOrNetworkError } from './localStore.js';
 import { UserProfile } from '../../src/types.js';
 import { withRetry } from '../utils/retry.js';
 import { addLog } from './logDao.js';
 import { PaymentStoreUnavailableError, runPaymentStore } from './paymentStore.js';
+
+const USERS_TABLE = 'users';
+
+// --- Row mapping: camelCase UserProfile <-> snake_case Postgres columns ---
+function toRow(p: UserProfile): Record<string, any> {
+  return {
+    uid: p.uid,
+    email: p.email ?? null,
+    display_name: p.displayName ?? null,
+    username: p.username ?? null,
+    photo_url: p.photoURL ?? null,
+    tier: p.tier || 'free',
+    pro_expires_at: p.proExpiresAt ?? null,
+    trial_used: !!p.trialUsed,
+    free_summary_used: !!p.freeSummaryUsed,
+    pro_plan_id: p.proPlanId ?? null,
+    last_payment_at: p.lastPaymentAt ?? null,
+    last_order_id: p.lastOrderId ?? null,
+    telegram_chat_id: p.telegramChatId ?? null,
+    telegram_username: p.telegramUsername ?? null,
+    mute_in_app_notifications: !!p.muteInAppNotifications,
+    notification_prefs: p.notificationPreferences ?? {},
+    created_at: p.createdAt ?? Date.now(),
+    last_login_at: p.lastLoginAt ?? Date.now(),
+    max_watchlist_stocks: p.maxWatchlistStocks ?? 25,
+  };
+}
+
+function fromRow(r: any): UserProfile {
+  return {
+    uid: r.uid,
+    email: r.email ?? null,
+    displayName: r.display_name ?? null,
+    username: r.username ?? null,
+    photoURL: r.photo_url ?? null,
+    tier: r.tier || 'free',
+    proExpiresAt: r.pro_expires_at != null ? Number(r.pro_expires_at) : null,
+    trialUsed: !!r.trial_used,
+    freeSummaryUsed: !!r.free_summary_used,
+    proPlanId: r.pro_plan_id ?? null,
+    lastPaymentAt: r.last_payment_at != null ? Number(r.last_payment_at) : null,
+    lastOrderId: r.last_order_id ?? null,
+    telegramChatId: r.telegram_chat_id ?? null,
+    telegramUsername: r.telegram_username ?? null,
+    muteInAppNotifications: !!r.mute_in_app_notifications,
+    notificationPreferences: r.notification_prefs || {},
+    createdAt: Number(r.created_at || 0),
+    lastLoginAt: Number(r.last_login_at || 0),
+    maxWatchlistStocks: Number(r.max_watchlist_stocks ?? 25),
+  } as UserProfile;
+}
 
 const USERS_FILE = 'users.json';
 const USER_CACHE_TTL_MS = 2500; // Fast cache invalidation for fresh Firestore reads
@@ -68,36 +119,30 @@ export async function getUsersWithTelegram(): Promise<UserProfile[]> {
   const localUsersMap = readLocalJson<Record<string, UserProfile>>(USERS_FILE, {});
   const localList = Object.values(localUsersMap).filter(u => u.telegramChatId && String(u.telegramChatId).trim() !== '');
 
-  if (isFirestoreQuotaExceeded() || isAdminPermissionDenied()) {
+  if (!isSupabaseConfigured()) {
     usersWithTelegramCache = { list: localList, fetchedAt: now };
     return localList;
   }
 
   try {
-    const snap = await adminDb.collection('users')
-      .where('telegramChatId', '!=', null)
-      .get();
-    
+    const { data, error } = await getSupabase()
+      .from(USERS_TABLE)
+      .select('*')
+      .not('telegram_chat_id', 'is', null);
+    if (error) throw error;
+
     const result: UserProfile[] = [];
-    snap.forEach(docSnap => {
-      const data = docSnap.data() as UserProfile;
-      if (data && docSnap.id) {
-        data.uid = docSnap.id;
-        if (data.telegramChatId && String(data.telegramChatId).trim() !== '') {
-          result.push(data);
-          userProfilesCache[docSnap.id] = { profile: data, fetchedAt: now };
-        }
+    for (const row of data || []) {
+      const profile = fromRow(row);
+      if (profile.telegramChatId && String(profile.telegramChatId).trim() !== '') {
+        result.push(profile);
+        userProfilesCache[profile.uid] = { profile, fetchedAt: now };
       }
-    });
+    }
 
     usersWithTelegramCache = { list: result, fetchedAt: now };
     return result;
   } catch (err: any) {
-    if (isQuotaError(err)) {
-      setFirestoreQuotaExceeded(true);
-    } else if (isPermissionDeniedError(err)) {
-      setAdminPermissionDenied(true);
-    }
     usersWithTelegramCache = { list: localList, fetchedAt: now };
     return localList;
   }
@@ -128,36 +173,29 @@ export async function getAllUserProfiles(): Promise<UserProfile[]> {
 
   const localUsersMap = readLocalJson<Record<string, UserProfile>>(USERS_FILE, {});
 
-  if (isFirestoreQuotaExceeded() || isAdminPermissionDenied()) {
+  if (!isSupabaseConfigured()) {
     const list = Object.values(localUsersMap);
     allUsersListCache = { list, fetchedAt: now };
     return list;
   }
 
   try {
-    const snap = await adminDb.collection('users').get();
+    const { data, error } = await getSupabase().from(USERS_TABLE).select('*');
+    if (error) throw error;
     const result: UserProfile[] = [];
     const updatedMap: Record<string, UserProfile> = { ...localUsersMap };
 
-    snap.forEach(docSnap => {
-      const data = docSnap.data() as UserProfile;
-      if (data && docSnap.id) {
-        data.uid = docSnap.id;
-        result.push(data);
-        updatedMap[docSnap.id] = data;
-        userProfilesCache[docSnap.id] = { profile: data, fetchedAt: now };
-      }
-    });
+    for (const row of data || []) {
+      const profile = fromRow(row);
+      result.push(profile);
+      updatedMap[profile.uid] = profile;
+      userProfilesCache[profile.uid] = { profile, fetchedAt: now };
+    }
 
     writeLocalJson(USERS_FILE, updatedMap);
     allUsersListCache = { list: result, fetchedAt: now };
     return result;
   } catch (err: any) {
-    if (isQuotaError(err)) {
-      setFirestoreQuotaExceeded(true);
-    } else if (isPermissionDeniedError(err)) {
-      setAdminPermissionDenied(true);
-    }
     const list = Object.values(localUsersMap);
     allUsersListCache = { list, fetchedAt: now };
     return list;
@@ -326,34 +364,30 @@ export async function getUserProfile(
   const durable = options.durable === true;
 
   // Ordinary app reads may use the short-lived cache. Durable payment/profile
-  // reads always go back to Firestore: an in-memory or local copy must never
+  // reads always go back to Supabase: an in-memory or local copy must never
   // be allowed to reinterpret a paid user as trial/free after a republish.
   if (!durable && userProfilesCache[uid] && (now - userProfilesCache[uid].fetchedAt < USER_CACHE_TTL_MS)) {
     return JSON.parse(JSON.stringify(userProfilesCache[uid].profile));
   }
 
   if (durable) {
-    if (isFirestoreQuotaExceeded()) {
-      throw new PaymentStoreUnavailableError('read user profile', new Error('Firestore quota exceeded'));
-    }
-    if (isAdminPermissionDenied()) {
-      throw new PaymentStoreUnavailableError('read user profile', new Error('Firestore permission denied'));
-    }
-
-    const userDoc = await runPaymentStore(
+    const row = await runPaymentStore(
       'read user profile',
-      Promise.resolve().then(() => adminDb.collection('users').doc(uid).get()),
+      (async () => {
+        const { data, error } = await getSupabase()
+          .from(USERS_TABLE)
+          .select('*')
+          .eq('uid', uid)
+          .maybeSingle();
+        if (error) throw error;
+        return data;
+      })(),
       10_000,
-    ).catch((err: any) => {
-      if (isQuotaError(err?.cause || err)) setFirestoreQuotaExceeded(true);
-      if (isPermissionDeniedError(err?.cause || err)) setAdminPermissionDenied(true);
-      throw err;
-    });
+    );
 
-    if (!userDoc.exists) return null;
+    if (!row) return null;
 
-    const data = userDoc.data() as UserProfile;
-    data.uid = uid;
+    const data = fromRow(row);
     userProfilesCache[uid] = { profile: data, fetchedAt: now };
 
     // Local JSON is only a disposable cache here, never the source of truth.
@@ -366,14 +400,18 @@ export async function getUserProfile(
     return JSON.parse(JSON.stringify(data));
   }
 
-  // General app path: Firestore first, local cache only as a resilience
+  // General app path: Supabase first, local cache only as a resilience
   // fallback for non-payment features. Payment code must pass durable:true.
-  if (!isFirestoreQuotaExceeded() && !isAdminPermissionDenied()) {
+  if (isSupabaseConfigured()) {
     try {
-      const userDoc = await adminDb.collection('users').doc(uid).get();
-      if (userDoc.exists) {
-        const data = userDoc.data() as UserProfile;
-        data.uid = uid;
+      const { data: row, error } = await getSupabase()
+        .from(USERS_TABLE)
+        .select('*')
+        .eq('uid', uid)
+        .maybeSingle();
+      if (error) throw error;
+      if (row) {
+        const data = fromRow(row);
         userProfilesCache[uid] = { profile: data, fetchedAt: now };
 
         try {
@@ -385,14 +423,10 @@ export async function getUserProfile(
         return JSON.parse(JSON.stringify(data));
       }
     } catch (err: any) {
-      if (isQuotaError(err)) {
-        setFirestoreQuotaExceeded(true);
-      } else if (isPermissionDeniedError(err)) {
-        setAdminPermissionDenied(true);
-      } else if (isOfflineOrNetworkError(err)) {
-        console.info(`[UsersDao] Firestore connecting for ${uid}, serving profile from local cache.`);
+      if (isOfflineOrNetworkError(err)) {
+        console.info(`[UsersDao] Supabase connecting for ${uid}, serving profile from local cache.`);
       } else {
-        console.warn(`[UsersDao] Firestore read notice for ${uid}:`, err?.message || err);
+        console.warn(`[UsersDao] Supabase read notice for ${uid}:`, err?.message || err);
       }
     }
   }
@@ -413,13 +447,6 @@ export async function saveUserProfile(
   options: { durable?: boolean } = {},
 ): Promise<UserProfile> {
   const durable = options.durable === true;
-
-  if (durable && isFirestoreQuotaExceeded()) {
-    throw new PaymentStoreUnavailableError('save user profile', new Error('Firestore quota exceeded'));
-  }
-  if (durable && isAdminPermissionDenied()) {
-    throw new PaymentStoreUnavailableError('save user profile', new Error('Firestore permission denied'));
-  }
 
   let existingProfile: UserProfile | undefined;
   if (durable) {
@@ -449,19 +476,20 @@ export async function saveUserProfile(
   if (durable) {
     await runPaymentStore(
       'save user profile',
-      Promise.resolve().then(() => adminDb.collection('users').doc(uid).set(updated, { merge: true })),
+      (async () => {
+        const { error } = await getSupabase()
+          .from(USERS_TABLE)
+          .upsert(toRow(updated), { onConflict: 'uid' });
+        if (error) throw error;
+      })(),
       12_000,
-    ).catch((err: any) => {
-      if (isQuotaError(err?.cause || err)) setFirestoreQuotaExceeded(true);
-      if (isPermissionDeniedError(err?.cause || err)) setAdminPermissionDenied(true);
-      throw err;
-    });
+    );
 
     userProfilesCache[uid] = { profile: updated, fetchedAt: Date.now() };
     allUsersListCache = null;
     usersWithTelegramCache = null;
 
-    // Cache only after Firestore confirms the write. A successful durable
+    // Cache only after Supabase confirms the write. A successful durable
     // return must never mean "saved only in revision-local JSON".
     try {
       const localUsersMap = readLocalJson<Record<string, UserProfile>>(USERS_FILE, {});
@@ -482,26 +510,22 @@ export async function saveUserProfile(
     writeLocalJson(USERS_FILE, localUsersMap);
   } catch { /* non-fatal cache write */ }
 
-  if (!isFirestoreQuotaExceeded() && !isAdminPermissionDenied()) {
+  if (isSupabaseConfigured()) {
     try {
       await withRetry(async () => {
-        await adminDb.collection('users').doc(uid).set(updated, { merge: true });
+        const { error } = await getSupabase()
+          .from(USERS_TABLE)
+          .upsert(toRow(updated), { onConflict: 'uid' });
+        if (error) throw error;
       }, {
         delays: [700, 1500, 3000],
         onRetry: (err, attempt) => {
-          console.warn(`[UsersDao] Retrying Firestore write for user ${uid} (attempt ${attempt}):`, err?.message || err);
+          console.warn(`[UsersDao] Retrying Supabase write for user ${uid} (attempt ${attempt}):`, err?.message || err);
         }
       });
     } catch (err: any) {
-      if (isQuotaError(err)) {
-        setFirestoreQuotaExceeded(true);
-        addLog('WARNING', 'SYNC', `Firestore quota limit reached during user profile save for ${uid}. Saved to local fallback.`);
-      } else if (isPermissionDeniedError(err)) {
-        setAdminPermissionDenied(true);
-      } else {
-        addLog('ERROR', 'SYNC', `Failed to persist user profile for ${uid} to Firestore after retries: ${err?.message || err}`);
-        console.error(`[UsersDao] Error persisting profile for ${uid}:`, err);
-      }
+      addLog('ERROR', 'SYNC', `Failed to persist user profile for ${uid} to Supabase after retries: ${err?.message || err}`);
+      console.error(`[UsersDao] Error persisting profile for ${uid}:`, err);
     }
   }
 
@@ -516,8 +540,9 @@ const freeDemoLocks = new Map<string, Promise<void>>();
  * Atomically claim the one-time free AI summary demo for a free-plan user.
  * Returns true if THIS call won the claim (caller may generate the summary),
  * false if the demo was already used (caller must 403).
- * - Firestore transaction when available (atomic across Cloud Run instances).
- * - Serialized local read-modify-write fallback when Firestore is down.
+ * - Supabase function claim_free_summary_demo when available (atomic across
+ *   Cloud Run instances: single INSERT-or-conditional-UPDATE statement).
+ * - Serialized local read-modify-write fallback when Supabase is down.
  */
 export async function claimFreeSummaryDemo(uid: string): Promise<boolean> {
   const prev = freeDemoLocks.get(uid) || Promise.resolve();
@@ -527,16 +552,10 @@ export async function claimFreeSummaryDemo(uid: string): Promise<boolean> {
   freeDemoLocks.set(uid, chained);
   await prev;
   try {
-    if (!isFirestoreQuotaExceeded() && !isAdminPermissionDenied()) {
+    if (isSupabaseConfigured()) {
       try {
-        const won = await adminDb.runTransaction(async (tx) => {
-          const ref = adminDb.collection('users').doc(uid);
-          const snap = await tx.get(ref);
-          const data = (snap.exists ? snap.data() : {}) as any;
-          if (data?.freeSummaryUsed) return false;
-          tx.set(ref, { freeSummaryUsed: true, uid }, { merge: true });
-          return true;
-        });
+        const { data: won, error } = await getSupabase().rpc('claim_free_summary_demo', { p_uid: uid });
+        if (error) throw error;
         if (won) {
           // Keep in-memory cache + local fallback in sync with the won claim
           try {
@@ -546,13 +565,11 @@ export async function claimFreeSummaryDemo(uid: string): Promise<boolean> {
             localUsersMap[uid] = updated;
             writeLocalJson(USERS_FILE, localUsersMap);
             userProfilesCache[uid] = { profile: updated, fetchedAt: Date.now() };
-          } catch { /* cache sync is best-effort; Firestore is authoritative */ }
+          } catch { /* cache sync is best-effort; Supabase is authoritative */ }
         }
-        return won;
+        return !!won;
       } catch (err: any) {
-        if (isQuotaError(err)) setFirestoreQuotaExceeded(true);
-        else if (isPermissionDeniedError(err)) setAdminPermissionDenied(true);
-        else console.warn(`[UsersDao] Free-demo claim transaction notice for ${uid}:`, err?.message || err);
+        console.warn(`[UsersDao] Free-demo claim notice for ${uid}:`, err?.message || err);
         // fall through to the serialized local fallback
       }
     }

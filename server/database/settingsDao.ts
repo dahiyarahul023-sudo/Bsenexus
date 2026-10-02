@@ -1,5 +1,5 @@
-import { adminDb } from './firebase.js';
-import { isFirestoreQuotaExceeded, setFirestoreQuotaExceeded, isQuotaError, isPermissionDeniedError, setAdminPermissionDenied, isAdminPermissionDenied, readLocalJson, writeLocalJson } from './localStore.js';
+import { getSupabase, isSupabaseConfigured } from './supabase.js';
+import { readLocalJson, writeLocalJson } from './localStore.js';
 
 export interface AppSettings {
   botToken: string;
@@ -9,7 +9,7 @@ export interface AppSettings {
   appPinHash?: string;
   excludeKeywords?: string;
   telegramAlertPriority?: 'HIGH_ONLY' | 'HIGH_MEDIUM' | 'ALL';
-  telegramAlertCategory?: 'ALL' | 'RESULTS_ONLY' | 'RESULTS_AND_CONCALLS' | 'RESULTS_AND_MATERIAL';
+  telegramAlertCategory?: 'ALL' | 'RESULTS_ONLY' | 'RESULTS_AND_MATERIAL';
   telegramWatchlistOnly?: boolean;
   telegramAlertsEnabled?: boolean;
   telegramAiSummaryEnabled?: boolean;
@@ -21,7 +21,7 @@ export interface AppSettings {
   muteInAppNotifications?: boolean;
 }
 
-const SETTINGS_ID = 'global';
+const SETTINGS_KEY = 'global';
 const SETTINGS_FILE = 'settings.json';
 
 const defaultSettings: AppSettings = {
@@ -60,6 +60,17 @@ let cachedSettings: AppSettings | null = null;
 let lastSettingsFetchTime = 0;
 const SETTINGS_CACHE_TTL_MS = 15000; // 15 seconds TTL for multi-instance sync
 
+async function readCloudSettings(): Promise<Partial<AppSettings> | null> {
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from('settings')
+    .select('value')
+    .eq('key', SETTINGS_KEY)
+    .maybeSingle();
+  if (error) throw error;
+  return (data?.value as Partial<AppSettings>) ?? null;
+}
+
 export async function getSettings(): Promise<AppSettings> {
   const now = Date.now();
   if (cachedSettings && (now - lastSettingsFetchTime < SETTINGS_CACHE_TTL_MS)) {
@@ -74,30 +85,18 @@ export async function getSettings(): Promise<AppSettings> {
     return { ...cachedSettings };
   }
 
-  if (isFirestoreQuotaExceeded() || isAdminPermissionDenied()) {
+  if (!isSupabaseConfigured()) {
     return sanitizeSettings(cachedSettings);
   }
-  
+
   try {
-    const snap = await adminDb.collection('settings').doc(SETTINGS_ID).get();
-    if (snap.exists) {
-      const data = snap.data() as AppSettings;
-      cachedSettings = sanitizeSettings(data);
-      writeLocalJson(SETTINGS_FILE, cachedSettings);
-      lastSettingsFetchTime = Date.now();
-      return { ...cachedSettings };
-    }
-    
-    cachedSettings = sanitizeSettings(defaultSettings);
+    const cloud = await readCloudSettings();
+    cachedSettings = sanitizeSettings(cloud ?? defaultSettings);
     writeLocalJson(SETTINGS_FILE, cachedSettings);
     lastSettingsFetchTime = Date.now();
     return { ...cachedSettings };
   } catch (err: any) {
-    if (isQuotaError(err)) {
-      setFirestoreQuotaExceeded(true);
-    } else if (isPermissionDeniedError(err)) {
-      setAdminPermissionDenied(true);
-    }
+    console.warn('[Settings] Supabase read failed, using cached/local:', err?.message || err);
     return sanitizeSettings(cachedSettings);
   }
 }
@@ -109,7 +108,7 @@ export async function saveSettings(settings: Partial<AppSettings>) {
 
   // Read current local disk settings
   const diskSettings = readLocalJson<AppSettings | null>(SETTINGS_FILE, null) || defaultSettings;
-  
+
   // Guard against unsetting existing botToken / chatId if empty string passed
   const cleanSettings = { ...settings };
   if (cleanSettings.botToken !== undefined && !cleanSettings.botToken.trim()) {
@@ -121,22 +120,24 @@ export async function saveSettings(settings: Partial<AppSettings>) {
   }
 
   const updated = sanitizeSettings({ ...diskSettings, ...cleanSettings });
-  
+
   // Save merged state to local disk immediately
   writeLocalJson(SETTINGS_FILE, updated);
   cachedSettings = updated;
   lastSettingsFetchTime = Date.now();
 
-  if (isFirestoreQuotaExceeded() || isAdminPermissionDenied()) return;
+  if (!isSupabaseConfigured()) return;
 
   try {
-    await adminDb.collection('settings').doc(SETTINGS_ID).set(cleanSettings, { merge: true });
+    // Read-modify-write so partial updates merge (same semantics as the old
+    // Firestore set(..., { merge: true })).
+    const cloud = await readCloudSettings();
+    const merged = sanitizeSettings({ ...(cloud || {}), ...cleanSettings });
+    const { error } = await getSupabase()
+      .from('settings')
+      .upsert({ key: SETTINGS_KEY, value: merged }, { onConflict: 'key' });
+    if (error) throw error;
   } catch (err: any) {
-    if (isQuotaError(err)) {
-      setFirestoreQuotaExceeded(true);
-    } else if (isPermissionDeniedError(err)) {
-      setAdminPermissionDenied(true);
-    }
+    console.warn('[Settings] Supabase write failed (local copy kept):', err?.message || err);
   }
 }
-

@@ -5,7 +5,7 @@ import { sendToTelegram } from './telegram.js';
 import { addLog } from '../database/logDao.js';
 import { getActiveWatchlistSymbols, getAllActiveWatchlistsAcrossUsers } from '../database/watchlistDao.js';
 
-import { deleteAnnouncementsFromStorageAndFirestore } from '../database/announcementDao.js';
+import { deleteAnnouncementsFromStorageAndCloud } from '../database/announcementDao.js';
 
 interface StorageAlertState {
   lastAlertPercentage: number;
@@ -190,7 +190,7 @@ export async function runAutoStorageCleanup(force: boolean = false): Promise<{
 
   const prunedDocIds = prunedItems.map(i => i.id || i.newsId).filter(Boolean);
   if (prunedDocIds.length > 0) {
-    await deleteAnnouncementsFromStorageAndFirestore(prunedDocIds);
+    await deleteAnnouncementsFromStorageAndCloud(prunedDocIds);
   } else {
     writeLocalJson(ANNOUNCEMENTS_FILE, finalAnnouncements);
   }
@@ -302,7 +302,7 @@ export async function pruneAnnouncementsByPercentage(
   // Delete dropped items from Firestore, memory, and local disk
   const droppedIds = droppedFromPool.map(i => i.id || i.newsId).filter(Boolean);
   if (droppedIds.length > 0) {
-    await deleteAnnouncementsFromStorageAndFirestore(droppedIds);
+    await deleteAnnouncementsFromStorageAndCloud(droppedIds);
   } else {
     writeLocalJson(ANNOUNCEMENTS_FILE, finalCombined);
   }
