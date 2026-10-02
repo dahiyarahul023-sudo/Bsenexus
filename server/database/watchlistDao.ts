@@ -785,7 +785,33 @@ export async function getActiveWatchlistSymbols(userId?: string, opts?: GetWatch
     return [...new Set(symbols)];
   }
 
-  // Aggregate across all known users and primary owner
+  // Aggregate across all users from Supabase (Phase 1: Supabase is source of truth)
+  // This ensures ANY user's watchlist (pro, free, admin) protects their stocks' announcements
+  if (isSupabaseConfigured()) {
+    try {
+      const { data, error } = await getSupabase()
+        .from(WATCHLISTS_TABLE)
+        .select('lists');
+      if (!error && data) {
+        for (const row of data) {
+          const lists = Array.isArray(row.lists) ? row.lists : [];
+          for (const list of lists) {
+            if (list && list.is_active !== false) {
+              const listItems = Array.isArray(list.items) ? list.items : [];
+              for (const it of listItems) {
+                const sym = extractSymbol(it);
+                if (sym) symbols.push(sym);
+              }
+            }
+          }
+        }
+        // Supabase gave us the full picture; skip the legacy local fallback
+        return [...new Set(symbols)];
+      }
+    } catch {}
+  }
+
+  // Legacy fallback: hardcoded UIDs + local users.json (pre-Supabase)
   const knownUids = new Set<string>(['bcb4FayOgxYPdyH7HoBKlfCpjZB2', 'guest']);
   try {
     const users = readLocalJson<Record<string, any>>('users.json', {});

@@ -146,7 +146,7 @@ export async function runAutoStorageCleanup(force: boolean = false): Promise<{
   // 1. Process Announcements Pruning
   const announcements = readLocalJson<any[]>(ANNOUNCEMENTS_FILE, []);
   const now = Date.now();
-  const sixtyDaysMs = 60 * 24 * 60 * 60 * 1000;
+  const tenDaysMs = 10 * 24 * 60 * 60 * 1000;
   const twoYearsMs = 730 * 24 * 60 * 60 * 1000;
 
   const preserved: any[] = [];
@@ -165,24 +165,25 @@ export async function runAutoStorageCleanup(force: boolean = false): Promise<{
       }
     }
 
-    // Rule 2: If item is generic noise (category === 'OTHER') and older than 60 days, prune it
-    if (age > sixtyDaysMs) {
+    // Rule 2: General announcements (not on any user's watchlist, not Results)
+    // are pruned after 10 days per user policy (max 3000 kept)
+    if (age > tenDaysMs) {
       prunedItems.push(item);
       continue;
     }
 
-    // Rule 3: Keep other items within safe capacity (max 5000 generic non-watchlist items)
+    // Rule 3: Keep other items within safe capacity (max 3000 general non-watchlist items)
     preserved.push(item);
   }
 
-  // If still above 8,000 items, trim oldest non-essential items while preserving all results/watchlists
+  // If still above 3,000 items, trim oldest non-essential items while preserving all results/watchlists
   let finalAnnouncements = preserved;
-  if (preserved.length > 8000) {
+  if (preserved.length > 3000) {
     const highPriority = preserved.filter(i => i.isWatchlist || i.category === 'RESULTS' || i.category === 'CONFERENCE_CALL');
     const standardPriority = preserved.filter(i => !i.isWatchlist && i.category !== 'RESULTS' && i.category !== 'CONFERENCE_CALL');
     standardPriority.sort((a, b) => (b.bseTimestamp || b.fetched_at || 0) - (a.bseTimestamp || a.fetched_at || 0));
-    const keptStandard = standardPriority.slice(0, 4000);
-    const trimmedStandard = standardPriority.slice(4000);
+    const keptStandard = standardPriority.slice(0, 3000);
+    const trimmedStandard = standardPriority.slice(3000);
     prunedItems.push(...trimmedStandard);
     finalAnnouncements = [...highPriority, ...keptStandard];
     finalAnnouncements.sort((a, b) => (b.bseTimestamp || b.fetched_at || 0) - (a.bseTimestamp || a.fetched_at || 0));
