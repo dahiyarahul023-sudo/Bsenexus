@@ -4,8 +4,8 @@
  * Payment records are intentionally NOT part of the app's general
  * local-JSON fallback system. Cloud Run files are revision-local, so a
  * payment written only there can disappear on the next republish.
- * Every payment-critical Firestore operation therefore either succeeds
- * in Firestore or fails closed with PaymentStoreUnavailableError. The
+ * Every payment-critical Supabase operation therefore either succeeds
+ * in Supabase or fails closed with PaymentStoreUnavailableError. The
  * caller can then tell the user to retry / let Cashfree retry the
  * webhook instead of pretending that a local-only payment is durable.
  */
@@ -50,31 +50,22 @@ export function isPaymentOrderOwnershipError(error: unknown): boolean {
   );
 }
 
-import {
-  isFirestoreQuotaExceeded,
-  isAdminPermissionDenied,
-  isQuotaError,
-  isPermissionDeniedError,
-  setFirestoreQuotaExceeded,
-  setAdminPermissionDenied,
-} from './localStore.js';
+import { isSupabaseConfigured } from './supabase.js';
 
 /**
- * Run one Firestore payment operation with a hard timeout. Any Firestore
- * error (quota, permission, network, timeout, missing configuration) is
- * normalized to PaymentStoreUnavailableError so payment code never falls
- * through to ephemeral local storage by accident.
+ * Run one Supabase payment operation with a hard timeout. Any Supabase
+ * error (network, timeout, missing configuration) is normalized to
+ * PaymentStoreUnavailableError so payment code never falls through to
+ * ephemeral local storage by accident. PaymentOrderOwnershipError passes
+ * through untouched — it is a caller bug, not a store outage.
  */
 export async function runPaymentStore<T>(
   operation: string,
   promise: Promise<T>,
   timeoutMs = 10_000,
 ): Promise<T> {
-  if (isFirestoreQuotaExceeded()) {
-    throw new PaymentStoreUnavailableError(operation, new Error('Firestore quota exceeded'));
-  }
-  if (isAdminPermissionDenied()) {
-    throw new PaymentStoreUnavailableError(operation, new Error('Firestore permission denied'));
+  if (!isSupabaseConfigured()) {
+    throw new PaymentStoreUnavailableError(operation, new Error('Supabase not configured'));
   }
 
   const TIMEOUT = Symbol('payment-store-timeout');
@@ -93,13 +84,6 @@ export async function runPaymentStore<T>(
     }
     return result;
   } catch (error) {
-    const rawErr = (error as any)?.cause || error;
-    if (isQuotaError(rawErr)) {
-      setFirestoreQuotaExceeded(true);
-    } else if (isPermissionDeniedError(rawErr)) {
-      setAdminPermissionDenied(true);
-    }
-
     if (error instanceof PaymentStoreUnavailableError || isPaymentOrderOwnershipError(error)) {
       throw error;
     }

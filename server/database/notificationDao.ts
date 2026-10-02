@@ -1,5 +1,5 @@
-import { adminDb } from './firebase.js';
-import { readLocalJson, writeLocalJson, isFirestoreQuotaExceeded, isAdminPermissionDenied, isQuotaError, isPermissionDeniedError, setFirestoreQuotaExceeded, setAdminPermissionDenied } from './localStore.js';
+import { getSupabase, isSupabaseConfigured } from './supabase.js';
+import { readLocalJson, writeLocalJson } from './localStore.js';
 
 export interface AppNotification {
   id: string;
@@ -33,58 +33,102 @@ function scheduleSave() {
   }, 1000);
 }
 
-const NOTIFICATIONS_COLLECTION = 'notifications';
+const NOTIFICATIONS_TABLE = 'notifications';
 const MAX_CACHED = 500;
 
-// --- Firestore persistence (fire-and-forget; never blocks the caller) ---
+// --- Row mapping: camelCase app shape <-> snake_case Postgres columns ---
+function toRow(n: AppNotification): Record<string, any> {
+  return {
+    id: n.id,
+    user_id: n.userId || 'system',
+    title: n.title,
+    message: n.message,
+    type: n.type,
+    priority: n.priority,
+    symbol: n.symbol || null,
+    scrip_code: n.scripCode || null,
+    news_id: n.newsId || null,
+    pdf_link: n.pdfLink || null,
+    timestamp: n.timestamp,
+    is_read: !!n.isRead,
+    is_watchlist: !!n.isWatchlist,
+    metadata: n.metadata || {},
+  };
+}
+
+function fromRow(r: any): AppNotification {
+  return {
+    id: r.id,
+    title: r.title || '',
+    message: r.message || '',
+    type: r.type || 'GENERAL',
+    priority: r.priority || 'LOW',
+    symbol: r.symbol || '',
+    scripCode: r.scrip_code || '',
+    newsId: r.news_id || undefined,
+    pdfLink: r.pdf_link || undefined,
+    timestamp: Number(r.timestamp) || 0,
+    isRead: !!r.is_read,
+    userId: r.user_id || 'system',
+    isWatchlist: !!r.is_watchlist,
+    metadata: r.metadata || {},
+  };
+}
+
+// --- Supabase persistence (fire-and-forget; never blocks the caller) ---
 // The local JSON file lives on Cloud Run's ephemeral filesystem, so without
 // this the inbox goes empty on every restart/republish.
 
 function persistNotificationToCloud(n: AppNotification): void {
-  if (isFirestoreQuotaExceeded() || isAdminPermissionDenied()) return;
-  adminDb.collection(NOTIFICATIONS_COLLECTION).doc(n.id).set(n, { merge: true }).catch((err: any) => {
-    if (isQuotaError(err)) setFirestoreQuotaExceeded(true);
-    else if (isPermissionDeniedError(err)) setAdminPermissionDenied(true);
-  });
+  if (!isSupabaseConfigured()) return;
+  void (async () => {
+    try {
+      const { error } = await getSupabase().from(NOTIFICATIONS_TABLE).upsert(toRow(n), { onConflict: 'id' });
+      if (error) throw error;
+    } catch { /* fire-and-forget: local cache is the source of truth for reads */ }
+  })();
 }
 
 function deleteNotificationFromCloud(id: string): void {
-  if (isFirestoreQuotaExceeded() || isAdminPermissionDenied()) return;
-  adminDb.collection(NOTIFICATIONS_COLLECTION).doc(id).delete().catch((err: any) => {
-    if (isQuotaError(err)) setFirestoreQuotaExceeded(true);
-    else if (isPermissionDeniedError(err)) setAdminPermissionDenied(true);
-  });
+  if (!isSupabaseConfigured()) return;
+  void (async () => {
+    try {
+      const { error } = await getSupabase().from(NOTIFICATIONS_TABLE).delete().eq('id', id);
+      if (error) throw error;
+    } catch { /* fire-and-forget */ }
+  })();
 }
 
 let notificationsCloudInitDone = false;
-/** One-time background restore of notifications from Firestore into the memory cache. */
-export async function initNotificationsFromFirestore(): Promise<void> {
+/** One-time background restore of notifications from Supabase into the memory cache. */
+export async function initNotificationsFromCloud(): Promise<void> {
   if (notificationsCloudInitDone) return;
   notificationsCloudInitDone = true;
-  if (isFirestoreQuotaExceeded() || isAdminPermissionDenied()) return;
+  if (!isSupabaseConfigured()) return;
   try {
-    const snap = await adminDb.collection(NOTIFICATIONS_COLLECTION)
-      .orderBy('timestamp', 'desc')
-      .limit(MAX_CACHED)
-      .get();
+    const { data, error } = await getSupabase()
+      .from(NOTIFICATIONS_TABLE)
+      .select('*')
+      .order('timestamp', { ascending: false })
+      .limit(MAX_CACHED);
+    if (error) throw error;
     const seen = new Set(notificationsCache.map(n => n.id));
     let added = 0;
-    snap.forEach(docSnap => {
-      const data = docSnap.data() as AppNotification;
-      if (data && data.id && !seen.has(data.id)) {
-        seen.add(data.id);
-        notificationsCache.push(data);
+    for (const row of data || []) {
+      const notif = fromRow(row);
+      if (notif.id && !seen.has(notif.id)) {
+        seen.add(notif.id);
+        notificationsCache.push(notif);
         added++;
       }
-    });
+    }
     if (added > 0) {
       notificationsCache.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
       if (notificationsCache.length > MAX_CACHED) notificationsCache = notificationsCache.slice(0, MAX_CACHED);
       scheduleSave();
     }
   } catch (err: any) {
-    if (isQuotaError(err)) setFirestoreQuotaExceeded(true);
-    else if (isPermissionDeniedError(err)) setAdminPermissionDenied(true);
+    console.warn('[Notifications] cloud restore failed:', err?.message || err);
   }
 }
 
@@ -221,17 +265,16 @@ export function addNotificationsBatch(
 }
 
 function markReadStatusToCloud(ids: string[]): void {
-  if (!ids.length || isFirestoreQuotaExceeded() || isAdminPermissionDenied()) return;
-  try {
-    const batch = adminDb.batch();
-    for (const id of ids.slice(0, MAX_CACHED)) {
-      batch.set(adminDb.collection(NOTIFICATIONS_COLLECTION).doc(id), { isRead: true }, { merge: true });
-    }
-    batch.commit().catch((err: any) => {
-      if (isQuotaError(err)) setFirestoreQuotaExceeded(true);
-      else if (isPermissionDeniedError(err)) setAdminPermissionDenied(true);
-    });
-  } catch { /* never break the request path on bookkeeping */ }
+  if (!ids.length || !isSupabaseConfigured()) return;
+  void (async () => {
+    try {
+      const { error } = await getSupabase()
+        .from(NOTIFICATIONS_TABLE)
+        .update({ is_read: true })
+        .in('id', ids.slice(0, MAX_CACHED));
+      if (error) throw error;
+    } catch { /* never break the request path on bookkeeping */ }
+  })();
 }
 
 export function markNotificationsReadBatch(ids: string[], userId: string = 'guest'): number {

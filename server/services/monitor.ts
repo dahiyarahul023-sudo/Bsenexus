@@ -7,7 +7,7 @@ import { getActiveWatchlistSymbols, getActiveWatchlistSymbolMap } from '../datab
 import { getAllUserProfiles } from '../database/usersDao.js';
 import { isAnnouncementProcessed, isAnnouncementSent, markAnnouncementSent, saveAnnouncement, pruneAndCheckStorageCapacity, initAnnouncementCache } from '../database/announcementDao.js';
 import { escapeHTML, determinePriority, isSymbolMatch, parseBseDate, isMarketHoursIST } from '../utils/helpers.js';
-import { addNotification, initNotificationsFromFirestore } from '../database/notificationDao.js';
+import { addNotification, initNotificationsFromCloud } from '../database/notificationDao.js';
 import { evaluateAlertRulesForUser } from '../database/alertRulesDao.js';
 import { classifyMaterialEvent } from './timelineClassifier.js';
 import { doesAnnouncementMatchUserPrefs, isTelegramEligible } from '../utils/alertDecision.js';
@@ -118,8 +118,8 @@ export async function processAnnouncements() {
   try {
     if (!isCacheInitialized) {
       await initAnnouncementCache();
-      // Restore in-app notifications from Firestore in the background (never blocks polling)
-      initNotificationsFromFirestore().catch(() => {});
+      // Restore in-app notifications from Supabase in the background (never blocks polling)
+      initNotificationsFromCloud().catch(() => {});
       isCacheInitialized = true;
     }
 
@@ -138,7 +138,7 @@ export async function processAnnouncements() {
           isBseOutageActive = true;
           lastAlertTime = Date.now();
           const errDetail = getLastBseError();
-          const alertMsg = `⚠️ <b>Bsenexus System Alert</b>\n\nUnable to fetch live feed from BSE India (${errDetail}). Both primary and backup endpoints failed.\n\n<b>Diagnostics:</b>\n• Exchange API unreachable or cloud IP filtered.\n• Exponential backoff retries active.\n• Recovery notification will be sent automatically upon reconnection.\n\n<i>No further outage alerts will be sent during this episode.</i>`;
+          const alertMsg = `⚠️ <b>BSE Nexus System Alert</b>\n\nUnable to fetch live feed from BSE India (${errDetail}). Both primary and backup endpoints failed.\n\n<b>Diagnostics:</b>\n• Exchange API unreachable or cloud IP filtered.\n• Exponential backoff retries active.\n• Recovery notification will be sent automatically upon reconnection.\n\n<i>No further outage alerts will be sent during this episode.</i>`;
           await sendToTelegram(alertMsg);
           await addLog('CRITICAL', 'SYSTEM', `Sent BSE Outage Alert to Telegram: ${errDetail}`);
         }

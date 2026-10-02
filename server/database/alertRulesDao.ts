@@ -1,5 +1,5 @@
-import { adminDb } from './firebase.js';
-import { readLocalJson, writeLocalJson, isFirestoreQuotaExceeded, setFirestoreQuotaExceeded, isQuotaError, isOfflineOrNetworkError, isPermissionDeniedError, setAdminPermissionDenied, isAdminPermissionDenied } from './localStore.js';
+import { getSupabase, isSupabaseConfigured } from './supabase.js';
+import { readLocalJson, writeLocalJson, isOfflineOrNetworkError } from './localStore.js';
 import { withRetry } from '../utils/retry.js';
 
 export interface AlertRule {
@@ -93,14 +93,17 @@ if (rulesCache.length === 0) {
   writeLocalJson(ALERT_RULES_FILE, rulesCache);
 }
 
-// Initial background sync to restore custom rules from Firestore
-export async function initAlertRulesFromFirestore(): Promise<void> {
-  if (isFirestoreQuotaExceeded() || isAdminPermissionDenied()) return;
+const ALERT_RULES_TABLE = 'alert_rules';
+
+// Initial background sync to restore custom rules from Supabase
+export async function initAlertRulesFromCloud(): Promise<void> {
+  if (!isSupabaseConfigured()) return;
   try {
-    const snap = await adminDb.collection('alert_rules').get();
+    const { data, error } = await getSupabase().from(ALERT_RULES_TABLE).select('rule');
+    if (error) throw error;
     let added = 0;
-    snap.forEach(docSnap => {
-      const cloudRule = docSnap.data() as AlertRule;
+    for (const row of data || []) {
+      const cloudRule = row.rule as AlertRule;
       if (cloudRule && cloudRule.id) {
         const idx = rulesCache.findIndex(r => r.id === cloudRule.id);
         if (idx >= 0) {
@@ -110,22 +113,18 @@ export async function initAlertRulesFromFirestore(): Promise<void> {
           added++;
         }
       }
-    });
+    }
     if (added > 0) {
       writeLocalJson(ALERT_RULES_FILE, rulesCache);
     }
   } catch (err: any) {
-    if (isQuotaError(err)) {
-      setFirestoreQuotaExceeded(true);
-    } else if (isPermissionDeniedError(err)) {
-      setAdminPermissionDenied(true);
-    } else if (!isOfflineOrNetworkError(err)) {
+    if (!isOfflineOrNetworkError(err)) {
       console.warn('[AlertRulesDao] Cloud sync notice:', err?.message || err);
     }
   }
 }
 setTimeout(() => {
-  initAlertRulesFromFirestore().catch(() => {});
+  initAlertRulesFromCloud().catch(() => {});
 }, 3000);
 
 export function getAllAlertRules(userId: string = 'guest'): AlertRule[] {
@@ -133,33 +132,25 @@ export function getAllAlertRules(userId: string = 'guest'): AlertRule[] {
 }
 
 async function persistRuleToCloud(rule: AlertRule): Promise<void> {
-  if (rule.userId === 'system' || isFirestoreQuotaExceeded() || isAdminPermissionDenied()) return;
+  if (rule.userId === 'system' || !isSupabaseConfigured()) return;
   try {
     await withRetry(async () => {
-      await adminDb.collection('alert_rules').doc(rule.id).set(rule, { merge: true });
+      const { error } = await getSupabase()
+        .from(ALERT_RULES_TABLE)
+        .upsert({ id: rule.id, user_id: rule.userId, rule }, { onConflict: 'id' });
+      if (error) throw error;
     }, { maxRetries: 1 });
-  } catch (err: any) {
-    if (isQuotaError(err)) {
-      setFirestoreQuotaExceeded(true);
-    } else if (isPermissionDeniedError(err)) {
-      setAdminPermissionDenied(true);
-    }
-  }
+  } catch { /* fire-and-forget: local cache is the source of truth for reads */ }
 }
 
 async function removeRuleFromCloud(ruleId: string): Promise<void> {
-  if (isFirestoreQuotaExceeded() || isAdminPermissionDenied()) return;
+  if (!isSupabaseConfigured()) return;
   try {
     await withRetry(async () => {
-      await adminDb.collection('alert_rules').doc(ruleId).delete();
+      const { error } = await getSupabase().from(ALERT_RULES_TABLE).delete().eq('id', ruleId);
+      if (error) throw error;
     }, { maxRetries: 1 });
-  } catch (err: any) {
-    if (isQuotaError(err)) {
-      setFirestoreQuotaExceeded(true);
-    } else if (isPermissionDeniedError(err)) {
-      setAdminPermissionDenied(true);
-    }
-  }
+  } catch { /* fire-and-forget */ }
 }
 
 export function saveAlertRule(rule: Partial<AlertRule> & { name: string }, userId: string = 'guest'): AlertRule {

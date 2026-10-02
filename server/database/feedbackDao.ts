@@ -1,5 +1,5 @@
-import { adminDb } from './firebase.js';
-import { readLocalJson, writeLocalJson, isQuotaError, isPermissionDeniedError, setFirestoreQuotaExceeded, setAdminPermissionDenied } from './localStore.js';
+import { getSupabase, isSupabaseConfigured } from './supabase.js';
+import { readLocalJson, writeLocalJson } from './localStore.js';
 
 export interface UserFeedback {
   id: string;
@@ -42,17 +42,18 @@ export async function saveFeedback(entry: {
   if (feedbackCache.length > 1000) feedbackCache.length = 1000;
   scheduleFeedbackDiskSave();
 
-  // Firestore sync runs in the background — NEVER block the API response on it.
-  // A slow or unreachable Firestore must not keep the user staring at "sending".
+  // Supabase sync runs in the background — NEVER block the API response on it.
+  // A slow or unreachable Supabase must not keep the user staring at "sending".
   // The item is already in the memory cache + scheduled for local disk write,
   // and the admin Telegram notification is fire-and-forget in the route.
-  adminDb.collection('feedback').doc(item.id).set(item).catch((err: any) => {
-    if (isQuotaError(err)) {
-      setFirestoreQuotaExceeded(true);
-    } else if (isPermissionDeniedError(err)) {
-      setAdminPermissionDenied(true);
-    }
-  });
+  if (isSupabaseConfigured()) {
+    getSupabase()
+      .from('feedback')
+      .upsert({ id: item.id, data: item }, { onConflict: 'id' })
+      .then(({ error }) => {
+        if (error) console.warn('[feedbackDao] cloud sync notice:', error.message);
+      });
+  }
   return item;
 }
 
@@ -65,6 +66,23 @@ export function markFeedbackRead(id: string): boolean {
   if (!item) return false;
   item.status = 'read';
   scheduleFeedbackDiskSave();
-  adminDb.collection('feedback').doc(id).set({ status: 'read' }, { merge: true }).catch(() => {});
+  if (isSupabaseConfigured()) {
+    // Best-effort read-modify-write so the stored document keeps all fields.
+    (async () => {
+      try {
+        const { data, error } = await getSupabase()
+          .from('feedback')
+          .select('data')
+          .eq('id', id)
+          .maybeSingle();
+        if (error) throw error;
+        const merged = { ...((data as any)?.data || {}), status: 'read' };
+        const { error: upsertError } = await getSupabase()
+          .from('feedback')
+          .upsert({ id, data: merged }, { onConflict: 'id' });
+        if (upsertError) throw upsertError;
+      } catch { /* best-effort */ }
+    })();
+  }
   return true;
 }

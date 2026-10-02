@@ -1,19 +1,19 @@
 /**
  * Dedicated paid-entitlement store.
  *
- * Firestore collection: payment_entitlements/<uid>
+ * Supabase table: payment_entitlements (uid PK)
  *
- * This is deliberately separate from the ordinary users/<uid> profile.
+ * This is deliberately separate from the ordinary users row.
  * Theme choices, notification preferences, profile edits, and app
  * republishes must never be able to create, erase, shorten, or reinterpret
- * a paid subscription. The users document receives a read-model mirror
- * only after the payment entitlement itself is durable in Firestore.
+ * a paid subscription. The users row receives a read-model mirror only
+ * after the payment entitlement itself is durable in Supabase.
  *
- * Fail-closed contract: every read/write here uses Firestore directly and
- * throws PaymentStoreUnavailableError if Firestore cannot confirm the
+ * Fail-closed contract: every read/write here uses Supabase directly and
+ * throws PaymentStoreUnavailableError if Supabase cannot confirm the
  * operation. There is NO local-JSON fallback for payment entitlement.
  */
-import { adminDb } from './firebase.js';
+import { getSupabase } from './supabase.js';
 import {
   PaymentOrderOwnershipError,
   runPaymentStore,
@@ -28,7 +28,6 @@ import {
   saveUserProfile,
 } from './usersDao.js';
 import {
-  calculateGrantExpiry,
   deriveEntitlementFromOrders,
   deriveEntitlementFromProfile,
   mergePaymentEntitlementCandidates,
@@ -44,27 +43,50 @@ export {
   mergePaymentEntitlementCandidates,
 } from '../services/paymentEntitlementLogic.js';
 
-const COLLECTION = 'payment_entitlements';
-const USERS_COLLECTION = 'users';
-const ORDERS_COLLECTION = 'payment_orders';
+const ENTITLEMENTS_TABLE = 'payment_entitlements';
 
-function entitlementRef(uid: string) {
-  return adminDb.collection(COLLECTION).doc(uid);
+function toRow(e: PaymentEntitlement): Record<string, any> {
+  return {
+    uid: e.uid,
+    pro_expires_at: e.proExpiresAt,
+    pro_plan_id: e.proPlanId,
+    last_payment_at: e.lastPaymentAt,
+    last_order_id: e.lastOrderId,
+    granted_order_ids: e.grantedOrderIds || [],
+    updated_at: e.updatedAt,
+    source: e.source,
+  };
 }
 
-function userRef(uid: string) {
-  return adminDb.collection(USERS_COLLECTION).doc(uid);
-}
-
-function orderRef(orderId: string) {
-  return adminDb.collection(ORDERS_COLLECTION).doc(orderId);
+function fromRow(r: any): Partial<PaymentEntitlement> {
+  return {
+    uid: r.uid,
+    proExpiresAt: Number(r.pro_expires_at || 0),
+    proPlanId: String(r.pro_plan_id || 'pro_monthly'),
+    lastPaymentAt: Number(r.last_payment_at || 0),
+    lastOrderId: String(r.last_order_id || ''),
+    grantedOrderIds: Array.isArray(r.granted_order_ids) ? r.granted_order_ids : [],
+    updatedAt: Number(r.updated_at || 0),
+    source: r.source,
+  };
 }
 
 export async function getPaymentEntitlement(uid: string): Promise<PaymentEntitlement | null> {
   if (!uid) return null;
-  const snap = await runPaymentStore('read payment entitlement', entitlementRef(uid).get(), 10_000);
-  if (!snap.exists) return null;
-  return normalizePaymentEntitlement(uid, snap.data() as Partial<PaymentEntitlement>);
+  return runPaymentStore(
+    'read payment entitlement',
+    (async () => {
+      const { data, error } = await getSupabase()
+        .from(ENTITLEMENTS_TABLE)
+        .select('*')
+        .eq('uid', uid)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+      return normalizePaymentEntitlement(uid, fromRow(data));
+    })(),
+    10_000,
+  );
 }
 
 async function mirrorEntitlementToProfile(
@@ -104,7 +126,7 @@ async function mirrorEntitlementToProfile(
  *   3. legacy paid fields on users/<uid> (bridge for pre-isolation users)
  *
  * The furthest expiry wins. Any missing dedicated record or stale profile
- * mirror is repaired in Firestore. Local JSON is never consulted.
+ * mirror is repaired in Supabase. Local JSON is never consulted.
  */
 export async function reconcilePaymentEntitlement(uid: string): Promise<{
   entitlement: PaymentEntitlement | null;
@@ -135,7 +157,12 @@ export async function reconcilePaymentEntitlement(uid: string): Promise<{
     };
     await runPaymentStore(
       'repair payment entitlement',
-      entitlementRef(uid).set(durable, { merge: true }),
+      (async () => {
+        const { error } = await getSupabase()
+          .from(ENTITLEMENTS_TABLE)
+          .upsert(toRow(durable), { onConflict: 'uid' });
+        if (error) throw error;
+      })(),
       12_000,
     );
     repaired = true;
@@ -166,140 +193,52 @@ export interface AtomicPaymentGrantResult {
 }
 
 /**
- * Grant Pro atomically in ONE Firestore transaction:
+ * Grant Pro atomically in ONE Postgres function call:
  *   - payment_orders/<orderId> claim + granted state
  *   - payment_entitlements/<uid> durable entitlement
  *   - users/<uid> compatibility mirror
  *
  * Concurrent webhook/verify/recover/claim calls for the same order see
- * status=granted and return the same expiry without extending twice.
+ * status='granted' and return the same expiry without extending twice.
  * A previous attempt left in `granting` by a crash is safely taken over.
- * If Firestore cannot commit all three writes, none is reported as done.
+ * If Supabase cannot commit all three writes, none is reported as done.
+ * The function returns the entitlement with the app's camelCase keys, so
+ * normalizePaymentEntitlement can validate it like any other source.
  */
 export async function grantPaymentAtomically(
   input: AtomicPaymentGrantInput,
 ): Promise<AtomicPaymentGrantResult> {
   const result = await runPaymentStore(
     'grant payment entitlement',
-    adminDb.runTransaction(async (tx: any) => {
-      const oRef = orderRef(input.orderId);
-      const eRef = entitlementRef(input.uid);
-      const uRef = userRef(input.uid);
-
-      const [orderSnap, entitlementSnap, userSnap] = await Promise.all([
-        tx.get(oRef),
-        tx.get(eRef),
-        tx.get(uRef),
-      ]);
-
-      const order = orderSnap.exists ? (orderSnap.data() as PaymentOrder) : null;
-      if (order?.uid && order.uid !== input.uid) {
-        throw new PaymentOrderOwnershipError(input.orderId);
-      }
-
-      const existingEntitlement = entitlementSnap.exists
-        ? normalizePaymentEntitlement(input.uid, entitlementSnap.data() as Partial<PaymentEntitlement>)
-        : null;
-      const user = userSnap.exists ? (userSnap.data() as any) : null;
-      const now = Date.now();
-      const paidAt = Number(input.paidAt || order?.paidAt || now);
-
-      const buildEntitlement = (
-        proExpiresAt: number,
-        source: PaymentEntitlement['source'],
-      ): PaymentEntitlement => ({
-        uid: input.uid,
-        proExpiresAt,
-        proPlanId: input.planId,
-        lastPaymentAt: paidAt,
-        lastOrderId: input.orderId,
-        grantedOrderIds: [
-          ...new Set([
-            ...((existingEntitlement?.grantedOrderIds || []) as string[]),
-            ...(order?.status === 'granted' ? [input.orderId] : []),
-            input.orderId,
-          ]),
-        ].slice(-200),
-        updatedAt: now,
-        source,
+    (async () => {
+      const { data, error } = await getSupabase().rpc('grant_payment_atomic', {
+        p_order_id: input.orderId,
+        p_uid: input.uid,
+        p_email: input.email,
+        p_plan_id: input.planId,
+        p_validity_days: input.validityDays,
+        p_amount_paise: input.amountPaise,
+        p_currency: input.currency,
+        p_paid_at: input.paidAt || 0,
+        p_grant_source: input.grantSource,
       });
-
-      const mirrorUser = (entitlement: PaymentEntitlement) => {
-        const patch: Record<string, unknown> = {
-          uid: input.uid,
-          proExpiresAt: entitlement.proExpiresAt,
-          proPlanId: entitlement.proPlanId,
-          lastPaymentAt: entitlement.lastPaymentAt,
-          lastOrderId: entitlement.lastOrderId,
-          maxWatchlistStocks: 9999,
-        };
-        if (user?.tier !== 'admin') patch.tier = 'pro';
-        tx.set(uRef, patch, { merge: true });
-      };
-
-      if (order?.status === 'granted') {
-        const expiry = Number(
-          order.proExpiresAt || existingEntitlement?.proExpiresAt || user?.proExpiresAt || now,
-        );
-        const entitlement: PaymentEntitlement = existingEntitlement
-          ? {
-              ...existingEntitlement,
-              proExpiresAt: Math.max(Number(existingEntitlement.proExpiresAt || 0), expiry),
-              grantedOrderIds: [
-                ...new Set([
-                  ...((existingEntitlement.grantedOrderIds || []) as string[]),
-                  input.orderId,
-                ]),
-              ].slice(-200),
-              updatedAt: now,
-            }
-          : buildEntitlement(expiry, 'ledger-repair');
-
-        tx.set(eRef, entitlement, { merge: true });
-        mirrorUser(entitlement);
-        return {
-          proExpiresAt: entitlement.proExpiresAt,
-          alreadyGranted: true,
-          entitlement,
-        } satisfies AtomicPaymentGrantResult;
+      if (error) {
+        if (String(error.message || '').includes('OWNERSHIP:')) {
+          throw new PaymentOrderOwnershipError(input.orderId);
+        }
+        throw error;
       }
-
-      // Once a dedicated entitlement exists, trial/profile expiry must not
-      // become an accidental second paid balance. For a first-ever grant,
-      // the profile expiry preserves the existing rule that an active trial
-      // is extended rather than discarded.
-      const currentPaidExpiry = existingEntitlement
-        ? Number(existingEntitlement.proExpiresAt || 0)
-        : Number(user?.proExpiresAt || 0);
-      const proExpiresAt = calculateGrantExpiry(now, currentPaidExpiry, input.validityDays);
-      const entitlement = buildEntitlement(proExpiresAt, 'grant');
-
-      const orderPatch: Partial<PaymentOrder> = {
-        orderId: input.orderId,
-        uid: input.uid,
-        email: input.email || order?.email || user?.email || '',
-        planId: input.planId,
-        amountPaise: input.amountPaise,
-        currency: input.currency,
-        status: 'granted',
-        createdAt: Number(order?.createdAt || now),
-        updatedAt: now,
-        grantedAt: Number(order?.grantedAt || now),
-        paidAt,
-        proExpiresAt,
-        grantSource: input.grantSource,
-      };
-
-      tx.set(oRef, orderPatch, { merge: true });
-      tx.set(eRef, entitlement, { merge: true });
-      mirrorUser(entitlement);
-
+      const row = data as { pro_expires_at: number; already_granted: boolean; entitlement: any };
+      const entitlement = normalizePaymentEntitlement(input.uid, row?.entitlement);
+      if (!entitlement) {
+        throw new Error('grant_payment_atomic returned an invalid entitlement');
+      }
       return {
-        proExpiresAt,
-        alreadyGranted: false,
+        proExpiresAt: Number(row.pro_expires_at || entitlement.proExpiresAt),
+        alreadyGranted: !!row.already_granted,
         entitlement,
       } satisfies AtomicPaymentGrantResult;
-    }),
+    })(),
     15_000,
   );
 

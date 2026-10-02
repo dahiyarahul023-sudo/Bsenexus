@@ -1,8 +1,33 @@
-import { adminDb } from './firebase.js';
-import { readLocalJson, writeLocalJson, isFirestoreQuotaExceeded, setFirestoreQuotaExceeded, isQuotaError, isOfflineOrNetworkError, isPermissionDeniedError, setAdminPermissionDenied, isAdminPermissionDenied, isNotFoundError } from './localStore.js';
+import { getSupabase, isSupabaseConfigured } from './supabase.js';
+import { readLocalJson, writeLocalJson, isOfflineOrNetworkError } from './localStore.js';
 import { resolveStockDetailsSync } from '../utils/stockResolver.js';
 import { withRetry } from '../utils/retry.js';
 import { addLog } from './logDao.js';
+
+const WATCHLISTS_TABLE = 'user_watchlists';
+
+/** Best-effort cloud write; never throws (background syncs only). */
+async function upsertWatchlistsQuiet(uid: string, lists: any[]): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  try {
+    const { error } = await getSupabase()
+      .from(WATCHLISTS_TABLE)
+      .upsert({ uid, lists, updated_at: new Date().toISOString() }, { onConflict: 'uid' });
+    if (error) throw error;
+  } catch { /* background sync is best-effort */ }
+}
+
+/** Read one user's lists from Supabase; null when no row / no lists. */
+async function readWatchlistsRow(uid: string): Promise<any[] | null> {
+  const { data, error } = await getSupabase()
+    .from(WATCHLISTS_TABLE)
+    .select('lists')
+    .eq('uid', uid)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return Array.isArray(data.lists) ? data.lists : null;
+}
 
 export interface WatchlistStockItemDao {
   symbol: string;
@@ -165,7 +190,7 @@ function migrateToSingleFoDefault(lists: any[]): { lists: any[]; changed: boolea
 
 /**
  * Applies the single-F&O-default migration to an existing user's lists and
- * persists the result (local JSON always; Firestore when available).
+ * persists the result (local JSON always; Supabase when available).
  * Read-only alert scans (noCreate) never mutate.
  */
 async function migrateExistingUserWatchlists(uid: string, lists: any[], noCreate: boolean): Promise<any[]> {
@@ -175,11 +200,8 @@ async function migrateExistingUserWatchlists(uid: string, lists: any[], noCreate
   userWatchlistsCache[uid] = { lists: migrated, fetchedAt: Date.now() };
   userWatchlistsDirty[uid] = false;
   writeLocalJson(getWatchlistFilename(uid), migrated);
-  if (uid !== 'guest' && !isFirestoreQuotaExceeded() && !isAdminPermissionDenied()) {
-    await adminDb.collection('user_watchlists').doc(uid).set(
-      { lists: migrated, isInitialized: true, updatedAt: Date.now() },
-      { merge: true }
-    ).catch(() => {});
+  if (uid !== 'guest') {
+    await upsertWatchlistsQuiet(uid, migrated);
   }
   console.log(`[WatchlistDao] Migrated to single "Futures & Options" default for UID: ${uid}`);
   return migrated;
@@ -234,14 +256,11 @@ export async function migrateLegacyAdminWatchlists(targetRealUid: string): Promi
       }
     }
     
-    if (!legacyLists && !isFirestoreQuotaExceeded() && !isAdminPermissionDenied()) {
+    if (!legacyLists && isSupabaseConfigured()) {
       try {
-        const adminDoc = await adminDb.collection('user_watchlists').doc('admin').get();
-        if (adminDoc.exists) {
-          const data = adminDoc.data();
-          if (data && Array.isArray(data.lists) && data.lists.some((l: any) => l.items?.length > 0)) {
-            legacyLists = data.lists;
-          }
+        legacyLists = await readWatchlistsRow('admin');
+        if (legacyLists && !legacyLists.some((l: any) => l.items?.length > 0)) {
+          legacyLists = null;
         }
       } catch {}
     }
@@ -299,31 +318,27 @@ async function persistUserWatchlists(uid: string, lists: any[]): Promise<void> {
   userWatchlistsDirty[uid] = false;
   writeLocalJson(getWatchlistFilename(uid), sanitized);
 
-  if (isFirestoreQuotaExceeded() || isAdminPermissionDenied()) return;
+  if (!isSupabaseConfigured()) return;
 
   try {
     await withRetry(async () => {
-      await adminDb.collection('user_watchlists').doc(uid).set({ lists: sanitized, isInitialized: true, updatedAt: Date.now() }, { merge: true });
+      const { error } = await getSupabase()
+        .from(WATCHLISTS_TABLE)
+        .upsert({ uid, lists: sanitized, updated_at: new Date().toISOString() }, { onConflict: 'uid' });
+      if (error) throw error;
     }, {
       delays: [700, 1500],
       onRetry: (err, attempt) => {
-        console.warn(`[WatchlistDao] Retrying Firestore write for watchlist UID ${uid} (attempt ${attempt}):`, err?.message || err);
+        console.warn(`[WatchlistDao] Retrying Supabase write for watchlist UID ${uid} (attempt ${attempt}):`, err?.message || err);
       }
     });
-    console.log(`[WatchlistDao] Cloud-First sync confirmed in Firestore for UID: ${uid} (${sanitized.length} lists, ${sanitized.reduce((acc, l) => acc + (l.items?.length || 0), 0)} stocks)`);
+    console.log(`[WatchlistDao] Cloud sync confirmed in Supabase for UID: ${uid} (${sanitized.length} lists, ${sanitized.reduce((acc, l) => acc + (l.items?.length || 0), 0)} stocks)`);
   } catch (err: any) {
-    if (isQuotaError(err)) {
-      setFirestoreQuotaExceeded(true);
-      addLog('WARNING', 'SYNC', `Firestore quota limit reached in persistUserWatchlists for ${uid}. Saved to local storage.`);
-      console.warn(`Firestore quota limit in persistUserWatchlists for ${uid}. Saved locally.`);
-    } else if (isPermissionDeniedError(err)) {
-      setAdminPermissionDenied(true);
-    } else if (isNotFoundError(err)) {
-      // Collection / database not created yet in cloud - saved locally as fallback
-      console.info(`[WatchlistDao] Cloud collection/database not initialized for ${uid}. Saved locally.`);
+    if (isOfflineOrNetworkError(err)) {
+      console.info(`[WatchlistDao] Supabase connecting for ${uid}. Saved locally.`);
     } else {
-      addLog('ERROR', 'SYNC', `Failed to persist watchlists for ${uid} to Firestore after retries: ${err?.message || err}`);
-      console.warn(`Firestore notice in persistUserWatchlists for ${uid}:`, err?.message || err);
+      addLog('ERROR', 'SYNC', `Failed to persist watchlists for ${uid} to Supabase after retries: ${err?.message || err}`);
+      console.warn(`Supabase notice in persistUserWatchlists for ${uid}:`, err?.message || err);
     }
   }
 }
@@ -350,21 +365,18 @@ export async function getAllWatchlists(userId?: string, opts?: GetWatchlistsOpti
 
   const localFile = getWatchlistFilename(uid);
 
-  // 2. For logged-in users and admin, Firestore is the Single Source of Truth
-  if (uid !== 'guest' && !isFirestoreQuotaExceeded() && !isAdminPermissionDenied()) {
+  // 2. For logged-in users and admin, Supabase is the Single Source of Truth
+  if (uid !== 'guest' && isSupabaseConfigured()) {
     try {
-      const snap = await adminDb.collection('user_watchlists').doc(uid).get();
-      if (snap && snap.exists) {
-        const data = snap.data();
-        if (data && (Array.isArray(data.lists) || data.isInitialized)) {
-          const sanitized = await migrateExistingUserWatchlists(uid, sanitizeWatchlistArray(data.lists || []), noCreate);
-          userWatchlistsCache[uid] = { lists: sanitized, fetchedAt: Date.now() };
-          userWatchlistsDirty[uid] = false;
-          writeLocalJson(localFile, sanitized);
-          return JSON.parse(JSON.stringify(sanitized));
-        }
+      const cloudLists = await readWatchlistsRow(uid);
+      if (cloudLists !== null) {
+        const sanitized = await migrateExistingUserWatchlists(uid, sanitizeWatchlistArray(cloudLists), noCreate);
+        userWatchlistsCache[uid] = { lists: sanitized, fetchedAt: Date.now() };
+        userWatchlistsDirty[uid] = false;
+        writeLocalJson(localFile, sanitized);
+        return JSON.parse(JSON.stringify(sanitized));
       } else {
-        // Document does not exist in Firestore yet:
+        // No cloud row yet:
         // First check if there is legacy admin data that needs migration to this user
         const legacyFile = getWatchlistFilename('admin');
         const legacyDisk = readLocalJson<any[] | null>(legacyFile, null);
@@ -381,7 +393,7 @@ export async function getAllWatchlists(userId?: string, opts?: GetWatchlistsOpti
           const sanitized = await migrateExistingUserWatchlists(uid, sanitizeWatchlistArray(loadedLocal), noCreate);
           userWatchlistsCache[uid] = { lists: sanitized, fetchedAt: Date.now() };
           userWatchlistsDirty[uid] = false;
-          await adminDb.collection('user_watchlists').doc(uid).set({ lists: sanitized, isInitialized: true, createdAt: Date.now(), updatedAt: Date.now() }, { merge: true }).catch(() => {});
+          await upsertWatchlistsQuiet(uid, sanitized);
           return JSON.parse(JSON.stringify(sanitized));
         }
 
@@ -394,21 +406,14 @@ export async function getAllWatchlists(userId?: string, opts?: GetWatchlistsOpti
         userWatchlistsCache[uid] = { lists: initial, fetchedAt: Date.now() };
         userWatchlistsDirty[uid] = false;
         writeLocalJson(localFile, initial);
-        await adminDb.collection('user_watchlists').doc(uid).set({ lists: initial, isInitialized: true, createdAt: Date.now(), updatedAt: Date.now() }, { merge: true }).catch(() => {});
+        await upsertWatchlistsQuiet(uid, initial);
         return JSON.parse(JSON.stringify(initial));
       }
     } catch (err: any) {
-      if (isQuotaError(err)) {
-        setFirestoreQuotaExceeded(true);
-        console.warn(`Firestore quota reached in getAllWatchlists (${uid}). Falling back to local copy.`);
-      } else if (isPermissionDeniedError(err)) {
-        setAdminPermissionDenied(true);
-      } else if (isNotFoundError(err)) {
-        console.info(`[WatchlistDao] Firestore document or collection not found for ${uid}. Using local defaults.`);
-      } else if (isOfflineOrNetworkError(err)) {
-        console.info(`[WatchlistDao] Firestore client currently connecting for ${uid}, serving from local cache.`);
+      if (isOfflineOrNetworkError(err)) {
+        console.info(`[WatchlistDao] Supabase client currently connecting for ${uid}, serving from local cache.`);
       } else {
-        console.warn(`Firestore read notice in getAllWatchlists (${uid}):`, err?.message || err);
+        console.warn(`Supabase read notice in getAllWatchlists (${uid}):`, err?.message || err);
       }
       if (userWatchlistsCache[uid] !== undefined) {
         return JSON.parse(JSON.stringify(userWatchlistsCache[uid].lists));

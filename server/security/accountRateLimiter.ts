@@ -1,8 +1,8 @@
 import crypto from 'node:crypto';
 import express from 'express';
 import bcrypt from 'bcryptjs';
-import { adminDb } from '../database/firebase.js';
-import { readLocalJson, writeLocalJson, isFirestoreQuotaExceeded, isOfflineOrNetworkError } from '../database/localStore.js';
+import { getSupabase, isSupabaseConfigured } from '../database/supabase.js';
+import { readLocalJson, writeLocalJson, isOfflineOrNetworkError } from '../database/localStore.js';
 import { addLog } from '../database/logDao.js';
 
 export interface AccountProtectionConfig {
@@ -121,7 +121,7 @@ async function withTimeout<T>(promise: Promise<T>, ms = 300): Promise<T> {
 }
 
 /**
- * Reads account lockout state from shared Firestore, falling back to local file storage if offline.
+ * Reads account lockout state from shared Supabase, falling back to local file storage if offline.
  */
 async function fetchAccountRecord(accountKey: string): Promise<AccountLockoutRecord | null> {
   // 1. Check local in-memory cache first
@@ -130,16 +130,21 @@ async function fetchAccountRecord(accountKey: string): Promise<AccountLockoutRec
     return { ...memoryRecord };
   }
 
-  // 2. Query shared distributed Firestore datastore (bypassed in unit tests without network)
-  if (adminDb && !isFirestoreQuotaExceeded() && !isTestEnv) {
+  // 2. Query shared distributed Supabase datastore (bypassed in unit tests without network)
+  if (isSupabaseConfigured() && !isTestEnv) {
     try {
-      const doc = await withTimeout(adminDb.collection(COLLECTION_NAME).doc(accountKey).get(), 350);
-      if (doc.exists) {
-        const data = doc.data() as AccountLockoutRecord;
-        if (data && typeof data === 'object') {
-          localMemoryStore.set(accountKey, data);
-          return { ...data };
-        }
+      const record = await withTimeout((async () => {
+        const { data, error } = await getSupabase()
+          .from('auth_account_limits')
+          .select('data')
+          .eq('id', accountKey)
+          .maybeSingle();
+        if (error) throw error;
+        return (data as any)?.data as AccountLockoutRecord | undefined;
+      })(), 350);
+      if (record && typeof record === 'object') {
+        localMemoryStore.set(accountKey, record);
+        return { ...record };
       }
     } catch (err: any) {
       if (!isOfflineOrNetworkError(err)) {
@@ -161,18 +166,23 @@ async function fetchAccountRecord(accountKey: string): Promise<AccountLockoutRec
 }
 
 /**
- * Persists account lockout state to shared Firestore and local fallback storage.
+ * Persists account lockout state to shared Supabase and local fallback storage.
  */
 async function persistAccountRecord(record: AccountLockoutRecord): Promise<void> {
   // Update memory cache
   localMemoryStore.set(record.accountKey, { ...record });
 
-  // Update shared Firestore datastore for multi-instance distributed synchronization
-  let firestoreSuccess = false;
-  if (adminDb && !isFirestoreQuotaExceeded() && !isTestEnv) {
+  // Update shared Supabase datastore for multi-instance distributed synchronization
+  let cloudSuccess = false;
+  if (isSupabaseConfigured() && !isTestEnv) {
     try {
-      await withTimeout(adminDb.collection(COLLECTION_NAME).doc(record.accountKey).set(record, { merge: true }), 350);
-      firestoreSuccess = true;
+      await withTimeout((async () => {
+        const { error } = await getSupabase()
+          .from('auth_account_limits')
+          .upsert({ id: record.accountKey, data: record }, { onConflict: 'id' });
+        if (error) throw error;
+      })(), 350);
+      cloudSuccess = true;
     } catch (err: any) {
       if (!isOfflineOrNetworkError(err)) {
         console.warn(`[AccountProtection] Notice saving record for ${record.accountKey.substring(0, 10)}...:`, err?.message || err);
@@ -187,9 +197,9 @@ async function persistAccountRecord(record: AccountLockoutRecord): Promise<void>
     writeLocalJson(LOCAL_STORE_FILE, fileData);
   } catch {}
 
-  if (!firestoreSuccess && process.env.NODE_ENV === 'production') {
+  if (!cloudSuccess && process.env.NODE_ENV === 'production') {
     // Flag for production audit
-    console.warn(`[AccountProtection] Warning: Multi-instance Firestore write unavailable. Account ${record.accountKey.substring(0, 10)}... stored in local fallback.`);
+    console.warn(`[AccountProtection] Warning: Multi-instance Supabase write unavailable. Account ${record.accountKey.substring(0, 10)}... stored in local fallback.`);
   }
 }
 
@@ -199,9 +209,15 @@ async function persistAccountRecord(record: AccountLockoutRecord): Promise<void>
 async function deleteAccountRecord(accountKey: string): Promise<void> {
   localMemoryStore.delete(accountKey);
 
-  if (adminDb && !isFirestoreQuotaExceeded() && !isTestEnv) {
+  if (isSupabaseConfigured() && !isTestEnv) {
     try {
-      await withTimeout(adminDb.collection(COLLECTION_NAME).doc(accountKey).delete(), 350);
+      await withTimeout((async () => {
+        const { error } = await getSupabase()
+          .from('auth_account_limits')
+          .delete()
+          .eq('id', accountKey);
+        if (error) throw error;
+      })(), 350);
     } catch {}
   }
 
@@ -420,21 +436,21 @@ export function getSanitizedClientIp(req: express.Request | any): string {
  * Reports status of the account protection store for multi-instance distributed readiness.
  */
 export function getAccountProtectionStoreStatus(): {
-  storeType: 'FIRESTORE_SHARED' | 'LOCAL_FALLBACK';
+  storeType: 'SUPABASE_SHARED' | 'LOCAL_FALLBACK';
   isDistributed: boolean;
   message: string;
 } {
-  if (adminDb && !isFirestoreQuotaExceeded()) {
+  if (isSupabaseConfigured()) {
     return {
-      storeType: 'FIRESTORE_SHARED',
+      storeType: 'SUPABASE_SHARED',
       isDistributed: true,
-      message: 'Active: Using shared Google Cloud Firestore collection "auth_account_limits" for multi-instance synchronization.'
+      message: 'Active: Using shared Supabase table "auth_account_limits" for multi-instance synchronization.'
     };
   }
   return {
     storeType: 'LOCAL_FALLBACK',
     isDistributed: false,
-    message: 'Local Fallback: In-memory & disk storage active. To guarantee cross-instance synchronization in multi-container deployments, configure Firebase Admin credentials or shared Redis rate limiter.'
+    message: 'Local Fallback: In-memory & disk storage active. To guarantee cross-instance synchronization in multi-container deployments, configure Supabase credentials or shared Redis rate limiter.'
   };
 }
 

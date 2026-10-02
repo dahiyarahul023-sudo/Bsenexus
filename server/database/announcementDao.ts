@@ -1,11 +1,29 @@
-import { adminDb } from './firebase.js';
+import { getSupabase, isSupabaseConfigured } from './supabase.js';
 import { determinePriority, parseBseDate, isSymbolMatch } from '../utils/helpers.js';
 import { addLog } from './logDao.js';
-import { readLocalJson, writeLocalJson, isFirestoreQuotaExceeded, setFirestoreQuotaExceeded, isQuotaError, isPermissionDeniedError, setAdminPermissionDenied, isAdminPermissionDenied } from './localStore.js';
+import { readLocalJson, writeLocalJson, isOfflineOrNetworkError } from './localStore.js';
 import { BloomFilter } from '../utils/bloomFilter.js';
 import { pageRenderCache } from '../utils/renderCache.js';
 import { notifySearchEnginesOfNewPages } from '../services/indexNow.js';
 import { resolveStockDetailsSync } from '../utils/stockResolver.js';
+
+const ANNOUNCEMENTS_TABLE = 'announcements';
+
+// --- Row mapping: the filing is one document (data jsonb); id/scrip_cd/
+// fetched_at are duplicated as columns for the queries the DAO runs. ---
+function toRow(id: string, item: any): Record<string, any> {
+  return {
+    id,
+    scrip_cd: String(item?.scrip_cd ?? item?.scripCode ?? ''),
+    fetched_at: Number(item?.fetched_at || 0),
+    data: item ?? {},
+  };
+}
+
+function fromRow(row: any): any {
+  const data = row?.data ?? {};
+  return { id: row?.id, ...data };
+}
 
 const ANNOUNCEMENTS_FILE = 'announcements.json';
 const sentCache = new Set<string>();
@@ -186,45 +204,48 @@ for (const item of announcementsMemoryCache) {
 }
 
 export async function initAnnouncementCache() {
-  if (isFirestoreQuotaExceeded()) {
-    console.warn("[Announcements] Using local file store (quota active). Items loaded:", announcementsMemoryCache.length);
+  if (!isSupabaseConfigured()) {
+    console.warn("[Announcements] Using local file store (Supabase not configured). Items loaded:", announcementsMemoryCache.length);
     return;
   }
 
   try {
     // Window-based hydration (not "latest N"): the feed serves a 7-day "what's new"
     // window, so boot must load exactly that window. "Latest 500" silently under-fills
-    // when the poller wrote to the local fallback (quota mode) — those days are then
-    // missing from Firestore and the feed looks empty after every restart/republish.
-    // Single-field where+orderBy on fetched_at needs no composite index.
+    // when the poller wrote to the local fallback — those days are then missing
+    // from the cloud store and the feed looks empty after every restart/republish.
     const WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
     const cutoff = Date.now() - WINDOW_MS;
-    const snap = await adminDb.collection('announcements')
-      .where('fetched_at', '>=', cutoff)
-      .orderBy('fetched_at', 'desc')
-      .limit(2500).get();
-    console.log(`[Announcements] Hydrated ${snap.docs.length} docs from 7-day Firestore window`);
-    
-    // Map union between memory/disk cache and Firestore items so no stored records are lost
+    const { data, error } = await getSupabase()
+      .from(ANNOUNCEMENTS_TABLE)
+      .select('*')
+      .gte('fetched_at', cutoff)
+      .order('fetched_at', { ascending: false })
+      .limit(2500);
+    if (error) throw error;
+    const rows = data || [];
+    console.log(`[Announcements] Hydrated ${rows.length} docs from 7-day Supabase window`);
+
+    // Map union between memory/disk cache and cloud items so no stored records are lost
     const mergedMap = new Map<string, any>();
     for (const item of announcementsMemoryCache) {
       if (item.id) mergedMap.set(item.id, item);
     }
 
-    for (const d of snap.docs) {
-      processedCache.add(d.id);
-      processedBloomFilter.add(d.id);
-      const data = d.data();
-      if (data?.is_sent === 1) {
-        sentCache.add(d.id);
-        sentBloomFilter.add(d.id);
+    for (const row of rows) {
+      processedCache.add(row.id);
+      processedBloomFilter.add(row.id);
+      const dataItem = row.data || {};
+      if (dataItem?.is_sent === 1) {
+        sentCache.add(row.id);
+        sentBloomFilter.add(row.id);
       }
-      let bseTs = parseBseDate(data.bseTime);
-      if (!bseTs) bseTs = data.fetched_at || 0;
+      let bseTs = parseBseDate(dataItem.bseTime);
+      if (!bseTs) bseTs = dataItem.fetched_at || 0;
 
-      const fsItem = { id: d.id, ...data, bseTimestamp: bseTs };
-      const existing = mergedMap.get(d.id);
-      mergedMap.set(d.id, existing ? { ...existing, ...fsItem } : fsItem);
+      const fsItem = { id: row.id, ...dataItem, bseTimestamp: bseTs };
+      const existing = mergedMap.get(row.id);
+      mergedMap.set(row.id, existing ? { ...existing, ...fsItem } : fsItem);
     }
 
     const now = Date.now();
@@ -259,11 +280,8 @@ export async function initAnnouncementCache() {
     writeLocalJson(ANNOUNCEMENTS_FILE, announcementsMemoryCache);
     await addLog('INFO', 'SYSTEM', `Initialized announcement cache with ${announcementsMemoryCache.length} items`);
   } catch (e: any) {
-    if (isQuotaError(e)) {
-      setFirestoreQuotaExceeded(true);
-      console.warn("Firestore quota limit reached during initAnnouncementCache. Using local disk cache.");
-    } else if (isPermissionDeniedError(e)) {
-      setAdminPermissionDenied(true);
+    if (isOfflineOrNetworkError(e)) {
+      console.warn("Supabase unreachable during initAnnouncementCache. Using local disk cache.");
     } else {
       console.warn("Notice during initAnnouncementCache:", e?.message || e);
     }
@@ -275,19 +293,20 @@ export async function getAnnouncementById(newsId: string): Promise<any | null> {
   const inMem = announcementsMemoryCache.find(a => a.id === newsId || a.newsId === newsId);
   if (inMem) return inMem;
 
-  if (isFirestoreQuotaExceeded() || isAdminPermissionDenied()) return null;
+  if (!isSupabaseConfigured()) return null;
 
   try {
-    const snap = await adminDb.collection('announcements').doc(newsId).get();
-    if (snap.exists) {
-      return { id: snap.id, ...snap.data() };
+    const { data, error } = await getSupabase()
+      .from(ANNOUNCEMENTS_TABLE)
+      .select('*')
+      .eq('id', newsId)
+      .maybeSingle();
+    if (error) throw error;
+    if (data) {
+      return fromRow(data);
     }
   } catch (err: any) {
-    if (isQuotaError(err)) {
-      setFirestoreQuotaExceeded(true);
-    } else if (isPermissionDeniedError(err)) {
-      setAdminPermissionDenied(true);
-    }
+    console.warn("Notice in getAnnouncementById:", err?.message || err);
   }
   return null;
 }
@@ -297,26 +316,31 @@ export async function isAnnouncementSent(newsId: string): Promise<boolean> {
 
   // Tier 1: Bloom Filter check (O(1), zero false negatives)
   // If not in sentBloomFilter, it was 100% DEFINITELY NEVER sent to Telegram.
-  // Instantly bypasses Firestore and expensive memory scans (0 DB scans).
+  // Instantly bypasses the cloud store and expensive memory scans (0 DB scans).
   if (!sentBloomFilter.has(newsId)) {
     return false;
   }
 
   // Tier 2: Bloom Filter says "possibly sent" -> Check exact in-memory set
   if (sentCache.has(newsId)) return true;
-  
+
   const inMem = announcementsMemoryCache.find(a => a.id === newsId);
   if (inMem && inMem.is_sent === 1) {
     sentCache.add(newsId);
     return true;
   }
 
-  if (isFirestoreQuotaExceeded() || isAdminPermissionDenied()) return false;
+  if (!isSupabaseConfigured()) return false;
 
   try {
-    const snap = await adminDb.collection('announcements').doc(newsId).get();
-    if (snap.exists) {
-      const isSent = snap.data()?.is_sent === 1;
+    const { data, error } = await getSupabase()
+      .from(ANNOUNCEMENTS_TABLE)
+      .select('data')
+      .eq('id', newsId)
+      .maybeSingle();
+    if (error) throw error;
+    if (data) {
+      const isSent = (data.data as any)?.is_sent === 1;
       if (isSent) {
         sentCache.add(newsId);
         sentBloomFilter.add(newsId);
@@ -328,14 +352,7 @@ export async function isAnnouncementSent(newsId: string): Promise<boolean> {
       return isSent;
     }
   } catch (err: any) {
-    if (isQuotaError(err)) {
-      setFirestoreQuotaExceeded(true);
-      console.warn("Firestore quota limit reached in isAnnouncementSent.");
-    } else if (isPermissionDeniedError(err)) {
-      setAdminPermissionDenied(true);
-    } else {
-      console.warn("Notice in isAnnouncementSent:", err?.message || err);
-    }
+    console.warn("Notice in isAnnouncementSent:", err?.message || err);
   }
   return false;
 }
@@ -353,7 +370,7 @@ export async function isAnnouncementProcessed(newsId: string): Promise<boolean> 
   return processedCache.has(newsId);
 }
 
-// Batched Firestore Write Queue with Zero Announcement Loss and Exponential Backoff Retries
+// Batched Supabase Write Queue with Zero Announcement Loss and Exponential Backoff Retries
 interface WriteTask {
   docId: string;
   data: any;
@@ -365,19 +382,19 @@ interface WriteTask {
 const MAX_WRITE_ATTEMPTS = 5;
 const BACKOFF_DELAYS = [1000, 5000, 15000, 30000, 60000];
 
-const firestoreWriteQueue: Map<string, WriteTask> = new Map();
+const supabaseWriteQueue: Map<string, WriteTask> = new Map();
 let isQueueWorkerRunning = false;
 let consecutiveBatchErrors = 0;
 let nextBatchRetryTime = 0;
 
-async function processFirestoreQueue() {
+async function processSupabaseQueue() {
   if (isQueueWorkerRunning) return;
   isQueueWorkerRunning = true;
 
   try {
-    while (firestoreWriteQueue.size > 0) {
-      if (isFirestoreQuotaExceeded() || isAdminPermissionDenied()) {
-        firestoreWriteQueue.clear();
+    while (supabaseWriteQueue.size > 0) {
+      if (!isSupabaseConfigured()) {
+        supabaseWriteQueue.clear();
         break;
       }
 
@@ -390,10 +407,10 @@ async function processFirestoreQueue() {
 
       // Collect eligible tasks (discard poisoned tasks that exceeded max attempts)
       const tasksToProcess: WriteTask[] = [];
-      for (const task of firestoreWriteQueue.values()) {
+      for (const task of supabaseWriteQueue.values()) {
         if ((task.attempts || 0) >= MAX_WRITE_ATTEMPTS) {
-          console.warn(`[Firestore] Dropping task ${task.docId} after ${task.attempts} failed write attempts.`);
-          firestoreWriteQueue.delete(task.docId);
+          console.warn(`[Supabase] Dropping task ${task.docId} after ${task.attempts} failed write attempts.`);
+          supabaseWriteQueue.delete(task.docId);
           continue;
         }
         tasksToProcess.push(task);
@@ -403,54 +420,64 @@ async function processFirestoreQueue() {
       if (tasksToProcess.length === 0) break;
 
       try {
-        const batch = adminDb.batch();
-        for (const task of tasksToProcess) {
-          const docRef = adminDb.collection('announcements').doc(task.docId);
-          batch.set(docRef, task.data, { merge: task.merge });
-        }
-        await batch.commit();
+        // Read-modify-write: tasks may carry partial updates (e.g. {is_sent: 1}),
+        // so merge each over the stored document before the whole-row upsert.
+        // One read + one upsert per batch — the Firestore batch.set(merge) equivalent.
+        const ids = tasksToProcess.map(t => t.docId);
+        const { data: existingRows, error: readError } = await getSupabase()
+          .from(ANNOUNCEMENTS_TABLE)
+          .select('*')
+          .in('id', ids);
+        if (readError) throw readError;
 
-        // Remove from queue ONLY after commit confirms success
+        const existingById = new Map<string, any>();
+        for (const row of existingRows || []) {
+          existingById.set(row.id, row.data || {});
+        }
+
+        const rowsToUpsert = tasksToProcess.map(task => {
+          const base = existingById.get(task.docId) || {};
+          // merge:true (the only mode used) overlays the task fields on the
+          // stored document, exactly like the old Firestore batch.set(merge).
+          const merged = task.merge === false ? task.data : { ...base, ...task.data };
+          return toRow(task.docId, merged);
+        });
+
+        const { error: upsertError } = await getSupabase()
+          .from(ANNOUNCEMENTS_TABLE)
+          .upsert(rowsToUpsert, { onConflict: 'id' });
+        if (upsertError) throw upsertError;
+
+        // Remove from queue ONLY after the upsert confirms success
         for (const t of tasksToProcess) {
-          firestoreWriteQueue.delete(t.docId);
+          supabaseWriteQueue.delete(t.docId);
         }
 
         consecutiveBatchErrors = 0;
         nextBatchRetryTime = 0;
       } catch (err: any) {
-        if (isQuotaError(err)) {
-          setFirestoreQuotaExceeded(true);
-          console.warn("[Firestore] Quota exceeded during batch announcement write. Falling back to local disk storage.");
-          firestoreWriteQueue.clear();
+        // Transient error: KEEP the queue, track attempts, and back off exponentially
+        consecutiveBatchErrors++;
+        for (const t of tasksToProcess) {
+          t.attempts = (t.attempts || 0) + 1;
+          t.lastAttemptAt = Date.now();
+        }
+
+        const delayIdx = Math.min(consecutiveBatchErrors - 1, BACKOFF_DELAYS.length - 1);
+        const backoffDelay = BACKOFF_DELAYS[delayIdx] || 30000;
+        nextBatchRetryTime = Date.now() + backoffDelay;
+
+        console.warn(`[Supabase] Batch write transient error for ${tasksToProcess.length} items (retry #${consecutiveBatchErrors}). Retrying in ${backoffDelay}ms:`, err?.message || err);
+
+        // Paced sleep before next iteration
+        await new Promise(r => setTimeout(r, Math.min(backoffDelay, 5000)));
+
+        if (consecutiveBatchErrors >= 10) {
+          // Schedule retry in background and release the immediate loop
+          setTimeout(() => {
+            processSupabaseQueue().catch(() => {});
+          }, backoffDelay);
           break;
-        } else if (isPermissionDeniedError(err)) {
-          setAdminPermissionDenied(true);
-          firestoreWriteQueue.clear();
-          break;
-        } else {
-          // Transient error: KEEP the queue, track attempts, and back off exponentially
-          consecutiveBatchErrors++;
-          for (const t of tasksToProcess) {
-            t.attempts = (t.attempts || 0) + 1;
-            t.lastAttemptAt = Date.now();
-          }
-
-          const delayIdx = Math.min(consecutiveBatchErrors - 1, BACKOFF_DELAYS.length - 1);
-          const backoffDelay = BACKOFF_DELAYS[delayIdx] || 30000;
-          nextBatchRetryTime = Date.now() + backoffDelay;
-
-          console.warn(`[Firestore] Batch write transient error for ${tasksToProcess.length} items (retry #${consecutiveBatchErrors}). Retrying in ${backoffDelay}ms:`, err?.message || err);
-
-          // Paced sleep before next iteration
-          await new Promise(r => setTimeout(r, Math.min(backoffDelay, 5000)));
-
-          if (consecutiveBatchErrors >= 10) {
-            // Schedule retry in background and release the immediate loop
-            setTimeout(() => {
-              processFirestoreQueue().catch(() => {});
-            }, backoffDelay);
-            break;
-          }
         }
       }
 
@@ -458,7 +485,7 @@ async function processFirestoreQueue() {
       await new Promise(r => setTimeout(r, 100));
     }
   } catch (globalQueueErr) {
-    console.warn("[Firestore] Write queue worker notice:", globalQueueErr);
+    console.warn("[Supabase] Write queue worker notice:", globalQueueErr);
   } finally {
     isQueueWorkerRunning = false;
   }
@@ -469,13 +496,13 @@ function queueAnnouncementWrite(docId: string, data: any, merge: boolean = true)
 }
 
 export function queueAnnouncementsBatchWrite(tasks: { docId: string; data: any; merge?: boolean }[]) {
-  if (isFirestoreQuotaExceeded() || isAdminPermissionDenied() || !tasks || tasks.length === 0) return;
+  if (!isSupabaseConfigured() || !tasks || tasks.length === 0) return;
 
   for (const t of tasks) {
     if (!t.docId) continue;
-    const existing = firestoreWriteQueue.get(t.docId);
+    const existing = supabaseWriteQueue.get(t.docId);
     if (existing) {
-      firestoreWriteQueue.set(t.docId, {
+      supabaseWriteQueue.set(t.docId, {
         docId: t.docId,
         data: { ...existing.data, ...t.data },
         merge: true,
@@ -483,7 +510,7 @@ export function queueAnnouncementsBatchWrite(tasks: { docId: string; data: any; 
         lastAttemptAt: existing.lastAttemptAt
       });
     } else {
-      firestoreWriteQueue.set(t.docId, {
+      supabaseWriteQueue.set(t.docId, {
         docId: t.docId,
         data: t.data,
         merge: t.merge !== false,
@@ -492,55 +519,50 @@ export function queueAnnouncementsBatchWrite(tasks: { docId: string; data: any; 
     }
   }
 
-  processFirestoreQueue().catch(() => {});
+  processSupabaseQueue().catch(() => {});
 }
 
-export async function flushFirestoreWriteQueue(): Promise<void> {
-  while (firestoreWriteQueue.size > 0 && !isFirestoreQuotaExceeded() && !isAdminPermissionDenied()) {
-    await processFirestoreQueue();
-    if (firestoreWriteQueue.size > 0) {
+export async function flushSupabaseWriteQueue(): Promise<void> {
+  while (supabaseWriteQueue.size > 0 && isSupabaseConfigured()) {
+    await processSupabaseQueue();
+    if (supabaseWriteQueue.size > 0) {
       await new Promise(r => setTimeout(r, 100));
     }
   }
 }
 
-// Delete announcements from local cache, disk, and Firestore
-export async function deleteAnnouncementsFromStorageAndFirestore(idsToDelete: string[]) {
+// Delete announcements from local cache, disk, and Supabase
+export async function deleteAnnouncementsFromStorageAndCloud(idsToDelete: string[]) {
   if (!idsToDelete || idsToDelete.length === 0) return;
-  
+
   const idSet = new Set(idsToDelete);
-  
+
   // 1. Remove from in-memory cache & local sets
   announcementsMemoryCache = announcementsMemoryCache.filter(a => !idSet.has(a.id) && !idSet.has(a.newsId));
   for (const id of idsToDelete) {
     processedCache.delete(id);
     sentCache.delete(id);
-    firestoreWriteQueue.delete(id);
+    supabaseWriteQueue.delete(id);
     pageRenderCache.invalidate(`ann:${id}`);
   }
-  
+
   // 2. Persist to local disk
   writeLocalJson(ANNOUNCEMENTS_FILE, announcementsMemoryCache);
 
-  // 3. Batch delete from Firestore if quota allows
-  if (!isFirestoreQuotaExceeded()) {
+  // 3. Batch delete from Supabase
+  if (isSupabaseConfigured()) {
     try {
       const BATCH_LIMIT = 400;
       for (let i = 0; i < idsToDelete.length; i += BATCH_LIMIT) {
         const chunk = idsToDelete.slice(i, i + BATCH_LIMIT);
-        const batch = adminDb.batch();
-        for (const docId of chunk) {
-          const docRef = adminDb.collection('announcements').doc(docId);
-          batch.delete(docRef);
-        }
-        await batch.commit();
+        const { error } = await getSupabase()
+          .from(ANNOUNCEMENTS_TABLE)
+          .delete()
+          .in('id', chunk);
+        if (error) throw error;
       }
-    } catch (fsErr: any) {
-      if (isQuotaError(fsErr)) {
-        setFirestoreQuotaExceeded(true);
-      } else {
-        console.warn("Firestore delete batch notice:", fsErr?.message || fsErr);
-      }
+    } catch (err: any) {
+      console.warn("Supabase delete batch notice:", err?.message || err);
     }
   }
 }
@@ -790,9 +812,9 @@ export function getTotalAnnouncementsCount(): number {
 // holds only the newest ~10,000 filings (boot hydration loads a 7-day fetched
 // window, then slices), so deep per-stock history — including filings saved by
 // an earlier deep sync — falls out of memory after restarts even though it
-// still exists in Firestore. Query Firestore directly by scrip (single-field
-// equality, no composite index) and union with whatever memory already holds.
-// During quota-out / local fallback this degrades to the memory-only view.
+// still exists in Supabase. Query Supabase directly by scrip (indexed column)
+// and union with whatever memory already holds.
+// During local fallback this degrades to the memory-only view.
 export async function getAnnouncementsForScrip(scripCode: string, limitNum: number = 400): Promise<any[]> {
   const target = String(scripCode || '').trim();
   if (!target) return [];
@@ -805,21 +827,23 @@ export async function getAnnouncementsForScrip(scripCode: string, limitNum: numb
     }
   }
 
-  if (adminDb && !isFirestoreQuotaExceeded() && !isAdminPermissionDenied()) {
+  if (isSupabaseConfigured()) {
     try {
-      const snap = await adminDb.collection('announcements')
-        .where('scrip_cd', '==', target)
-        .limit(limitNum)
-        .get();
-      for (const d of snap.docs) {
-        const data: any = d.data() || {};
-        let bseTs = parseBseDate(data.bseTime);
-        if (!bseTs) bseTs = data.bseTimestamp || data.fetched_at || 0;
-        const item = { id: d.id, ...data, bseTimestamp: bseTs };
-        byId.set(d.id, { ...(byId.get(d.id) || {}), ...item });
+      const { data, error } = await getSupabase()
+        .from(ANNOUNCEMENTS_TABLE)
+        .select('*')
+        .eq('scrip_cd', target)
+        .limit(limitNum);
+      if (error) throw error;
+      for (const row of data || []) {
+        const dataItem: any = row.data || {};
+        let bseTs = parseBseDate(dataItem.bseTime);
+        if (!bseTs) bseTs = dataItem.bseTimestamp || dataItem.fetched_at || 0;
+        const item = { id: row.id, ...dataItem, bseTimestamp: bseTs };
+        byId.set(row.id, { ...(byId.get(row.id) || {}), ...item });
       }
     } catch (e) {
-      // Quota/permission/network — memory-only view is the honest fallback.
+      // Network trouble — memory-only view is the honest fallback.
     }
   }
 

@@ -5,7 +5,6 @@ import { getScripCodeForSymbolOrName, isSymbolMatch, parseBseDate, resolveStockD
 import { addLog } from '../database/logDao.js';
 import { 
   getRecentAnnouncements, 
-  getAnnouncementsForScrip,
   saveAnnouncement, 
   saveAnnouncementsBatch,
   flushLocalDiskSave, 
@@ -15,8 +14,7 @@ import {
 import { sendToTelegram } from './telegram.js';
 import { getSettings } from '../database/settingsDao.js';
 import { determinePriority } from '../utils/helpers.js';
-import { isFirestoreQuotaExceeded, setFirestoreQuotaExceeded, isQuotaError, isPermissionDeniedError, setAdminPermissionDenied, isAdminPermissionDenied } from '../database/localStore.js';
-import { adminDb } from '../database/firebase.js';
+import { getSupabase, isSupabaseConfigured } from '../database/supabase.js';
 import { getBseISTDate } from './bse.js';
 import { externalFeedsCircuitBreaker } from '../utils/circuitBreaker.js';
 
@@ -135,21 +133,11 @@ export interface NSECalendarEvent {
   date: string;
 }
 
-// Per-symbol memo (10 min): board-meeting dates don't move minute to
-// minute, and one stock open reads history twice (raw read + post-sync
-// re-read) — without this, a slow/hung NSE endpoint taxes every read
-// with an 8s timeout plus retry. Empty answers are cached too; the
-// results poller keeps filings fresh independently of this calendar.
-const NSE_EVENT_CACHE_TTL_MS = 10 * 60 * 1000;
-const nseEventCache = new Map<string, { ts: number; events: NSECalendarEvent[] }>();
-
 export async function fetchNSEEventCalendarForSymbol(symbol: string): Promise<NSECalendarEvent[]> {
   if (!symbol) return [];
   const cleanSym = symbol.trim().toUpperCase();
-  const cached = nseEventCache.get(cleanSym);
-  if (cached && Date.now() - cached.ts < NSE_EVENT_CACHE_TTL_MS) return cached.events;
   const url = `https://www.nseindia.com/api/event-calendar?symbol=${encodeURIComponent(cleanSym)}`;
-  const attempt = () => externalFeedsCircuitBreaker.execute(
+  return await externalFeedsCircuitBreaker.execute(
     async (signal) => {
       const res = await fetch(url, { headers: NSE_HEADERS, signal: signal || AbortSignal.timeout(8000) });
       if (!res.ok) return [];
@@ -162,18 +150,6 @@ export async function fetchNSEEventCalendarForSymbol(symbol: string): Promise<NS
     (_err) => [],
     8000
   );
-  // NSE intermittently answers empty/blocked for this endpoint, and it is
-  // the only date source for quarters whose filings sit outside the recent
-  // cache — one quiet retry before giving up.
-  const first = await attempt();
-  if (first.length > 0) {
-    nseEventCache.set(cleanSym, { ts: Date.now(), events: first });
-    return first;
-  }
-  await new Promise(r => setTimeout(r, 700));
-  const second = await attempt();
-  nseEventCache.set(cleanSym, { ts: Date.now(), events: second });
-  return second;
 }
 
 export async function fetchGeneralNSEEventCalendar(): Promise<NSECalendarEvent[]> {
@@ -500,29 +476,29 @@ export async function fetchAndSyncResultsCalendar(
       console.error('Failed to write results calendar disk cache:', fsErr.message);
     }
 
-    // Optionally sync with Firestore
+    // Optionally sync with Supabase
     try {
-      if (!isFirestoreQuotaExceeded() && !isAdminPermissionDenied()) {
-        const batch = adminDb.batch();
-        let count = 0;
+      if (isSupabaseConfigured()) {
+        const rows: Record<string, any>[] = [];
         for (const item of cachedCalendar) {
-          if (count >= 400) break;
-          const docRef = adminDb.collection('results_calendar').doc(item.id);
-          batch.set(docRef, item, { merge: true });
-          count++;
+          if (rows.length >= 400) break;
+          if (!item || !item.id) continue;
+          rows.push({
+            id: item.id,
+            scrip_code: String(item.scripCode || ''),
+            symbol: String(item.symbol || ''),
+            data: item,
+          });
         }
-        if (count > 0) {
-          await batch.commit();
+        if (rows.length > 0) {
+          const { error } = await getSupabase()
+            .from('results_calendar')
+            .upsert(rows, { onConflict: 'id' });
+          if (error) throw error;
         }
       }
-    } catch (fireErr: any) {
-      if (isQuotaError(fireErr)) {
-        setFirestoreQuotaExceeded(true);
-      } else if (isPermissionDeniedError(fireErr)) {
-        setAdminPermissionDenied(true);
-      } else {
-        console.warn('Firestore results calendar sync notice:', fireErr.message);
-      }
+    } catch (syncErr: any) {
+      console.warn('Supabase results calendar sync notice:', syncErr?.message || syncErr);
     }
 
     // Auto-notify Telegram for newly discovered upcoming board meetings
@@ -1113,22 +1089,9 @@ export async function getStockResultsHistory(
   const quarterOutcomesMap = new Map<string, StockHistoricalResultItem>();
   const todayStartTs = getIstMidnightTs(new Date());
 
-  // 1. Fetch announcements for this stock from Dao. The recent-announcements
-  // cache only holds the newest ~10k filings, so union in the durable
-  // per-scrip read — otherwise older quarters vanish after every restart
-  // even though their filings are still stored.
+  // 1. Fetch announcements for this stock from Dao
   const recentAnnouncements = await getRecentAnnouncements(10000);
-  let announcementPool: any[] = recentAnnouncements;
-  if (targetScrip) {
-    try {
-      const durable = await getAnnouncementsForScrip(targetScrip);
-      if (durable.length > 0) {
-        const seen = new Set(announcementPool.map((a: any) => a.id || a.newsId));
-        announcementPool = [...announcementPool, ...durable.filter((a: any) => !seen.has(a.id || a.newsId))];
-      }
-    } catch (e) {}
-  }
-  const stockAnns = announcementPool.filter((ann: any) => {
+  const stockAnns = recentAnnouncements.filter((ann: any) => {
     const annScrip = String(ann.scrip_cd || ann.SCRIP_CD || ann.scripCode || '').trim();
     const annSym = (ann.symbol || '').toUpperCase().trim();
     const annComp = (ann.companyName || ann.SLONGNAME || '').toUpperCase();
@@ -1166,24 +1129,7 @@ export async function getStockResultsHistory(
   for (const [dateStr, filings] of dateMap.entries()) {
     filings.sort((a, b) => a.ts - b.ts);
 
-    // Declaration rule (Rohit, 1 Oct 2026): date from the results calendar,
-    // time from the filings — on the results date, the earliest result filing
-    // IS the declaration; no unaudited-vs-financial-vs-outcome subject check,
-    // and the day's remaining filings stay one tap away as follow-ups.
-    // (Filings are time-sorted ascending above.) Board-meeting archive
-    // placeholders (bm_* ids, date-only) are meeting notices, not filings of
-    // the day, so they can never take the declaration slot. A bucket with NO
-    // result filing (e.g. only a pre-meeting newspaper publication or board
-    // meeting intimation) claims no card at all — the calendar sources below
-    // provide that quarter's date-only card, and the real results-day bucket
-    // keeps the declaration. (Regression seen 1 Oct 2026: a 06-Jul newspaper
-    // publication stole the FY27-Q1 declaration from the 09-Jul outcome.)
-    const isMeetingPlaceholder = (f: any) => String(f.newsId || '').startsWith('bm_');
-    // Pre-meeting notices only announce the meeting — never the declaration,
-    // even if a classifier tagged one RESULTS by its result keywords.
-    const isPreMeetingNotice = (f: any) => /newspaper\s*(publication|advertisement)|intimation|notice of board|prior intimation|trading window/i.test(`${f.subject || ''} ${f.details || ''}`);
-    const resultPool = filings.filter(f => !isMeetingPlaceholder(f) && !isPreMeetingNotice(f) && (f.category === 'RESULTS' || isPureResultOutcomeFiling(f.subject, f.details)));
-    const outcomeFiling = resultPool[0];
+    const outcomeFiling = filings.find(f => isPureResultOutcomeFiling(f.subject, f.details));
     if (outcomeFiling) {
       const { quarterKey, periodLabel } = parseQuarterPeriod(`${outcomeFiling.subject} ${outcomeFiling.details}`, outcomeFiling.ts);
 
@@ -1425,39 +1371,17 @@ export async function fetchDeepHistoricalResultsForStock(
     console.warn(`BSE BoardMeeting sync for ${targetScrip} notice:`, e.message);
   }
 
-  // Fetch strategy (rewritten 1 Oct 2026, after Rohit's Sync-2Y test filled
-  // only the two newest quarters): page EACH 366-day window from page 1 until
-  // an empty page, window by window, newest first. This is correct under both
-  // pagination behaviors BSE may use — if BSE filters by date before
-  // paginating, each window is an independent archive slice; if it pages the
-  // newest-first list first and filters by date afterwards, restarting at
-  // page 1 inside each older window still surfaces that window's filings.
-  // (Earlier designs failed: one queried the same last-180-days window on
-  // every page; the next slid the window WITH the global page number, which
-  // under paginate-first behavior returns empty deep pages and strands
-  // filings older than ~6 months.)
-  const windowDays = 366;
-  const windowCount = Math.max(1, Math.ceil(validYears));
-  const pagesPerWindow = Math.max(6, Math.ceil(maxPages / windowCount));
-  const totalPages = windowCount * pagesPerWindow;
-  const exhaustedWindows = new Set<number>();
-
   // Process in batches of 4 pages concurrently for rapid sync
   const batchSize = 4;
-  for (let startPage = 1; startPage <= totalPages && !reachedCutoff; startPage += batchSize) {
-    const pageNumbers = Array.from({ length: Math.min(batchSize, totalPages - startPage + 1) }, (_, i) => startPage + i);
+  for (let startPage = 1; startPage <= maxPages && !reachedCutoff; startPage += batchSize) {
+    const pageNumbers = Array.from({ length: Math.min(batchSize, maxPages - startPage + 1) }, (_, i) => startPage + i);
 
     const batchResults = await Promise.all(
       pageNumbers.map(async (page) => {
-        // Global page p maps to window floor((p-1)/pagesPerWindow); the BSE
-        // pageno restarts at 1 inside each window (see strategy note above).
-        const windowIdx = Math.floor((page - 1) / pagesPerWindow);
-        const pageInWindow = ((page - 1) % pagesPerWindow) + 1;
-        const toDate = getBseISTDate(windowDays * windowIdx);
-        const prevDate = getBseISTDate(windowDays * (windowIdx + 1));
-        if (exhaustedWindows.has(windowIdx)) return [];
+        const prevDate = getBseISTDate(180);
+        const toDate = getBseISTDate(0);
         try {
-          const url = `https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w?pageno=${pageInWindow}&strCat=Result&strPrevDate=${prevDate}&strScrip=${targetScrip}&strSearch=P&strToDate=${toDate}&strType=C`;
+          const url = `https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w?pageno=${page}&strCat=Result&strPrevDate=${prevDate}&strScrip=${targetScrip}&strSearch=P&strToDate=${toDate}&strType=C`;
           const res = await fetch(url, {
             headers: COMMON_HEADERS,
             signal: AbortSignal.timeout(9000)
@@ -1467,17 +1391,13 @@ export async function fetchDeepHistoricalResultsForStock(
           if (!txt || txt.includes("No Record") || txt.trim() === "{}" || txt.trim() === "[]") return [];
 
           const data = JSON.parse(txt);
-          // Provenance: these rows came from BSE's own Result category, so tag
-          // them — the save loop stores category 'RESULTS' for them (BSE's
-          // classification is the candidacy for the declaration rule; our
-          // keyword classifier alone drops titles like "Standalone Results…").
-          if (data && data.Table && Array.isArray(data.Table)) return data.Table.map((r: any) => ({ ...r, __bseCat: 'Result' }));
-          if (Array.isArray(data)) return data.map((r: any) => ({ ...r, __bseCat: 'Result' }));
+          if (data && data.Table && Array.isArray(data.Table)) return data.Table;
+          if (Array.isArray(data)) return data;
           return [];
         } catch {
           // Fallback to general AnnSubCategoryGetData for this page
           try {
-            const fbUrl = `https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w?pageno=${pageInWindow}&strCat=-1&strPrevDate=${prevDate}&strScrip=${targetScrip}&strSearch=P&strToDate=${toDate}&strType=C`;
+            const fbUrl = `https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w?pageno=${page}&strCat=-1&strPrevDate=${prevDate}&strScrip=${targetScrip}&strSearch=P&strToDate=${toDate}&strType=C`;
             const fbRes = await fetch(fbUrl, {
               headers: COMMON_HEADERS,
               signal: AbortSignal.timeout(9000)
@@ -1494,14 +1414,9 @@ export async function fetchDeepHistoricalResultsForStock(
       })
     );
 
-    for (let bi = 0; bi < batchResults.length; bi++) {
-      const items = batchResults[bi];
+    for (const items of batchResults) {
       if (!items || items.length === 0) {
-        // An empty page exhausts only its own window. Older windows are still
-        // tried (under paginate-first behavior this window's later pages are
-        // empty anyway; under filter-first behavior the next window is a
-        // separate archive slice that may well hold filings).
-        exhaustedWindows.add(Math.floor((pageNumbers[bi] - 1) / pagesPerWindow));
+        reachedCutoff = true;
         continue;
       }
 
@@ -1520,10 +1435,7 @@ export async function fetchDeepHistoricalResultsForStock(
         const parsedTs = parseBseDate(rawTime);
 
         if (parsedTs > 0 && parsedTs < cutoffTimestamp) {
-          // Before the requested years horizon: stop paging further back and
-          // don't store filings the user didn't ask for.
           reachedCutoff = true;
-          continue;
         }
 
         historicalAnnouncements.push({
@@ -1535,7 +1447,7 @@ export async function fetchDeepHistoricalResultsForStock(
           scrip_cd,
           bseTime: rawTime,
           priority: priority.level,
-          category: (item as any).__bseCat === 'Result' ? 'RESULTS' : priority.category,
+          category: priority.category,
           isWatchlist: true
         });
       }
@@ -1564,54 +1476,6 @@ export async function fetchDeepHistoricalResultsForStock(
     totalHistoryCount: updatedHistory.length,
     years: validYears
   };
-}
-
-// ── Bounded auto deep-fetch ─────────────────────────────────────────────
-// The auto-fill callers (company-intel auto-sync, empty results history)
-// must never hold an HTTP request hostage: when BSE is slow or blocked, a
-// 1-year archive pull burns 9s page timeouts batch after batch (~45s+),
-// and the UI reads that as a frozen app. So the auto fetch gets three
-// guards: (1) a bounded wait — the request waits at most
-// AUTO_DEEP_FETCH_WAIT_MS; a fast fetch still lands in the SAME response
-// because the caller re-reads right after; (2) in-flight dedupe — repeat
-// opens of the same stock share one fetch instead of stacking BSE calls;
-// (3) a per-scrip cooldown — a stock attempted within
-// AUTO_DEEP_FETCH_COOLDOWN_MS is not re-fetched, so a stock with nothing
-// on BSE doesn't tax every open. The fetch itself is unchanged and keeps
-// running past the bounded wait, saving batch by batch, so the next open
-// serves the filled history from store. The manual Sync endpoints keep
-// awaiting the full fetch on purpose (explicit user action).
-const AUTO_DEEP_FETCH_WAIT_MS = 8000;
-const AUTO_DEEP_FETCH_COOLDOWN_MS = 10 * 60 * 1000;
-const autoDeepFetchInFlight = new Map<string, Promise<unknown>>();
-const autoDeepFetchLastAttempt = new Map<string, number>();
-
-export async function autoFetchDeepHistoricalResults(
-  scripCode: string,
-  symbol: string | undefined,
-  years: number
-): Promise<boolean> {
-  const key = String(scripCode || '').trim();
-  if (!key) return false;
-  let task = autoDeepFetchInFlight.get(key);
-  if (!task) {
-    const lastAttempt = autoDeepFetchLastAttempt.get(key) || 0;
-    if (Date.now() - lastAttempt < AUTO_DEEP_FETCH_COOLDOWN_MS) return false;
-    autoDeepFetchLastAttempt.set(key, Date.now());
-    task = fetchDeepHistoricalResultsForStock(key, symbol, years)
-      .catch(() => undefined)
-      .finally(() => {
-        autoDeepFetchInFlight.delete(key);
-      });
-    autoDeepFetchInFlight.set(key, task);
-  }
-  // true = the pull landed inside the wait, so a re-read shows fresh data;
-  // false = still running in the background (or skipped by cooldown), and
-  // callers must NOT pay a second slow read on top of the wait.
-  return Promise.race([
-    task.then(() => true),
-    new Promise<boolean>((resolve) => setTimeout(() => resolve(false), AUTO_DEEP_FETCH_WAIT_MS))
-  ]);
 }
 
 export async function fetchDeepHistoricalResultsForWatchlist(
@@ -1751,7 +1615,7 @@ function generateServerGoogleCalUrl(item: { symbol: string; companyName: string;
   const q = new URLSearchParams({
     action: 'TEMPLATE',
     text: `BSE: ${item.symbol} Board Meeting (${item.purpose})`,
-    details: `Company: ${item.companyName}\nSymbol: ${item.symbol} (BSE: ${item.scripCode})\nMeeting Purpose: ${item.purpose}\nScheduled Date: ${item.meetingDate}\n\nTrack real-time outcomes on Bsenexus.`,
+    details: `Company: ${item.companyName}\nSymbol: ${item.symbol} (BSE: ${item.scripCode})\nMeeting Purpose: ${item.purpose}\nScheduled Date: ${item.meetingDate}\n\nTrack real-time outcomes on BSE Nexus.`,
     location: 'BSE India / Corporate Headquarters',
     dates: `${startIso}/${endIso}`
   });
