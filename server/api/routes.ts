@@ -8,6 +8,7 @@ import { generateDirectSummary, generateAndSendSummary, askAppHelpAI } from "../
 import { escapeHTML } from "../utils/helpers.js";
 import { resumeFirestoreNetwork, pauseFirestoreNetwork, persistStorageMode } from "../database/firebase.js";
 import { requireAuth, requireAdmin, requireProOrAdmin, aiRateLimiter, telegramRateLimiter, apiRateLimiter } from "../security/auth.js";
+import { registerAdminMigrateRoutes } from "./adminMigrate.js";
 import { runSecurityAudit, executeSimulatedPenTest } from "../security/hardening.js";
 import {
   getAllWatchlists,
@@ -2582,3 +2583,7 @@ apiRouter.get("/admin/bloom-test", requireAdmin, async (req, res) => {
 
 
 
+
+// TEMPORARY: Firestore -> Supabase migration endpoint (Phase 1).
+// Remove adminMigrate.ts + this registration after migration is verified.
+registerAdminMigrateRoutes(apiRouter);
